@@ -1,10 +1,10 @@
- 'use client';
+'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Play, Users, Link as LinkIcon, FileText, CheckCircle2, 
   ShieldAlert, Smartphone, Download, Copy, Check, LogOut, 
-  History, PlusCircle, UserCheck, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet
+  History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -35,21 +35,21 @@ export default function AdminPanel() {
   const [remainingMinutes, setRemainingMinutes] = useState<number>(10);
   const [isLinkExpired, setIsLinkExpired] = useState<boolean>(false);
 
-  // 1. Carrega dados do Usuário Logado no Banco
+  // 1. Carrega dados do Usuário Logado no Banco de Dados
   useEffect(() => {
     const auth = localStorage.getItem('dds_admin_auth');
     if (!auth) {
-      router.push('/login');
+      router.push('/');
       return;
     }
     try {
       setCurrentUser(JSON.parse(auth));
     } catch {
-      router.push('/login');
+      router.push('/');
     }
   }, [router]);
 
-  // 2. Busca dados de reuniões filtradas por usuário e datas
+  // 2. Busca dados de reuniões filtradas por usuário e datas (com leitura segura de JSON)
   const fetchAllData = useCallback(async () => {
     if (!currentUser?.id) return;
 
@@ -59,7 +59,15 @@ export default function AdminPanel() {
       if (endDate) url += `&endDate=${endDate}`;
 
       const res = await fetch(url);
-      const data = await res.json();
+      if (!res.ok) return;
+
+      const responseText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        return; // Ignora se o servidor devolver algo que não seja JSON durante o polling
+      }
       
       if (data.success) {
         setActiveMeeting(data.meeting || null);
@@ -96,11 +104,11 @@ export default function AdminPanel() {
     return () => clearInterval(interval);
   }, [fetchAllData]);
 
-  // Iniciar Novo DDS vinculado ao Usuário
+  // Iniciar Novo DDS com Leitura Segura de JSON/HTML
   const handleStartNewMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic.trim() || !farm.trim()) {
-      alert('Preencha o Tema do DDS e o Local da fazenda.');
+      alert('Por favor, preencha o Tema do DDS e o Local da fazenda.');
       return;
     }
 
@@ -117,17 +125,24 @@ export default function AdminPanel() {
         })
       });
       
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any = {};
       
-      if (data.success && data.meeting) {
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error(`O servidor retornou status ${res.status}. Verifique se a rota src/app/api/reuniao/route.ts existe e a DATABASE_URL na Vercel.`);
+      }
+      
+      if (res.ok && data.success && data.meeting) {
         setActiveMeeting(data.meeting);
         setIsLiveMode(true);
         setTopic('');
       } else {
-        alert('Erro ao iniciar reunião: ' + (data.error || 'Verifique o banco'));
+        alert('Erro ao iniciar reunião: ' + (data.error || 'Falha ao salvar no banco de dados.'));
       }
     } catch (err: any) {
-      alert('Erro de conexão: ' + (err?.message || 'Falha ao se comunicar com o servidor.'));
+      alert('Aviso do Sistema: ' + (err?.message || 'Falha de comunicação com a API.'));
     } finally {
       setIsCreatingMeeting(false);
     }
