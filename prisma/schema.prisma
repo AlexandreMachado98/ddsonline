@@ -7,14 +7,27 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id        String    @id @default(uuid())
+  name      String
+  email     String    @unique
+  password  String
+  role      String    @default("Técnico em Segurança do Trabalho")
+  company   String?
+  createdAt DateTime  @default(now())
+  meetings  Meeting[]
+}
+
 model Meeting {
   id              String       @id @default(uuid())
   topic           String
   farm            String
-  status          String       @default("LIVE")
+  status          String       @default("LIVE") // LIVE ou ENDED
   createdAt       DateTime     @default(now())
   inviteExpiresAt DateTime?
   inviteToken     String?
+  organizerId     String?
+  organizer       User?        @relation(fields: [organizerId], references: [id])
   attendees       Attendance[]
 }
 

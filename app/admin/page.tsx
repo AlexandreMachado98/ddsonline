@@ -1,62 +1,64 @@
  'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Play, Users, Link as LinkIcon, FileText, CheckCircle2, 
   ShieldAlert, Smartphone, Download, Copy, Check, LogOut, 
-  History, PlusCircle, UserCheck, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2
+  History, PlusCircle, UserCheck, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { generateDdsPdf } from '@/lib/pdfGenerator';
+import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
 
 export default function AdminPanel() {
   const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
   const [activeTab, setActiveTab] = useState<'NEW_DDS' | 'HISTORY'>('NEW_DDS');
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
 
-  // Perfil do Organizador
-  const [organizerName, setOrganizerName] = useState('');
-  const [organizerRole, setOrganizerRole] = useState('Técnico em Segurança do Trabalho');
-  const [companyName, setCompanyName] = useState('');
-
-  // Novo DDS
+  // Formulário do Novo DDS
   const [topic, setTopic] = useState('');
   const [farm, setFarm] = useState('');
 
-  // Reunião em andamento
+  // Filtros de Data no Histórico
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // Reunião Ativa e Histórico
   const [activeMeeting, setActiveMeeting] = useState<any>(null);
+  const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
   const [exitNotification, setExitNotification] = useState<string | null>(null);
   const [remainingMinutes, setRemainingMinutes] = useState<number>(10);
   const [isLinkExpired, setIsLinkExpired] = useState<boolean>(false);
 
-  // Histórico
-  const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
-
+  // 1. Carrega dados do Usuário Logado no Banco
   useEffect(() => {
     const auth = localStorage.getItem('dds_admin_auth');
     if (!auth) {
       router.push('/login');
       return;
     }
-
-    const savedProfile = localStorage.getItem('dds_organizer_profile');
-    if (savedProfile) {
-      try {
-        const parsed = JSON.parse(savedProfile);
-        setOrganizerName(parsed.name || '');
-        setOrganizerRole(parsed.role || 'Técnico em Segurança do Trabalho');
-        setCompanyName(parsed.company || '');
-      } catch {}
+    try {
+      setCurrentUser(JSON.parse(auth));
+    } catch {
+      router.push('/login');
     }
   }, [router]);
 
-  const fetchAllData = async () => {
+  // 2. Busca dados de reuniões filtradas por usuário e datas
+  const fetchAllData = useCallback(async () => {
+    if (!currentUser?.id) return;
+
     try {
-      const res = await fetch('/api/reuniao');
+      let url = `/api/reuniao?organizerId=${currentUser.id}`;
+      if (startDate) url += `&startDate=${startDate}`;
+      if (endDate) url += `&endDate=${endDate}`;
+
+      const res = await fetch(url);
       const data = await res.json();
       
       if (data.success) {
@@ -86,32 +88,23 @@ export default function AdminPanel() {
     } catch (error) {
       console.error(error);
     }
-  };
+  }, [currentUser, startDate, endDate, exitNotification]);
 
   useEffect(() => {
     fetchAllData();
     const interval = setInterval(fetchAllData, 3000);
     return () => clearInterval(interval);
-  }, [exitNotification]);
+  }, [fetchAllData]);
 
-  const handleSaveProfile = () => {
-    localStorage.setItem('dds_organizer_profile', JSON.stringify({
-      name: organizerName,
-      role: organizerRole,
-      company: companyName
-    }));
-  };
-
-  // Iniciar Novo DDS com feedback explícito
+  // Iniciar Novo DDS vinculado ao Usuário
   const handleStartNewMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic.trim() || !farm.trim()) {
-      alert('Por favor, preencha o Tema do DDS e o Local da fazenda.');
+      alert('Preencha o Tema do DDS e o Local da fazenda.');
       return;
     }
 
     setIsCreatingMeeting(true);
-    handleSaveProfile();
 
     try {
       const res = await fetch('/api/reuniao', {
@@ -119,7 +112,8 @@ export default function AdminPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           topic: topic.trim(), 
-          farm: farm.trim() 
+          farm: farm.trim(),
+          organizerId: currentUser?.id
         })
       });
       
@@ -130,7 +124,7 @@ export default function AdminPanel() {
         setIsLiveMode(true);
         setTopic('');
       } else {
-        alert('Erro ao iniciar reunião: ' + (data.error || 'Verifique a conexão com o banco de dados.'));
+        alert('Erro ao iniciar reunião: ' + (data.error || 'Verifique o banco'));
       }
     } catch (err: any) {
       alert('Erro de conexão: ' + (err?.message || 'Falha ao se comunicar com o servidor.'));
@@ -141,7 +135,6 @@ export default function AdminPanel() {
 
   const handleRenewLink = async () => {
     if (!activeMeeting) return;
-
     try {
       const res = await fetch('/api/reuniao', {
         method: 'PATCH',
@@ -152,7 +145,7 @@ export default function AdminPanel() {
       if (data.success) {
         setActiveMeeting(data.meeting);
         handleCopyInviteLink();
-        alert('✅ Link renovado por mais 10 minutos e copiado para sua área de transferência!');
+        alert('✅ Link renovado por mais 10 minutos e copiado!');
       }
     } catch {
       alert('Erro ao renovar o link.');
@@ -193,12 +186,33 @@ export default function AdminPanel() {
     });
   };
 
+  // Baixar Relatório Consolidado de todo o Período
+  const handleDownloadConsolidatedPdf = () => {
+    if (meetingHistory.length === 0) {
+      alert('Não há reuniões no período selecionado para gerar o dossiê.');
+      return;
+    }
+
+    generateConsolidatedDdsPdf({
+      organizerName: currentUser?.name || 'Técnico de Segurança',
+      organizerRole: currentUser?.role || 'Técnico em Segurança do Trabalho',
+      companyName: currentUser?.company || 'Unidade Rural',
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      meetings: meetingHistory
+    });
+  };
+
   const handleEndMeeting = async () => {
     if (confirm('Encerrar este DDS? A sala será fechada e os dados serão salvos no histórico.')) {
       if (activeMeeting && activeMeeting.attendees && activeMeeting.attendees.length > 0) {
         handleDownloadActivePdf();
       }
-      await fetch('/api/reuniao', { method: 'PUT' });
+      await fetch('/api/reuniao', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingId: activeMeeting?.id })
+      });
       setIsLiveMode(false);
       setActiveMeeting(null);
       fetchAllData();
@@ -208,7 +222,7 @@ export default function AdminPanel() {
 
   const handleLogout = () => {
     localStorage.removeItem('dds_admin_auth');
-    router.push('/login');
+    router.push('/');
   };
 
   // =========================================================================
@@ -218,14 +232,13 @@ export default function AdminPanel() {
     return (
       <main className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans relative">
         <div className="max-w-7xl mx-auto space-y-6">
-          
           <header className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <ShieldAlert size={36} className="text-blue-700" />
               <div>
                 <h1 className="text-2xl font-bold text-slate-800">DDS em Andamento</h1>
                 <p className="text-slate-500 text-xs">
-                  Organizador: <strong>{organizerName || 'Técnico de Segurança'}</strong> • {companyName || 'Unidade Rural'}
+                  Organizador: <strong>{currentUser?.name || 'Técnico'}</strong> ({currentUser?.company || 'Empresa'})
                 </p>
               </div>
             </div>
@@ -234,7 +247,7 @@ export default function AdminPanel() {
               onClick={() => setIsLiveMode(false)}
               className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors"
             >
-              Voltar ao Dashboard
+              Voltar ao Painel
             </button>
           </header>
 
@@ -246,7 +259,6 @@ export default function AdminPanel() {
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                 </span>
                 <span className="font-semibold text-blue-100 uppercase tracking-wider text-xs">Transmissão Ativa</span>
-                
                 <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
                   isLinkExpired ? 'bg-red-500 text-white' : 'bg-blue-800 text-blue-200'
                 }`}>
@@ -296,22 +308,9 @@ export default function AdminPanel() {
             <div className="lg:col-span-7 space-y-4">
               <DdsConferenceRoom
                 roomName={activeMeeting.id}
-                userName={`${organizerName || 'Técnico'} (Organizador)`}
+                userName={`${currentUser?.name || 'Técnico'} (Organizador)`}
                 isAdmin={true}
               />
-
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
-                <span className="text-xs text-slate-500 flex items-center gap-1.5">
-                  <Clock size={14} className="text-blue-600" />
-                  {isLinkExpired ? 'O link de 10 min expirou.' : `Link expira em aproximadamente ${remainingMinutes} minutos.`}
-                </span>
-                <button 
-                  onClick={handleRenewLink}
-                  className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg text-xs transition-colors flex items-center gap-1"
-                >
-                  <RefreshCw size={12} /> Gerar Novo Link
-                </button>
-              </div>
             </div>
 
             <div className="lg:col-span-5 space-y-6">
@@ -335,7 +334,7 @@ export default function AdminPanel() {
                 {!activeMeeting.attendees || activeMeeting.attendees.length === 0 ? (
                   <div className="text-center py-12 text-slate-400">
                     <p>Ninguém assinou ainda.</p>
-                    <p className="text-xs text-slate-400 mt-1">Envie o link de 10 minutos para a equipe.</p>
+                    <p className="text-xs text-slate-400 mt-1">Envie o link para a equipe.</p>
                   </div>
                 ) : (
                   <ul className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
@@ -356,9 +355,7 @@ export default function AdminPanel() {
                                 {person.name.replace(/\(Saída:.*\)/, '')}
                               </p>
                               {isExited ? (
-                                <p className="text-[11px] font-semibold text-amber-700">
-                                  ⚠️ Saída Justificada
-                                </p>
+                                <p className="text-[11px] font-semibold text-amber-700">⚠️ Saída Justificada</p>
                               ) : (
                                 <p className="text-xs text-slate-500">CPF: {person.cpf}</p>
                               )}
@@ -376,51 +373,40 @@ export default function AdminPanel() {
             </div>
           </div>
         </div>
-
-        {exitNotification && (
-          <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white border border-amber-500/40 p-4 rounded-2xl shadow-2xl flex items-center gap-3 max-w-sm">
-            <div className="bg-amber-500/20 text-amber-400 p-2 rounded-xl">
-              <AlertTriangle size={20} />
-            </div>
-            <div className="flex-1">
-              <p className="text-xs font-bold text-amber-300">Aviso de Saída</p>
-              <p className="text-xs text-slate-300 mt-0.5">{exitNotification}</p>
-            </div>
-            <button onClick={() => setExitNotification(null)} className="text-slate-400 hover:text-white p-1">
-              <X size={16} />
-            </button>
-          </div>
-        )}
       </main>
     );
   }
 
   // =========================================================================
-  // DASHBOARD PRINCIPAL
+  // DASHBOARD PRINCIPAL (INICIAR DDS + HISTÓRICO COM FILTRO DE DATAS)
   // =========================================================================
   return (
     <main className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
       <div className="max-w-5xl mx-auto space-y-6">
         
+        {/* Cabeçalho */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-3.5">
             <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-700">
               <ShieldAlert size={32} />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-800">Painel do Organizador</h1>
-              <p className="text-slate-500 text-xs">Gestão Diária de Segurança e Links Temporários</p>
+              <h1 className="text-2xl font-bold text-slate-800">Olá, {currentUser?.name || 'Técnico'}!</h1>
+              <p className="text-slate-500 text-xs">
+                {currentUser?.role} • <strong>{currentUser?.company || 'Unidade'}</strong>
+              </p>
             </div>
           </div>
 
           <button
             onClick={handleLogout}
-            className="self-end sm:self-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors"
+            className="self-end sm:self-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors"
           >
-            <LogOut size={16} /> Sair da Conta
+            <LogOut size={16} /> Sair
           </button>
         </header>
 
+        {/* Alerta de DDS Ativo */}
         {activeMeeting && (
           <div className="bg-emerald-600 text-white p-5 rounded-2xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -442,157 +428,144 @@ export default function AdminPanel() {
           </div>
         )}
 
+        {/* Abas */}
         <div className="flex bg-slate-200/80 p-1 rounded-2xl max-w-md">
           <button
             onClick={() => setActiveTab('NEW_DDS')}
             className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'NEW_DDS'
-                ? 'bg-white text-blue-700 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+              activeTab === 'NEW_DDS' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <PlusCircle size={16} /> Iniciar Novo DDS
+            <PlusCircle size={16} /> Novo DDS
           </button>
 
           <button
             onClick={() => setActiveTab('HISTORY')}
             className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'HISTORY'
-                ? 'bg-white text-blue-700 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+              activeTab === 'HISTORY' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <History size={16} /> Histórico ({meetingHistory.length})
+            <History size={16} /> Meu Histórico ({meetingHistory.length})
           </button>
         </div>
 
+        {/* ABA 1: FORMULÁRIO DO NOVO DDS */}
         {activeTab === 'NEW_DDS' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-7 bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6">
-              <div>
-                <h2 className="text-lg font-bold text-slate-800">Configurar Nova Reunião</h2>
-                <p className="text-slate-500 text-xs">O link gerado terá validade de 10 minutos para entrada da equipe</p>
-              </div>
-
-              <form onSubmit={handleStartNewMeeting} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Tema do DDS de Hoje</label>
-                  <input 
-                    type="text" 
-                    value={topic} 
-                    onChange={(e) => setTopic(e.target.value)}
-                    placeholder="Ex: Prevenção de Acidentes com Tratores e Máquinas"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Local / Fazenda / Galpão</label>
-                  <input 
-                    type="text" 
-                    value={farm} 
-                    onChange={(e) => setFarm(e.target.value)}
-                    placeholder="Ex: Fazenda Santa Maria - Setor Mecanizado"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                  />
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={isCreatingMeeting}
-                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 text-sm transition-all active:scale-[0.99]"
-                >
-                  {isCreatingMeeting ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" /> Gerando Sala e Link de 10 Minutos...
-                    </>
-                  ) : (
-                    <>
-                      <Play size={18} /> Iniciar DDS e Gerar Link de 10 Minutos
-                    </>
-                  )}
-                </button>
-              </form>
+          <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 max-w-2xl mx-auto space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">Iniciar Reunião de Segurança</h2>
+              <p className="text-slate-500 text-xs">Os registros ficarão salvos no seu histórico pessoal de auditoria</p>
             </div>
 
-            <div className="lg:col-span-5 bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 space-y-5">
+            <form onSubmit={handleStartNewMeeting} className="space-y-4">
               <div>
-                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <UserCheck size={18} className="text-blue-600" /> Meus Dados de Organizador
-                </h2>
-                <p className="text-slate-500 text-xs">Ficam salvos para assinar os relatórios em PDF</p>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Tema do DDS</label>
+                <input 
+                  type="text" 
+                  value={topic} 
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="Ex: Treinamento NR-31 / Manuseio de Defensivos"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                />
               </div>
 
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Seu Nome Completo</label>
-                  <input
-                    type="text"
-                    value={organizerName}
-                    onChange={(e) => setOrganizerName(e.target.value)}
-                    placeholder="Ex: Alexandre Santos"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Função / Cargo</label>
-                  <input
-                    type="text"
-                    value={organizerRole}
-                    onChange={(e) => setOrganizerRole(e.target.value)}
-                    placeholder="Ex: Técnico em Segurança do Trabalho"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Empresa / Fazenda Principal</label>
-                  <input
-                    type="text"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="Ex: Agropecuária Progresso"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleSaveProfile();
-                    alert('✅ Dados do organizador salvos no navegador com sucesso!');
-                  }}
-                  className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
-                >
-                  Salvar Minhas Informações
-                </button>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Local / Fazenda / Galpão</label>
+                <input 
+                  type="text" 
+                  value={farm} 
+                  onChange={(e) => setFarm(e.target.value)}
+                  placeholder="Ex: Fazenda Santa Maria - Setor 03"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                />
               </div>
-            </div>
+
+              <button 
+                type="submit"
+                disabled={isCreatingMeeting}
+                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 text-sm transition-all active:scale-[0.99]"
+              >
+                {isCreatingMeeting ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" /> Gerando Sala...
+                  </>
+                ) : (
+                  <>
+                    <Play size={18} /> Iniciar DDS e Abrir Videoconferência
+                  </>
+                )}
+              </button>
+            </form>
           </div>
         )}
 
+        {/* ABA 2: HISTÓRICO COM FILTROS DE DATA E DOWNLOAD POR PERÍODO */}
         {activeTab === 'HISTORY' && (
           <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4">
-              <div>
-                <h2 className="text-lg font-bold text-slate-800">Histórico de Reuniões Realizadas</h2>
-                <p className="text-slate-500 text-xs">Arquivo de conformidade e auditoria</p>
+            
+            {/* Barra de Filtros por Período */}
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Filter size={14} className="text-blue-600" /> Filtrar Histórico por Período
+                </span>
+
+                {(startDate || endDate) && (
+                  <button
+                    onClick={() => {
+                      setStartDate('');
+                      setEndDate('');
+                    }}
+                    className="text-[11px] text-red-600 hover:text-red-700 font-bold"
+                  >
+                    Limpar Filtro
+                  </button>
+                )}
               </div>
 
-              <span className="text-xs bg-blue-50 text-blue-700 font-semibold px-3 py-1 rounded-full border border-blue-200">
-                {meetingHistory.length} reuniões arquivadas
-              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Data Inicial</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full bg-white px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Data Final</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full bg-white px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    onClick={handleDownloadConsolidatedPdf}
+                    className="w-full py-2.5 bg-slate-900 hover:bg-black text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <FileSpreadsheet size={15} className="text-emerald-400" />
+                    Baixar Dossiê do Período (PDF)
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {meetingHistory.length === 0 ? (
-              <div className="text-center py-16 text-slate-400 space-y-2">
-                <History size={40} className="mx-auto opacity-40" />
-                <p className="text-sm font-semibold">Nenhum DDS finalizado no histórico ainda.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {meetingHistory.map((meeting) => (
+            {/* Listagem de Reuniões do Histórico */}
+            <div className="space-y-3">
+              {meetingHistory.length === 0 ? (
+                <div className="text-center py-16 text-slate-400 space-y-2">
+                  <History size={40} className="mx-auto opacity-40" />
+                  <p className="text-sm font-semibold">Nenhum DDS encontrado para o período selecionado.</p>
+                  <p className="text-xs">Tente ajustar as datas do filtro ou inicie um novo DDS.</p>
+                </div>
+              ) : (
+                meetingHistory.map((meeting) => (
                   <div 
                     key={meeting.id} 
                     className="p-5 rounded-2xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm"
@@ -610,20 +583,21 @@ export default function AdminPanel() {
                       <h3 className="text-base font-bold text-slate-800">{meeting.topic}</h3>
                       <p className="text-xs text-slate-500 flex items-center gap-1.5">
                         <Users size={14} className="text-emerald-600" />
-                        <strong>{meeting.attendees?.length || 0}</strong> participantes registrados e auditados
+                        <strong>{meeting.attendees?.length || 0}</strong> colaboradores com presença e biometria
                       </p>
                     </div>
 
                     <button
                       onClick={() => handleDownloadHistoryPdf(meeting)}
-                      className="px-4 py-2.5 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
+                      className="px-4 py-2.5 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm self-start md:self-auto"
                     >
-                      <Download size={15} /> Baixar Relatório PDF
+                      <Download size={15} /> Baixar Ata Individual (PDF)
                     </button>
                   </div>
-                ))}
-              </div>
-            )}
+                ))
+              )}
+            </div>
+
           </div>
         )}
 
