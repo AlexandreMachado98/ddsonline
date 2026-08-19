@@ -26,43 +26,60 @@ export async function GET() {
     });
 
     return NextResponse.json({ success: true, meeting: activeMeeting, history });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'Erro ao buscar dados' }, { status: 500 });
+  } catch (error: any) {
+    console.error("Erro no GET /api/reuniao:", error);
+    return NextResponse.json({ success: false, error: error?.message || 'Erro ao buscar dados' }, { status: 500 });
   }
 }
 
-// 2. POST: Cria nova reunião com validade de 10 minutos
+// 2. POST: Abre uma nova reunião
 export async function POST(req: Request) {
   try {
-    const { topic, farm } = await req.json();
+    const body = await req.json();
+    const { topic, farm } = body;
 
-    // Encerra reuniões anteriores
-    await prisma.meeting.updateMany({
-      where: { status: 'LIVE' },
-      data: { status: 'ENDED' }
-    });
+    if (!topic || !farm) {
+      return NextResponse.json({ success: false, error: 'Preencha o Tema e o Local da fazenda' }, { status: 400 });
+    }
 
-    // Define expiração para exatamente 10 minutos a partir de agora
+    // Encerra reuniões anteriores com segurança
+    try {
+      await prisma.meeting.updateMany({
+        where: { status: 'LIVE' },
+        data: { status: 'ENDED' }
+      });
+    } catch (e) {
+      console.warn("Aviso ao encerrar anteriores:", e);
+    }
+
+    // Calcula expiração de 10 minutos
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     const inviteToken = Math.random().toString(36).substring(2, 8).toUpperCase();
 
     const newMeeting = await prisma.meeting.create({
       data: {
-        topic,
-        farm,
+        topic: String(topic).trim(),
+        farm: String(farm).trim(),
         status: 'LIVE',
         inviteExpiresAt: expiresAt,
         inviteToken: inviteToken
+      },
+      include: {
+        attendees: true
       }
     });
 
     return NextResponse.json({ success: true, meeting: newMeeting });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'Erro ao criar reunião' }, { status: 500 });
+  } catch (error: any) {
+    console.error("Erro detalhado no POST /api/reuniao:", error);
+    return NextResponse.json({ 
+      success: false, 
+      error: error?.message || 'Falha ao salvar a nova reunião no banco de dados' 
+    }, { status: 500 });
   }
 }
 
-// 3. PATCH: Renova o link por mais 10 minutos (Quando o técnico clica em "Gerar Novo Link")
+// 3. PATCH: Renova o link por mais 10 minutos
 export async function PATCH(req: Request) {
   try {
     const { meetingId } = await req.json();
@@ -74,12 +91,15 @@ export async function PATCH(req: Request) {
       data: {
         inviteExpiresAt: newExpiresAt,
         inviteToken: newToken
+      },
+      include: {
+        attendees: true
       }
     });
 
     return NextResponse.json({ success: true, meeting: updated });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'Erro ao renovar link' }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error?.message || 'Erro ao renovar link' }, { status: 500 });
   }
 }
 
@@ -91,7 +111,7 @@ export async function PUT() {
       data: { status: 'ENDED' }
     });
     return NextResponse.json({ success: true });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'Erro ao encerrar' }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error?.message }, { status: 500 });
   }
 }

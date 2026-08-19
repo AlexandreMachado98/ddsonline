@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Play, Users, Link as LinkIcon, FileText, CheckCircle2, 
   ShieldAlert, Smartphone, Download, Copy, Check, LogOut, 
-  History, PlusCircle, UserCheck, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw
+  History, PlusCircle, UserCheck, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -15,6 +15,7 @@ export default function AdminPanel() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'NEW_DDS' | 'HISTORY'>('NEW_DDS');
   const [isLiveMode, setIsLiveMode] = useState(false);
+  const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
 
   // Perfil do Organizador
   const [organizerName, setOrganizerName] = useState('');
@@ -62,7 +63,6 @@ export default function AdminPanel() {
         setActiveMeeting(data.meeting || null);
         setMeetingHistory(data.history || []);
 
-        // Calcula tempo restante do link de 10 min
         if (data.meeting && data.meeting.inviteExpiresAt) {
           const diffMs = new Date(data.meeting.inviteExpiresAt).getTime() - Date.now();
           if (diffMs > 0) {
@@ -102,30 +102,43 @@ export default function AdminPanel() {
     }));
   };
 
+  // Iniciar Novo DDS com feedback explícito
   const handleStartNewMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!topic || !farm) {
-      alert('Preencha o tema e o local da fazenda.');
+    if (!topic.trim() || !farm.trim()) {
+      alert('Por favor, preencha o Tema do DDS e o Local da fazenda.');
       return;
     }
 
+    setIsCreatingMeeting(true);
     handleSaveProfile();
 
-    const res = await fetch('/api/reuniao', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, farm })
-    });
-    
-    const data = await res.json();
-    if (data.success && data.meeting) {
-      setActiveMeeting(data.meeting);
-      setIsLiveMode(true);
-      setTopic('');
+    try {
+      const res = await fetch('/api/reuniao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          topic: topic.trim(), 
+          farm: farm.trim() 
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (data.success && data.meeting) {
+        setActiveMeeting(data.meeting);
+        setIsLiveMode(true);
+        setTopic('');
+      } else {
+        alert('Erro ao iniciar reunião: ' + (data.error || 'Verifique a conexão com o banco de dados.'));
+      }
+    } catch (err: any) {
+      alert('Erro de conexão: ' + (err?.message || 'Falha ao se comunicar com o servidor.'));
+    } finally {
+      setIsCreatingMeeting(false);
     }
   };
 
-  // Botão para o Técnico Renovar o Link por mais 10 Minutos
   const handleRenewLink = async () => {
     if (!activeMeeting) return;
 
@@ -199,7 +212,7 @@ export default function AdminPanel() {
   };
 
   // =========================================================================
-  // SALA DO DDS AO VIVO (COM CONTROLE DO LINK DE 10 MINUTOS)
+  // SALA DO DDS AO VIVO
   // =========================================================================
   if (isLiveMode && activeMeeting) {
     return (
@@ -225,7 +238,6 @@ export default function AdminPanel() {
             </button>
           </header>
 
-          {/* Banner Superior com Status do Link */}
           <div className="bg-blue-600 rounded-2xl p-6 text-white shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -235,7 +247,6 @@ export default function AdminPanel() {
                 </span>
                 <span className="font-semibold text-blue-100 uppercase tracking-wider text-xs">Transmissão Ativa</span>
                 
-                {/* Badge de Validade do Link */}
                 <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
                   isLinkExpired ? 'bg-red-500 text-white' : 'bg-blue-800 text-blue-200'
                 }`}>
@@ -248,7 +259,6 @@ export default function AdminPanel() {
             </div>
             
             <div className="flex flex-wrap gap-2">
-              {/* Botão de Renovar Link ou Copiar */}
               {isLinkExpired ? (
                 <button 
                   onClick={handleRenewLink}
@@ -290,7 +300,6 @@ export default function AdminPanel() {
                 isAdmin={true}
               />
 
-              {/* Botão de Renovação Rápida */}
               <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
                 <span className="text-xs text-slate-500 flex items-center gap-1.5">
                   <Clock size={14} className="text-blue-600" />
@@ -490,9 +499,18 @@ export default function AdminPanel() {
 
                 <button 
                   type="submit"
-                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 text-sm transition-all"
+                  disabled={isCreatingMeeting}
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 text-sm transition-all active:scale-[0.99]"
                 >
-                  <Play size={18} /> Iniciar DDS e Gerar Link de 10 Minutos
+                  {isCreatingMeeting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" /> Gerando Sala e Link de 10 Minutos...
+                    </>
+                  ) : (
+                    <>
+                      <Play size={18} /> Iniciar DDS e Gerar Link de 10 Minutos
+                    </>
+                  )}
                 </button>
               </form>
             </div>
