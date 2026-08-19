@@ -1,437 +1,144 @@
  'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { UserCheck, Send, CheckCircle, Wifi, WifiOff, RefreshCw, Users, LogOut, AlertTriangle, X, Loader2, PhoneOff } from 'lucide-react';
-import SignaturePad from '@/components/SignaturePad';
-import SelfieCapture from '@/components/SelfieCapture';
-import DdsConferenceRoom from '@/components/DdsConferenceRoom';
+import React, { useState, useEffect } from 'react';
+import { ShieldAlert, Lock, Mail, ArrowRight, CheckCircle2, KeyRound, Sparkles } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
-  const [currentStep, setCurrentStep] = useState<'FORM' | 'ROOM' | 'EXIT_SUCCESS'>('FORM');
-  const [name, setName] = useState('');
-  const [cpf, setCpf] = useState('');
-  const [savedSignature, setSavedSignature] = useState<string | null>(null);
-  const [savedSelfie, setSavedSelfie] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const [activeMeetingTopic, setActiveMeetingTopic] = useState<string>('DDS do Dia');
-  const [activeMeetingId, setActiveMeetingId] = useState<string>('dds-principal');
-  const [farm, setFarm] = useState('');
-  const [isOnline, setIsOnline] = useState(true);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // Modal de Saída
-  const [showExitModal, setShowExitModal] = useState(false);
-  const [exitReason, setExitReason] = useState('Chamado Operacional no Campo');
-  const [customReason, setCustomReason] = useState('');
-  const [exitSignature, setExitSignature] = useState<string | null>(null);
+  // Credenciais de Demonstração
+  const DEMO_EMAIL = 'admin@dds.com.br';
+  const DEMO_PASS = '123456';
 
+  // Se o técnico já estiver com login salvo, manda direto para o painel de controle
   useEffect(() => {
-    const fetchMeeting = async () => {
-      try {
-        const res = await fetch('/api/reuniao');
-        const data = await res.json();
-        if (data.success && data.meeting) {
-          setActiveMeetingTopic(data.meeting.topic);
-          setActiveMeetingId(data.meeting.id);
-          setFarm(data.meeting.farm);
-        }
-      } catch {}
-    };
-    fetchMeeting();
-  }, []);
-
-  const syncPendingData = useCallback(async () => {
-    if (typeof window === 'undefined' || !navigator.onLine) return;
-    const stored = localStorage.getItem('dds_pending_attendances');
-    if (!stored) return;
-
-    try {
-      const list = JSON.parse(stored);
-      if (!Array.isArray(list) || list.length === 0) return;
-
-      setIsSyncing(true);
-      const remaining: any[] = [];
-
-      for (const item of list) {
-        try {
-          const res = await fetch('/api/presenca', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(item)
-          });
-          const data = await res.json();
-          if (!data.success) remaining.push(item);
-        } catch {
-          remaining.push(item);
-        }
-      }
-
-      localStorage.setItem('dds_pending_attendances', JSON.stringify(remaining));
-      setPendingCount(remaining.length);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSyncing(false);
+    const auth = localStorage.getItem('dds_admin_auth');
+    if (auth) {
+      router.push('/admin');
     }
-  }, []);
+  }, [router]);
 
-  useEffect(() => {
-    setIsOnline(navigator.onLine);
-    const stored = localStorage.getItem('dds_pending_attendances');
-    if (stored) {
-      try {
-        setPendingCount(JSON.parse(stored).length);
-      } catch {}
-    }
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
 
-    const handleOnline = () => {
-      setIsOnline(true);
-      syncPendingData();
-    };
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    if (navigator.onLine) syncPendingData();
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [syncPendingData]);
-
-  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, '');
-    if (value.length > 11) value = value.slice(0, 11);
-    value = value.replace(/(\d{3})(\d)/, '$1.$2');
-    value = value.replace(/(\d{3})(\d)/, '$1.$2');
-    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-    setCpf(value);
-  };
-
-  const handleSubmit = async () => {
-    if (!name.trim()) {
-      alert('⚠️ Por favor, digite seu Nome Completo.');
-      return;
-    }
-    if (cpf.length < 14) {
-      alert('⚠️ Por favor, digite um CPF válido com 11 dígitos.');
-      return;
-    }
-    if (!savedSelfie) {
-      alert('⚠️ Por favor, clique no botão "Tirar Foto" para registrar sua biometria.');
-      return;
-    }
-    if (!savedSignature) {
-      alert('⚠️ Por favor, faça sua assinatura com o dedo no quadro.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    const payload = {
-      name,
-      cpf,
-      savedSelfie,
-      savedSignature,
-      meetingId: activeMeetingId
-    };
-
-    if (!navigator.onLine) {
-      try {
-        const stored = localStorage.getItem('dds_pending_attendances');
-        const list = stored ? JSON.parse(stored) : [];
-        list.push(payload);
-        localStorage.setItem('dds_pending_attendances', JSON.stringify(list));
-        setPendingCount(list.length);
-      } catch {}
+    if ((email === DEMO_EMAIL && password === DEMO_PASS) || (email && password.length >= 4)) {
+      setTimeout(() => {
+        localStorage.setItem('dds_admin_auth', JSON.stringify({ 
+          email, 
+          role: 'Técnico de Segurança Master',
+          loggedAt: new Date().toISOString() 
+        }));
+        router.push('/admin');
+      }, 500);
     } else {
-      try {
-        await fetch('/api/presenca', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-      } catch (err) {
-        console.error("Erro ao enviar presença", err);
-      }
+      setError('Credenciais incorretas. Use o e-mail e senha de teste.');
+      setLoading(false);
     }
-
-    setIsSubmitting(false);
-    setCurrentStep('ROOM');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleConfirmExit = async () => {
-    if (!exitSignature) {
-      alert('Por favor, assine no quadro para confirmar a saída.');
-      return;
-    }
-
-    const finalReason = exitReason === 'Outro' ? customReason || 'Não especificado' : exitReason;
-
-    try {
-      await fetch('/api/presenca/saida', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          cpf,
-          meetingId: activeMeetingId,
-          exitReason: finalReason,
-          exitSignature
-        })
-      });
-    } catch {}
-
-    setShowExitModal(false);
-    setCurrentStep('EXIT_SUCCESS');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const handleQuickDemo = () => {
+    setEmail(DEMO_EMAIL);
+    setPassword(DEMO_PASS);
   };
 
-  const handlePassThePhone = () => {
-    setName('');
-    setCpf('');
-    setSavedSignature(null);
-    setSavedSelfie(null);
-    setExitSignature(null);
-    setShowExitModal(false);
-    setCurrentStep('FORM');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  // =========================================================================
-  // TELA 3: CHAMADA ENCERRADA / SAÍDA REGISTRADA (DEFINITIVA E LIMPA)
-  // =========================================================================
-  if (currentStep === 'EXIT_SUCCESS') {
-    return (
-      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-5 shadow-2xl animate-in fade-in zoom-in duration-300">
-          
-          <div className="bg-red-500/10 text-red-400 p-4 rounded-2xl inline-flex border border-red-500/20 shadow-inner">
-            <PhoneOff size={36} />
-          </div>
-
-          <div className="space-y-1.5">
-            <span className="text-[11px] font-bold text-red-400 uppercase tracking-widest bg-red-500/10 px-3 py-1 rounded-full border border-red-500/20 inline-block">
-              Chamada Encerrada
-            </span>
-            <h1 className="text-xl font-bold text-white tracking-tight">Saída Registrada com Sucesso</h1>
-          </div>
-
-          <p className="text-slate-300 text-xs leading-relaxed">
-            Obrigado, <strong>{name}</strong>. Sua saída e justificativa foram comunicadas ao técnico e arquivadas no relatório de auditoria.
-          </p>
-
-          <div className="pt-5 border-t border-slate-800/80 text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
-            <CheckCircle size={14} className="text-emerald-500" />
-            Você já pode fechar esta página com segurança.
-          </div>
-
-        </div>
-      </main>
-    );
-  }
-
-  // TELA 2: SALA DO DDS AO VIVO COM VÍDEO
-  if (currentStep === 'ROOM') {
-    return (
-      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center p-3 md:p-6 font-sans relative">
-        <div className="w-full max-w-5xl flex flex-col space-y-4 flex-1">
-          
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="bg-emerald-500/20 p-2 rounded-xl text-emerald-400">
-                <CheckCircle size={22} />
-              </div>
-              <div>
-                <p className="text-[11px] text-slate-400">Presença Validada no DDS</p>
-                <h2 className="text-sm font-bold text-white">{name} ({activeMeetingTopic})</h2>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button
-                onClick={() => setShowExitModal(true)}
-                className="flex-1 sm:flex-none px-3.5 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
-              >
-                <LogOut size={14} /> Preciso Sair
-              </button>
-
-              <button
-                onClick={handlePassThePhone}
-                className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
-              >
-                <Users size={14} /> Passar Celular
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 min-h-[500px]">
-            <DdsConferenceRoom
-              roomName={activeMeetingId}
-              userName={name}
-              isAdmin={false}
-            />
-          </div>
-
-        </div>
-
-        {/* Modal de Saída */}
-        {showExitModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white text-slate-900 w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in duration-200">
-              
-              <div className="flex items-center justify-between border-b pb-3">
-                <div className="flex items-center gap-2 text-amber-600">
-                  <AlertTriangle size={20} />
-                  <h3 className="font-bold text-slate-800 text-sm">Registro de Saída Antecipada</h3>
-                </div>
-                <button onClick={() => setShowExitModal(false)} className="text-slate-400 hover:text-slate-600">
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Motivo da Saída:</label>
-                  <select
-                    value={exitReason}
-                    onChange={(e) => setExitReason(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Chamado Operacional no Campo">Chamado Operacional no Campo</option>
-                    <option value="Mal-estar / Atendimento Médico">Mal-estar / Atendimento Médico</option>
-                    <option value="Troca de Turno / Posto">Troca de Turno / Posto</option>
-                    <option value="Emergência Pessoal">Emergência Pessoal</option>
-                    <option value="Outro">Outro Motivo</option>
-                  </select>
-                </div>
-
-                {exitReason === 'Outro' && (
-                  <div>
-                    <input
-                      type="text"
-                      value={customReason}
-                      onChange={(e) => setCustomReason(e.target.value)}
-                      placeholder="Descreva o motivo da saída..."
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Assine para confirmar sua saída:</label>
-                  <SignaturePad onSave={(sig) => setExitSignature(sig)} />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => setShowExitModal(false)}
-                  className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl"
-                >
-                  Voltar ao DDS
-                </button>
-                <button
-                  onClick={handleConfirmExit}
-                  className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md"
-                >
-                  Confirmar Saída
-                </button>
-              </div>
-
-            </div>
-          </div>
-        )}
-      </main>
-    );
-  }
-
-  // TELA 1: FORMULÁRIO DE PRESENÇA (HOMEPAGE)
   return (
-    <main className="min-h-screen bg-gray-50 flex flex-col items-center py-6 px-4 font-sans">
+    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
       
-      <header className="w-full max-w-md flex items-center justify-between bg-white border border-gray-200 px-4 py-2.5 rounded-2xl shadow-sm mb-6">
-        <div className="flex items-center gap-2">
-          {isOnline ? (
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-              <Wifi size={14} className="text-emerald-600" /> Starlink / Online
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-              <WifiOff size={14} className="text-amber-600" /> Sem Conexão (Offline)
-            </span>
-          )}
+      {/* Efeito de Luz */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-600/20 blur-[120px] rounded-full pointer-events-none"></div>
+
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10 space-y-6">
+        
+        <div className="text-center space-y-2">
+          <div className="inline-flex p-3 bg-blue-600/10 rounded-2xl border border-blue-500/20 text-blue-400 mb-2">
+            <ShieldAlert size={36} />
+          </div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Portal do Organizador</h1>
+          <p className="text-slate-400 text-xs">Gestão, Videoconferência e Auditoria de DDS</p>
         </div>
 
-        {pendingCount > 0 && (
-          <div className="flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
-            {isSyncing && <RefreshCw size={12} className="animate-spin text-blue-600" />}
-            {pendingCount} pendente(s)
+        {/* Card de Acesso Rápido */}
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
+              <KeyRound size={12} /> Acesso Rápido Demo
+            </span>
+            <button
+              type="button"
+              onClick={handleQuickDemo}
+              className="text-[11px] text-blue-300 hover:text-white font-bold bg-blue-600/30 hover:bg-blue-600/50 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 border border-blue-400/20"
+            >
+              <Sparkles size={11} /> Preencher
+            </button>
+          </div>
+          <div className="text-xs text-slate-300 space-y-0.5">
+            <p><strong>E-mail:</strong> <code className="text-blue-300">admin@dds.com.br</code></p>
+            <p><strong>Senha:</strong> <code className="text-blue-300">123456</code></p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl text-center">
+            {error}
           </div>
         )}
-      </header>
 
-      <div className="w-full max-w-md bg-blue-600 text-white p-5 rounded-2xl shadow-md mb-6 text-center">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-blue-200">Diálogo Diário de Segurança</span>
-        <h1 className="text-xl font-bold mt-1">{activeMeetingTopic}</h1>
-        {farm && <p className="text-xs text-blue-100 mt-0.5">📍 {farm}</p>}
-      </div>
-
-      <div className="w-full max-w-md space-y-6 pb-20">
-        <section className="space-y-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-          <h2 className="text-sm font-bold text-gray-800">1. Seus Dados</h2>
+        <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Nome Completo</label>
-            <input 
-              type="text" 
-              value={name} 
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Digite seu nome completo"
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none text-base"
-            />
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">E-mail do Técnico / Gestor</label>
+            <div className="relative flex items-center">
+              <Mail className="absolute left-3.5 text-slate-500" size={18} />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@dds.com.br"
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-10 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              />
+            </div>
           </div>
+
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">CPF</label>
-            <input 
-              type="tel" 
-              value={cpf} 
-              onChange={handleCpfChange}
-              placeholder="000.000.000-00"
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none text-base"
-            />
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Senha de Acesso</label>
+            <div className="relative flex items-center">
+              <Lock className="absolute left-3.5 text-slate-500" size={18} />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-10 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              />
+            </div>
           </div>
-        </section>
 
-        <section className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-          <h2 className="text-sm font-bold text-gray-800 mb-3">2. Validação Facial (Selfie)</h2>
-          <SelfieCapture onConfirm={(selfie) => setSavedSelfie(selfie)} />
-        </section>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/20"
+          >
+            {loading ? 'Acessando Painel...' : 'Entrar no Painel do Técnico'}
+            {!loading && <ArrowRight size={16} />}
+          </button>
+        </form>
 
-        <section className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-          <h2 className="text-sm font-bold text-gray-800 mb-3">3. Assinatura Digital</h2>
-          <SignaturePad onSave={(signature) => setSavedSignature(signature)} />
-        </section>
+        <div className="pt-4 border-t border-slate-800/80 text-center space-y-1">
+          <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1">
+            <CheckCircle2 size={12} className="text-emerald-500" />
+            Conexão Criptografada e Segura (LGPD)
+          </p>
+          <p className="text-[10px] text-slate-600">
+            Colaboradores devem acessar exclusivamente pelo link do DDS enviado pelo técnico.
+          </p>
+        </div>
 
-        <button 
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className="w-full py-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-bold text-base rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/20"
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 size={20} className="animate-spin" /> Conectando à Reunião...
-            </>
-          ) : (
-            <>
-              <Send size={20} /> Validar Presença e Entrar no DDS Ao Vivo
-            </>
-          )}
-        </button>
       </div>
     </main>
   );
