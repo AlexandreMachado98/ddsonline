@@ -1,0 +1,34 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Tabela do DDS (Criada pelo Técnico)
+model Meeting {
+  id        String       @id @default(uuid())
+  topic     String
+  farm      String
+  status    String       @default("LIVE") // Pode ser LIVE ou ENDED
+  createdAt DateTime     @default(now())
+  
+  // Relação: Uma reunião tem várias assinaturas
+  attendees Attendance[]
+}
+
+// Tabela de Presença (Preenchida pelo Trabalhador)
+model Attendance {
+  id           String   @id @default(uuid())
+  name         String
+  cpf          String
+  selfie       String   // Vamos salvar a imagem em Base64 por enquanto
+  signature    String   // Imagem da assinatura em Base64
+  createdAt    DateTime @default(now())
+  
+  // Relação com a Reunião
+  meetingId    String
+  meeting      Meeting  @relation(fields: [meetingId], references: [id])
+}
