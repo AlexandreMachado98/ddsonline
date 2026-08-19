@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -6,48 +6,40 @@ const prisma = new PrismaClient();
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, cpf, savedSelfie, savedSignature, meetingId } = body;
+    const { name, cpf, meetingId, exitReason, exitSignature } = body;
 
-    let meeting = null;
+    const cleanCpf = String(cpf || '').replace(/\D/g, '');
 
-    // Se veio com o ID da reunião (link do Meet), vincula nela
-    if (meetingId) {
-      meeting = await prisma.meeting.findUnique({
-        where: { id: meetingId }
-      });
-    }
-
-    // Se não veio ID, pega a reunião ao vivo
-    if (!meeting) {
-      meeting = await prisma.meeting.findFirst({
-        where: { status: 'LIVE' }
-      });
-    }
-
-    if (!meeting) {
-      meeting = await prisma.meeting.create({
-        data: {
-          topic: 'DDS Diário',
-          farm: 'Fazenda Geral',
-          status: 'LIVE'
-        }
-      });
-    }
-
-    // Salva a presença atrelada à reunião correta
-    const attendance = await prisma.attendance.create({
-      data: {
-        name,
-        cpf,
-        selfie: savedSelfie,
-        signature: savedSignature,
-        meetingId: meeting.id
-      }
+    // 1. Busca as presenças desta reunião
+    const attendances = await (prisma as any).attendance.findMany({
+      where: {
+        meetingId: meetingId
+      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    return NextResponse.json({ success: true, data: attendance, meetingId: meeting.id });
-  } catch (error) {
-    console.error("Erro no POST /api/presenca:", error);
-    return NextResponse.json({ success: false, error: 'Erro interno ao salvar' }, { status: 500 });
+    // 2. Localiza o registro do colaborador por CPF ou Nome
+    const target = attendances.find((a: any) => 
+      a.cpf.replace(/\D/g, '') === cleanCpf ||
+      a.name.toLowerCase().trim() === String(name || '').toLowerCase().trim()
+    );
+
+    if (target) {
+      const updated = await (prisma as any).attendance.update({
+        where: { id: target.id },
+        data: {
+          exitReason: String(exitReason || 'Não informado').trim(),
+          exitSignature: exitSignature || null,
+          leftAt: new Date()
+        }
+      });
+
+      return NextResponse.json({ success: true, data: updated });
+    }
+
+    return NextResponse.json({ success: false, error: 'Presença não localizada' }, { status: 404 });
+  } catch (error: any) {
+    console.error("Erro no registro de saída:", error);
+    return NextResponse.json({ success: false, error: error?.message || 'Erro ao registrar saída' }, { status: 500 });
   }
 }

@@ -22,7 +22,7 @@ model Meeting {
   id              String       @id @default(uuid())
   topic           String
   farm            String
-  status          String       @default("LIVE") // LIVE ou ENDED
+  status          String       @default("LIVE")
   createdAt       DateTime     @default(now())
   inviteExpiresAt DateTime?
   inviteToken     String?
@@ -32,12 +32,15 @@ model Meeting {
 }
 
 model Attendance {
-  id           String   @id @default(uuid())
-  name         String
-  cpf          String
-  selfie       String
-  signature    String
-  createdAt    DateTime @default(now())
-  meetingId    String
-  meeting      Meeting  @relation(fields: [meetingId], references: [id])
+  id            String    @id @default(uuid())
+  name          String
+  cpf           String
+  selfie        String
+  signature     String
+  exitReason    String?   // Motivo da saída antecipada
+  exitSignature String?   // Assinatura manual de saída
+  leftAt        DateTime? // Horário exato da saída
+  createdAt     DateTime  @default(now())
+  meetingId     String
+  meeting       Meeting   @relation(fields: [meetingId], references: [id])
 }

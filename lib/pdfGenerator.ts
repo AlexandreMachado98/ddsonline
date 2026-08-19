@@ -9,6 +9,8 @@ interface Attendee {
   signature?: string;
   createdAt: string;
   exitReason?: string;
+  exitSignature?: string;
+  leftAt?: string;
 }
 
 interface MeetingData {
@@ -27,61 +29,68 @@ interface ConsolidatedReportData {
   meetings: MeetingData[];
 }
 
-// 1. RELATÓRIO INDIVIDUAL DE UM DDS
+// 1. RELATÓRIO INDIVIDUAL DO DDS COM ENTRADA E SAÍDA AUDITADA
 export function generateDdsPdf(meeting: MeetingData) {
   const doc = new jsPDF();
 
+  // Cabeçalho
   doc.setFillColor(37, 99, 235);
   doc.rect(0, 0, 210, 26, 'F');
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(13);
+  doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('DDS ONLINE - REGISTRO DE CONFORMIDADE E AUDITORIA', 14, 17);
+  doc.text('DDS ONLINE - ATA DE CONFORMIDADE, PRESENÇA E REGISTRO DE SAÍDA', 14, 17);
 
+  // Metadados
   doc.setTextColor(31, 41, 55);
-  doc.setFontSize(9.5);
+  doc.setFontSize(9);
   
   doc.setFont('helvetica', 'bold');
-  doc.text('Tema do DDS:', 14, 35);
+  doc.text('Tema do DDS:', 14, 34);
   doc.setFont('helvetica', 'normal');
-  doc.text(meeting.topic || 'Não informado', 43, 35);
+  doc.text(meeting.topic || 'Não informado', 40, 34);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Local / Fazenda:', 14, 42);
+  doc.text('Local / Fazenda:', 14, 40);
   doc.setFont('helvetica', 'normal');
-  doc.text(meeting.farm || 'Não informado', 46, 42);
+  doc.text(meeting.farm || 'Não informado', 43, 40);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Data e Horário:', 14, 49);
+  doc.text('Data e Horário:', 14, 46);
   doc.setFont('helvetica', 'normal');
-  doc.text(new Date(meeting.createdAt || Date.now()).toLocaleString('pt-BR'), 42, 49);
+  doc.text(new Date(meeting.createdAt || Date.now()).toLocaleString('pt-BR'), 40, 46);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Total Registrado:', 14, 56);
+  doc.text('Total Registrado:', 14, 52);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${meeting.attendees.length} colaborador(es)`, 47, 56);
+  doc.text(`${meeting.attendees.length} colaborador(es)`, 45, 52);
 
   doc.setDrawColor(229, 231, 235);
-  doc.line(14, 60, 196, 60);
+  doc.line(14, 56, 196, 56);
 
+  // Tabela com Entrada e Saída
   const tableRows = meeting.attendees.map(a => {
-    const isEarlyExit = a.name.includes('(Saída:') || a.exitReason;
-    const statusText = isEarlyExit ? `SAÍDA ANTECIPADA\n${a.exitReason || 'Justificada'}` : 'PRESENTE ATÉ O FIM';
+    const isEarlyExit = Boolean(a.exitReason || a.exitSignature);
+    const exitTime = a.leftAt ? new Date(a.leftAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const statusText = isEarlyExit 
+      ? `SAÍDA ANTECIPADA (${exitTime})\nMotivo: ${a.exitReason}` 
+      : 'PRESENTE ATÉ O FIM';
 
     return [
       a.name.replace(/\(Saída:.*\)/, ''),
       a.cpf,
       new Date(a.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      '', // Espaço para Selfie
+      '', // Espaço para Assinatura de Entrada
       statusText,
-      '',
-      ''
+      ''  // Espaço para Assinatura de Saída
     ];
   });
 
   autoTable(doc, {
-    startY: 64,
-    head: [['Nome Completo', 'CPF', 'Entrada', 'Status / Saída', 'Biometria', 'Assinatura Digital']],
+    startY: 60,
+    head: [['Colaborador', 'CPF', 'Entrada', 'Biometria', 'Assinatura Entrada', 'Status / Saída', 'Assinatura Saída']],
     body: tableRows,
     theme: 'grid',
     headStyles: {
@@ -89,36 +98,46 @@ export function generateDdsPdf(meeting: MeetingData) {
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       halign: 'center',
-      fontSize: 8.5
+      fontSize: 7.5
     },
     styles: {
-      fontSize: 8,
+      fontSize: 7,
       valign: 'middle',
       minCellHeight: 18,
-      cellPadding: 2
+      cellPadding: 1.5
     },
     columnStyles: {
-      0: { cellWidth: 40 },
-      1: { cellWidth: 30, halign: 'center' },
-      2: { cellWidth: 16, halign: 'center' },
-      3: { cellWidth: 38, halign: 'center', fontSize: 7.5 },
+      0: { cellWidth: 32 },
+      1: { cellWidth: 26, halign: 'center' },
+      2: { cellWidth: 14, halign: 'center' },
+      3: { cellWidth: 22, halign: 'center' },
       4: { cellWidth: 30, halign: 'center' },
-      5: { cellWidth: 38, halign: 'center' }
+      5: { cellWidth: 36, halign: 'center', fontSize: 6.5 },
+      6: { cellWidth: 30, halign: 'center' }
     },
     didDrawCell: (data) => {
       if (data.section === 'body') {
         const attendee = meeting.attendees[data.row.index];
         if (!attendee) return;
 
-        if (data.column.index === 4 && attendee.selfie) {
+        // Selfie na coluna 3
+        if (data.column.index === 3 && attendee.selfie) {
           try {
-            doc.addImage(attendee.selfie, 'JPEG', data.cell.x + 8, data.cell.y + 2, 14, 14);
+            doc.addImage(attendee.selfie, 'JPEG', data.cell.x + 4, data.cell.y + 2, 14, 14);
           } catch (e) {}
         }
 
-        if (data.column.index === 5 && attendee.signature) {
+        // Assinatura Entrada na coluna 4
+        if (data.column.index === 4 && attendee.signature) {
           try {
-            doc.addImage(attendee.signature, 'PNG', data.cell.x + 6, data.cell.y + 3, 26, 12);
+            doc.addImage(attendee.signature, 'PNG', data.cell.x + 3, data.cell.y + 3, 24, 12);
+          } catch (e) {}
+        }
+
+        // Assinatura Saída na coluna 6 (se houver saída registrada)
+        if (data.column.index === 6 && attendee.exitSignature) {
+          try {
+            doc.addImage(attendee.exitSignature, 'PNG', data.cell.x + 3, data.cell.y + 3, 24, 12);
           } catch (e) {}
         }
       }
@@ -128,25 +147,24 @@ export function generateDdsPdf(meeting: MeetingData) {
   const pageCount = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(156, 163, 175);
     doc.text(
-      `Documento oficial de auditoria emitido digitalmente pelo DDS Online - Página ${i} de ${pageCount}`,
+      `Documento oficial emitido digitalmente pelo DDS Online - Página ${i} de ${pageCount}`,
       14,
       doc.internal.pageSize.height - 8
     );
   }
 
   const cleanTopic = (meeting.topic || 'DDS').replace(/[^a-zA-Z0-9]/g, '_');
-  doc.save(`Relatorio_DDS_${cleanTopic}_${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`Ata_Auditoria_DDS_${cleanTopic}_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
-// 2. RELATÓRIO CONSOLIDADO DO PERÍODO / AUDITORIA GERAL
+// 2. RELATÓRIO CONSOLIDADO DO PERÍODO
 export function generateConsolidatedDdsPdf(report: ConsolidatedReportData) {
   const doc = new jsPDF();
 
-  // Cabeçalho
-  doc.setFillColor(15, 23, 42); // Slate escuro
+  doc.setFillColor(15, 23, 42);
   doc.rect(0, 0, 210, 30, 'F');
 
   doc.setTextColor(255, 255, 255);
@@ -155,9 +173,8 @@ export function generateConsolidatedDdsPdf(report: ConsolidatedReportData) {
   doc.text('DDS ONLINE - DOSSIÊ CONSOLIDADO DE AUDITORIA', 14, 15);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text('Relatório Geral de Conformidade e Treinamentos por Período', 14, 23);
+  doc.text('Relatório Geral de Treinamentos e Presenças por Período', 14, 23);
 
-  // Informações do Período e Responsável
   doc.setTextColor(31, 41, 55);
   doc.setFontSize(9.5);
 
@@ -195,7 +212,6 @@ export function generateConsolidatedDdsPdf(report: ConsolidatedReportData) {
   doc.setDrawColor(229, 231, 235);
   doc.line(14, 60, 196, 60);
 
-  // Tabela Consolidada de Todas as Reuniões do Período
   const tableData = report.meetings.map(m => [
     new Date(m.createdAt || Date.now()).toLocaleDateString('pt-BR'),
     new Date(m.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
