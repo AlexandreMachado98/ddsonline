@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Play, Users, Link as LinkIcon, FileText, CheckCircle2, 
   ShieldAlert, Smartphone, Download, Copy, Check, LogOut, 
-  History, PlusCircle, UserCheck, Building2, Calendar, AlertTriangle, X, Radio
+  History, PlusCircle, UserCheck, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -13,31 +13,28 @@ import DdsConferenceRoom from '@/components/DdsConferenceRoom';
 
 export default function AdminPanel() {
   const router = useRouter();
-
-  // Controle de Abas no Painel: 'NEW_DDS' (Iniciar Reunião) ou 'HISTORY' (Auditoria)
   const [activeTab, setActiveTab] = useState<'NEW_DDS' | 'HISTORY'>('NEW_DDS');
-
-  // Modo de Sala Ao Vivo (só fica true quando o técnico clica em iniciar ou retomar)
   const [isLiveMode, setIsLiveMode] = useState(false);
 
-  // --- DADOS DO ORGANIZADOR (Salvos no navegador) ---
+  // Perfil do Organizador
   const [organizerName, setOrganizerName] = useState('');
   const [organizerRole, setOrganizerRole] = useState('Técnico em Segurança do Trabalho');
   const [companyName, setCompanyName] = useState('');
 
-  // --- DADOS DO NOVO DDS ---
+  // Novo DDS
   const [topic, setTopic] = useState('');
   const [farm, setFarm] = useState('');
 
-  // --- DADOS DA REUNIÃO EM ANDAMENTO ---
+  // Reunião em andamento
   const [activeMeeting, setActiveMeeting] = useState<any>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [exitNotification, setExitNotification] = useState<string | null>(null);
+  const [remainingMinutes, setRemainingMinutes] = useState<number>(10);
+  const [isLinkExpired, setIsLinkExpired] = useState<boolean>(false);
 
-  // --- HISTÓRICO DE REUNIÕES FINALIZADAS ---
+  // Histórico
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
 
-  // 1. Carrega o perfil salvo do Organizador e verifica Login
   useEffect(() => {
     const auth = localStorage.getItem('dds_admin_auth');
     if (!auth) {
@@ -56,7 +53,6 @@ export default function AdminPanel() {
     }
   }, [router]);
 
-  // 2. Busca os dados de histórico e reunião ativa no banco
   const fetchAllData = async () => {
     try {
       const res = await fetch('/api/reuniao');
@@ -66,7 +62,18 @@ export default function AdminPanel() {
         setActiveMeeting(data.meeting || null);
         setMeetingHistory(data.history || []);
 
-        // Notificação de saída se houver
+        // Calcula tempo restante do link de 10 min
+        if (data.meeting && data.meeting.inviteExpiresAt) {
+          const diffMs = new Date(data.meeting.inviteExpiresAt).getTime() - Date.now();
+          if (diffMs > 0) {
+            setRemainingMinutes(Math.ceil(diffMs / (60 * 1000)));
+            setIsLinkExpired(false);
+          } else {
+            setRemainingMinutes(0);
+            setIsLinkExpired(true);
+          }
+        }
+
         if (data.meeting && data.meeting.attendees) {
           data.meeting.attendees.forEach((person: any) => {
             if (person.name.includes('(Saída:') && !exitNotification) {
@@ -77,7 +84,7 @@ export default function AdminPanel() {
         }
       }
     } catch (error) {
-      console.error("Erro ao buscar dados", error);
+      console.error(error);
     }
   };
 
@@ -87,7 +94,6 @@ export default function AdminPanel() {
     return () => clearInterval(interval);
   }, [exitNotification]);
 
-  // Salva o perfil do organizador no navegador
   const handleSaveProfile = () => {
     localStorage.setItem('dds_organizer_profile', JSON.stringify({
       name: organizerName,
@@ -96,11 +102,10 @@ export default function AdminPanel() {
     }));
   };
 
-  // Inicia um NOVO DDS
   const handleStartNewMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic || !farm) {
-      alert('Por favor, preencha o tema do DDS e o local/fazenda.');
+      alert('Preencha o tema e o local da fazenda.');
       return;
     }
 
@@ -120,12 +125,27 @@ export default function AdminPanel() {
     }
   };
 
-  // Retoma uma reunião que já estava aberta
-  const handleResumeActiveMeeting = () => {
-    setIsLiveMode(true);
+  // Botão para o Técnico Renovar o Link por mais 10 Minutos
+  const handleRenewLink = async () => {
+    if (!activeMeeting) return;
+
+    try {
+      const res = await fetch('/api/reuniao', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingId: activeMeeting.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActiveMeeting(data.meeting);
+        handleCopyInviteLink();
+        alert('✅ Link renovado por mais 10 minutos e copiado para sua área de transferência!');
+      }
+    } catch {
+      alert('Erro ao renovar o link.');
+    }
   };
 
-  // Copia o link de convite
   const handleCopyInviteLink = () => {
     if (!activeMeeting) return;
     const inviteUrl = `${window.location.origin}/reuniao/${activeMeeting.id}`;
@@ -134,7 +154,6 @@ export default function AdminPanel() {
     setTimeout(() => setCopiedLink(false), 3000);
   };
 
-  // Baixa o PDF da reunião ativa
   const handleDownloadActivePdf = () => {
     if (!activeMeeting || !activeMeeting.attendees || activeMeeting.attendees.length === 0) {
       alert('Ainda não há presenças registradas nesta reunião.');
@@ -148,7 +167,6 @@ export default function AdminPanel() {
     });
   };
 
-  // Baixa o PDF de uma reunião do HISTÓRICO
   const handleDownloadHistoryPdf = (meeting: any) => {
     if (!meeting.attendees || meeting.attendees.length === 0) {
       alert('Esta reunião foi encerrada sem presenças registradas.');
@@ -162,7 +180,6 @@ export default function AdminPanel() {
     });
   };
 
-  // Encerra a reunião ativa
   const handleEndMeeting = async () => {
     if (confirm('Encerrar este DDS? A sala será fechada e os dados serão salvos no histórico.')) {
       if (activeMeeting && activeMeeting.attendees && activeMeeting.attendees.length > 0) {
@@ -172,7 +189,7 @@ export default function AdminPanel() {
       setIsLiveMode(false);
       setActiveMeeting(null);
       fetchAllData();
-      alert('✅ DDS Encerrado! Os dados foram arquivados no histórico de auditoria.');
+      alert('✅ DDS Encerrado com sucesso!');
     }
   };
 
@@ -182,14 +199,13 @@ export default function AdminPanel() {
   };
 
   // =========================================================================
-  // CENÁRIO 2: SALA DO DDS AO VIVO (VÍDEO + LISTA EM TEMPO REAL)
+  // SALA DO DDS AO VIVO (COM CONTROLE DO LINK DE 10 MINUTOS)
   // =========================================================================
   if (isLiveMode && activeMeeting) {
     return (
       <main className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans relative">
         <div className="max-w-7xl mx-auto space-y-6">
           
-          {/* Cabeçalho */}
           <header className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <ShieldAlert size={36} className="text-blue-700" />
@@ -209,7 +225,7 @@ export default function AdminPanel() {
             </button>
           </header>
 
-          {/* Banner Superior com Ações */}
+          {/* Banner Superior com Status do Link */}
           <div className="bg-blue-600 rounded-2xl p-6 text-white shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -218,19 +234,37 @@ export default function AdminPanel() {
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                 </span>
                 <span className="font-semibold text-blue-100 uppercase tracking-wider text-xs">Transmissão Ativa</span>
+                
+                {/* Badge de Validade do Link */}
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
+                  isLinkExpired ? 'bg-red-500 text-white' : 'bg-blue-800 text-blue-200'
+                }`}>
+                  <Clock size={12} />
+                  {isLinkExpired ? 'Link Expirado' : `Link válido por ~${remainingMinutes} min`}
+                </span>
               </div>
               <h2 className="text-2xl font-bold">{activeMeeting.topic}</h2>
               <p className="text-blue-100 text-sm mt-1">📍 {activeMeeting.farm}</p>
             </div>
             
             <div className="flex flex-wrap gap-2">
-              <button 
-                onClick={handleCopyInviteLink}
-                className="px-4 py-3 bg-blue-500 hover:bg-blue-400 text-white rounded-xl font-bold transition-all flex items-center gap-2 shadow-sm text-sm border border-blue-300/30"
-              >
-                {copiedLink ? <Check size={18} className="text-green-300" /> : <Copy size={18} />}
-                {copiedLink ? 'Link Copiado!' : 'Copiar Link do DDS'}
-              </button>
+              {/* Botão de Renovar Link ou Copiar */}
+              {isLinkExpired ? (
+                <button 
+                  onClick={handleRenewLink}
+                  className="px-4 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-bold transition-all flex items-center gap-2 shadow-sm text-sm animate-bounce"
+                >
+                  <RefreshCw size={18} /> Renovar Link (Mais 10 min)
+                </button>
+              ) : (
+                <button 
+                  onClick={handleCopyInviteLink}
+                  className="px-4 py-3 bg-blue-500 hover:bg-blue-400 text-white rounded-xl font-bold transition-all flex items-center gap-2 shadow-sm text-sm border border-blue-300/30"
+                >
+                  {copiedLink ? <Check size={18} className="text-green-300" /> : <Copy size={18} />}
+                  {copiedLink ? 'Link Copiado!' : 'Copiar Link (10 min)'}
+                </button>
+              )}
 
               <button 
                 onClick={handleDownloadActivePdf}
@@ -248,7 +282,6 @@ export default function AdminPanel() {
             </div>
           </div>
 
-          {/* Grid Principal: Mosaico de Vídeo + Lista de Presença */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-7 space-y-4">
               <DdsConferenceRoom
@@ -257,13 +290,18 @@ export default function AdminPanel() {
                 isAdmin={true}
               />
 
+              {/* Botão de Renovação Rápida */}
               <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
-                <span className="text-xs text-slate-500">Acesso local neste aparelho:</span>
-                <Link href={`/reuniao/${activeMeeting.id}`}>
-                  <button className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-2 text-xs transition-colors">
-                    <Smartphone size={16} /> Abrir Coleta de Presença
-                  </button>
-                </Link>
+                <span className="text-xs text-slate-500 flex items-center gap-1.5">
+                  <Clock size={14} className="text-blue-600" />
+                  {isLinkExpired ? 'O link de 10 min expirou.' : `Link expira em aproximadamente ${remainingMinutes} minutos.`}
+                </span>
+                <button 
+                  onClick={handleRenewLink}
+                  className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg text-xs transition-colors flex items-center gap-1"
+                >
+                  <RefreshCw size={12} /> Gerar Novo Link
+                </button>
               </div>
             </div>
 
@@ -288,7 +326,7 @@ export default function AdminPanel() {
                 {!activeMeeting.attendees || activeMeeting.attendees.length === 0 ? (
                   <div className="text-center py-12 text-slate-400">
                     <p>Ninguém assinou ainda.</p>
-                    <p className="text-xs text-slate-400 mt-1">Envie o link copiado para a equipe.</p>
+                    <p className="text-xs text-slate-400 mt-1">Envie o link de 10 minutos para a equipe.</p>
                   </div>
                 ) : (
                   <ul className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
@@ -330,7 +368,6 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        {/* Notificação Toast de Saída */}
         {exitNotification && (
           <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white border border-amber-500/40 p-4 rounded-2xl shadow-2xl flex items-center gap-3 max-w-sm">
             <div className="bg-amber-500/20 text-amber-400 p-2 rounded-xl">
@@ -350,13 +387,12 @@ export default function AdminPanel() {
   }
 
   // =========================================================================
-  // CENÁRIO 1: DASHBOARD PRINCIPAL (INICIAR NOVO DDS + HISTÓRICO DE AUDITORIA)
+  // DASHBOARD PRINCIPAL
   // =========================================================================
   return (
     <main className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
       <div className="max-w-5xl mx-auto space-y-6">
         
-        {/* Topo do Portal */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-3.5">
             <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-700">
@@ -364,7 +400,7 @@ export default function AdminPanel() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-800">Painel do Organizador</h1>
-              <p className="text-slate-500 text-xs">Gestão Diária de Segurança e Auditoria Digital</p>
+              <p className="text-slate-500 text-xs">Gestão Diária de Segurança e Links Temporários</p>
             </div>
           </div>
 
@@ -376,9 +412,8 @@ export default function AdminPanel() {
           </button>
         </header>
 
-        {/* Alerta de Reunião em Andamento (Se houver) */}
         {activeMeeting && (
-          <div className="bg-emerald-600 text-white p-5 rounded-2xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-300">
+          <div className="bg-emerald-600 text-white p-5 rounded-2xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-white/20 rounded-xl">
                 <Radio size={24} className="animate-pulse" />
@@ -390,7 +425,7 @@ export default function AdminPanel() {
             </div>
 
             <button
-              onClick={handleResumeActiveMeeting}
+              onClick={() => setIsLiveMode(true)}
               className="px-5 py-3 bg-white text-emerald-800 hover:bg-emerald-50 font-bold text-xs rounded-xl transition-all shadow-sm"
             >
               Entrar na Sala Ao Vivo ➡️
@@ -398,7 +433,6 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* Abas de Navegação */}
         <div className="flex bg-slate-200/80 p-1 rounded-2xl max-w-md">
           <button
             onClick={() => setActiveTab('NEW_DDS')}
@@ -423,17 +457,12 @@ export default function AdminPanel() {
           </button>
         </div>
 
-        {/* ========================================================================= */}
-        {/* ABA 1: FORMULÁRIO DE NOVO DDS COM PERFIL SALVO */}
-        {/* ========================================================================= */}
         {activeTab === 'NEW_DDS' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {/* Formulário do Novo DDS */}
             <div className="lg:col-span-7 bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6">
               <div>
                 <h2 className="text-lg font-bold text-slate-800">Configurar Nova Reunião</h2>
-                <p className="text-slate-500 text-xs">Preencha o tema para gerar a sala de hoje</p>
+                <p className="text-slate-500 text-xs">O link gerado terá validade de 10 minutos para entrada da equipe</p>
               </div>
 
               <form onSubmit={handleStartNewMeeting} className="space-y-4">
@@ -461,14 +490,13 @@ export default function AdminPanel() {
 
                 <button 
                   type="submit"
-                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 text-sm transition-all"
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 text-sm transition-all"
                 >
-                  <Play size={18} /> Iniciar DDS e Abrir Videoconferência
+                  <Play size={18} /> Iniciar DDS e Gerar Link de 10 Minutos
                 </button>
               </form>
             </div>
 
-            {/* Perfil Salvo do Organizador */}
             <div className="lg:col-span-5 bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 space-y-5">
               <div>
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
@@ -523,19 +551,15 @@ export default function AdminPanel() {
                 </button>
               </div>
             </div>
-
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* ABA 2: HISTÓRICO DE AUDITORIA COM DOWNLOAD DE PDFS ANTERIORES */}
-        {/* ========================================================================= */}
         {activeTab === 'HISTORY' && (
           <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4">
               <div>
                 <h2 className="text-lg font-bold text-slate-800">Histórico de Reuniões Realizadas</h2>
-                <p className="text-slate-500 text-xs">Arquivo de conformidade e auditoria de Normas Regulamentadoras</p>
+                <p className="text-slate-500 text-xs">Arquivo de conformidade e auditoria</p>
               </div>
 
               <span className="text-xs bg-blue-50 text-blue-700 font-semibold px-3 py-1 rounded-full border border-blue-200">
@@ -547,7 +571,6 @@ export default function AdminPanel() {
               <div className="text-center py-16 text-slate-400 space-y-2">
                 <History size={40} className="mx-auto opacity-40" />
                 <p className="text-sm font-semibold">Nenhum DDS finalizado no histórico ainda.</p>
-                <p className="text-xs">Assim que você encerrar uma reunião, o relatório arquivado aparecerá aqui.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -575,7 +598,7 @@ export default function AdminPanel() {
 
                     <button
                       onClick={() => handleDownloadHistoryPdf(meeting)}
-                      className="px-4 py-2.5 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm self-start md:self-auto"
+                      className="px-4 py-2.5 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
                     >
                       <Download size={15} /> Baixar Relatório PDF
                     </button>
