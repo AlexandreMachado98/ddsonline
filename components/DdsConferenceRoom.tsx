@@ -1,9 +1,9 @@
  'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import '@livekit/components-styles';
-import { Loader2, Video, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Loader2, Video, ShieldCheck, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface DdsConferenceProps {
   roomName: string;
@@ -17,16 +17,22 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
 
-  const cleanRoom = (roomName || 'dds-principal')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9-_]/g, '-')
-    .toLowerCase();
+  // Nome da sala padronizado
+  const cleanRoom = useMemo(() => {
+    return (roomName || 'dds-sala')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9-_]/g, '-')
+      .toLowerCase();
+  }, [roomName]);
 
-  const finalUserName = userName?.trim() || (isAdmin ? 'Técnico de Segurança' : 'Colaborador');
+  const finalUserName = useMemo(() => {
+    return userName?.trim() || (isAdmin ? 'Organizador' : 'Colaborador');
+  }, [userName, isAdmin]);
 
+  // Busca o token apenas UMA vez ao abrir a sala
   useEffect(() => {
-    let isMounted = true;
+    let isCancelled = false;
 
     const fetchToken = async () => {
       try {
@@ -36,25 +42,25 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
         const res = await fetch(
           `/api/livekit/token?room=${encodeURIComponent(cleanRoom)}&username=${encodeURIComponent(
             finalUserName
-          )}&isAdmin=${isAdmin}`
+          )}&_t=${Date.now()}`
         );
 
         const data = await res.json();
 
         if (!res.ok || !data.token) {
-          throw new Error(data.error || 'Não foi possível obter o token da sala.');
+          throw new Error(data.error || 'Falha ao autenticar na sala do LiveKit.');
         }
 
-        if (isMounted) {
+        if (!isCancelled) {
           setToken(data.token);
           setWsUrl(data.wsUrl);
         }
       } catch (err: any) {
-        if (isMounted) {
-          setError(err?.message || 'Erro ao conectar à sala de vídeo.');
+        if (!isCancelled) {
+          setError(err?.message || 'Erro ao conectar à sala de transmissão.');
         }
       } finally {
-        if (isMounted) {
+        if (!isCancelled) {
           setLoading(false);
         }
       }
@@ -63,16 +69,16 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     fetchToken();
 
     return () => {
-      isMounted = false;
+      isCancelled = true;
     };
-  }, [cleanRoom, finalUserName, isAdmin]);
+  }, [cleanRoom, finalUserName]);
 
   if (loading) {
     return (
       <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-3xl border border-slate-800 flex flex-col items-center justify-center space-y-3 p-6 text-center shadow-xl">
         <Loader2 className="w-8 h-8 text-green-400 animate-spin" />
         <p className="text-sm font-bold text-white">Iniciando Transmissão Ao Vivo...</p>
-        <p className="text-xs text-slate-400">Conectando aos servidores WebRTC da AM TST</p>
+        <p className="text-xs text-slate-400">Conectando aos servidores WebRTC do DDS ON</p>
       </div>
     );
   }
@@ -81,8 +87,14 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     return (
       <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-3xl border border-red-500/30 flex flex-col items-center justify-center space-y-3 p-6 text-center shadow-xl">
         <AlertCircle className="w-10 h-10 text-red-400" />
-        <p className="text-sm font-bold text-white">Falha na Conexão do Vídeo</p>
+        <p className="text-sm font-bold text-white">Falha na Conexão do LiveKit</p>
         <p className="text-xs text-slate-400 max-w-md">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700"
+        >
+          <RefreshCw size={14} /> Tentar Novamente
+        </button>
       </div>
     );
   }
@@ -109,13 +121,13 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
             </span>
           ) : (
             <span className="text-[11px] bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/30">
-              🎙️ Transmissão Nativa
+              🎙️ Ao Vivo
             </span>
           )}
         </div>
       </div>
 
-      {/* LiveKit Room com conexão ativa */}
+      {/* Sala Nativa LiveKit com Conexão Estável */}
       <div className="relative flex-1 w-full bg-black min-h-[400px]" data-lk-theme="default">
         {token && wsUrl && (
           <LiveKitRoom
