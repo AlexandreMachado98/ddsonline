@@ -7,17 +7,16 @@ import {
   History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
 
 export default function AdminPanel() {
-  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   const [activeTab, setActiveTab] = useState<'NEW_DDS' | 'HISTORY'>('NEW_DDS');
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
+  const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
 
   const [topic, setTopic] = useState('');
   const [farm, setFarm] = useState('');
@@ -32,18 +31,21 @@ export default function AdminPanel() {
   const [remainingMinutes, setRemainingMinutes] = useState<number>(10);
   const [isLinkExpired, setIsLinkExpired] = useState<boolean>(false);
 
+  // Carrega a sessão sem loop
   useEffect(() => {
-    const auth = localStorage.getItem('dds_admin_auth');
-    if (!auth) {
-      router.push('/');
-      return;
-    }
     try {
-      setCurrentUser(JSON.parse(auth));
+      const auth = localStorage.getItem('dds_admin_auth');
+      if (!auth) {
+        window.location.replace('/');
+        return;
+      }
+      const user = JSON.parse(auth);
+      setCurrentUser(user);
     } catch {
-      router.push('/');
+      localStorage.removeItem('dds_admin_auth');
+      window.location.replace('/');
     }
-  }, [router]);
+  }, []);
 
   const fetchAllData = useCallback(async () => {
     try {
@@ -68,7 +70,12 @@ export default function AdminPanel() {
       }
       
       if (data.success) {
-        setActiveMeeting(data.meeting || null);
+        if (data.meeting && data.meeting.status === 'LIVE') {
+          setActiveMeeting(data.meeting);
+        } else {
+          setActiveMeeting(null);
+        }
+
         setMeetingHistory(data.history || []);
 
         if (data.meeting && data.meeting.inviteExpiresAt) {
@@ -92,15 +99,19 @@ export default function AdminPanel() {
         }
       }
     } catch (error) {
-      console.error("Erro na busca:", error);
+      console.error(error);
+    } finally {
+      setIsInitialLoadDone(true);
     }
   }, [currentUser, startDate, endDate, exitNotification]);
 
   useEffect(() => {
-    fetchAllData();
-    const interval = setInterval(fetchAllData, 2500);
-    return () => clearInterval(interval);
-  }, [fetchAllData]);
+    if (currentUser) {
+      fetchAllData();
+      const interval = setInterval(fetchAllData, 2500);
+      return () => clearInterval(interval);
+    }
+  }, [currentUser, fetchAllData]);
 
   const handleStartNewMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,7 +215,7 @@ export default function AdminPanel() {
     }
     generateConsolidatedDdsPdf({
       organizerName: currentUser?.name || 'Técnico de Segurança',
-      organizerRole: currentUser?.role || 'Técnico em Segurança do Trabalho',
+      organizerRole: currentUser?.position || currentUser?.role || 'Técnico em Segurança do Trabalho',
       companyName: currentUser?.company || 'Unidade Rural',
       startDate: startDate || undefined,
       endDate: endDate || undefined,
@@ -231,7 +242,7 @@ export default function AdminPanel() {
 
   const handleLogout = () => {
     localStorage.removeItem('dds_admin_auth');
-    router.push('/');
+    window.location.replace('/');
   };
 
   // SALA DO DDS AO VIVO
@@ -421,9 +432,9 @@ export default function AdminPanel() {
           </div>
         </header>
 
-        {/* Alerta de DDS Ativo */}
-        {activeMeeting && (
-          <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-5 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-green-400/30">
+        {/* Alerta de DDS Ativo (Blindado contra flash) */}
+        {isInitialLoadDone && activeMeeting && (
+          <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-5 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-green-400/30 animate-in fade-in duration-300">
             <div className="flex items-center gap-3.5">
               <div className="p-3 bg-white/20 rounded-2xl">
                 <Radio size={24} className="animate-pulse" />

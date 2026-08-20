@@ -7,15 +7,46 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  ORGANIZER
+}
+
+enum Status {
+  ACTIVE
+  PENDING_APPROVAL
+  SUSPENDED
+  BLOCKED
+}
+
+model Company {
+  id                 String    @id @default(uuid())
+  name               String
+  document           String?
+  status             Status    @default(ACTIVE)
+  secretKey          String?
+  autoApproveWithKey Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  
+  users              User[]
+  meetings           Meeting[]
+}
+
 model User {
-  id        String    @id @default(uuid())
-  name      String
-  email     String    @unique
-  password  String
-  role      String    @default("Técnico em Segurança do Trabalho")
-  company   String?
-  createdAt DateTime  @default(now())
-  meetings  Meeting[]
+  id         String    @id @default(uuid())
+  name       String
+  email      String    @unique
+  password   String
+  role       Role      @default(ORGANIZER)
+  status     Status    @default(ACTIVE)
+  position   String?   @default("Técnico em Segurança do Trabalho")
+  company    String?
+  createdAt  DateTime  @default(now())
+  
+  companyId  String?
+  companyRel Company?  @relation(fields: [companyId], references: [id])
+  meetings   Meeting[]
 }
 
 model Meeting {
@@ -28,6 +59,8 @@ model Meeting {
   inviteToken     String?
   organizerId     String?
   organizer       User?        @relation(fields: [organizerId], references: [id])
+  companyId       String?
+  company         Company?     @relation(fields: [companyId], references: [id])
   attendees       Attendance[]
 }
 
@@ -37,9 +70,9 @@ model Attendance {
   cpf           String
   selfie        String
   signature     String
-  exitReason    String?   // Motivo da saída antecipada
-  exitSignature String?   // Assinatura manual de saída
-  leftAt        DateTime? // Horário exato da saída
+  exitReason    String?
+  exitSignature String?
+  leftAt        DateTime?
   createdAt     DateTime  @default(now())
   meetingId     String
   meeting       Meeting   @relation(fields: [meetingId], references: [id])

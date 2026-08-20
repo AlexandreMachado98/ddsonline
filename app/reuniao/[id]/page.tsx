@@ -154,7 +154,6 @@ export default function MeetingRoomPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // TELA DE LINK EXPIRADO
   if (currentStep === 'EXPIRED' || !isLinkValid) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
@@ -194,7 +193,6 @@ export default function MeetingRoomPage() {
     );
   }
 
-  // TELA DE SAÍDA REGISTRADA
   if (currentStep === 'EXIT_SUCCESS') {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
@@ -223,7 +221,6 @@ export default function MeetingRoomPage() {
     );
   }
 
-  // TELA DA SALA DE VÍDEO
   if (currentStep === 'ROOM') {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center p-3 md:p-6 font-sans relative">
@@ -265,7 +262,6 @@ export default function MeetingRoomPage() {
           </div>
         </div>
 
-        {/* Modal de Justificativa de Saída */}
         {showExitModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white text-slate-900 w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in duration-200">
@@ -334,11 +330,8 @@ export default function MeetingRoomPage() {
     );
   }
 
-  // TELA DE FORMULÁRIO DE ENTRADA
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center py-6 px-4 font-sans">
-      
-      {/* Topo Limpo Padronizado: DDS ON */}
       <header className="w-full max-w-md flex items-center justify-between bg-slate-900 border border-slate-800 px-4 py-3 rounded-2xl shadow-sm mb-6">
         <div className="flex items-center gap-2">
           <span className="text-base font-black tracking-tight">
@@ -356,7 +349,6 @@ export default function MeetingRoomPage() {
         </div>
       </header>
 
-      {/* Banner da Reunião */}
       <div className="w-full max-w-md bg-gradient-to-r from-green-700 to-emerald-800 text-white p-5 rounded-2xl shadow-lg mb-6 text-center border border-green-500/30">
         <span className="text-[10px] font-bold uppercase tracking-wider text-green-200">Diálogo Diário de Segurança</span>
         <h1 className="text-xl font-bold mt-1 text-white">{topic}</h1>
@@ -369,7 +361,6 @@ export default function MeetingRoomPage() {
           <span>Preencha sua presença para liberar seu microfone e câmera no DDS ao vivo.</span>
         </div>
 
-        {/* Dados */}
         <section className="space-y-4 bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
           <h2 className="text-sm font-bold text-white">1. Seus Dados</h2>
           <div>
@@ -394,13 +385,11 @@ export default function MeetingRoomPage() {
           </div>
         </section>
 
-        {/* Selfie */}
         <section className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
           <h2 className="text-sm font-bold text-white mb-3">2. Biometria Facial</h2>
           <SelfieCapture onConfirm={(selfie) => setSavedSelfie(selfie)} />
         </section>
 
-        {/* Assinatura */}
         <section className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
           <h2 className="text-sm font-bold text-white mb-3">3. Assinatura Digital</h2>
           <SignaturePad onSave={(signature) => setSavedSignature(signature)} />

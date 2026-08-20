@@ -29,7 +29,7 @@ interface ConsolidatedReportData {
   meetings: MeetingData[];
 }
 
-// 1. ATA INDIVIDUAL DE DDS (DDS ON)
+// 1. ATA INDIVIDUAL DE DDS COM ENTRADA E SAÍDA AUDITADA (DDS ON)
 export function generateDdsPdf(meeting: MeetingData) {
   const doc = new jsPDF();
 
@@ -133,18 +133,21 @@ export function generateDdsPdf(meeting: MeetingData) {
         const attendee = meeting.attendees[data.row.index];
         if (!attendee) return;
 
+        // Selfie na coluna 3
         if (data.column.index === 3 && attendee.selfie) {
           try {
             doc.addImage(attendee.selfie, 'JPEG', data.cell.x + 4, data.cell.y + 2, 14, 14);
           } catch (e) {}
         }
 
+        // Assinatura Entrada na coluna 4
         if (data.column.index === 4 && attendee.signature) {
           try {
             doc.addImage(attendee.signature, 'PNG', data.cell.x + 3, data.cell.y + 3, 24, 12);
           } catch (e) {}
         }
 
+        // Assinatura Saída na coluna 6 (se houver)
         if (data.column.index === 6 && attendee.exitSignature) {
           try {
             doc.addImage(attendee.exitSignature, 'PNG', data.cell.x + 3, data.cell.y + 3, 24, 12);
