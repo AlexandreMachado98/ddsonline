@@ -3,16 +3,31 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { 
   Video, VideoOff, Mic, MicOff, Monitor, Square, Circle, 
-  Download, FlipHorizontal, ShieldCheck, AlertCircle 
+  Download, FlipHorizontal, ShieldCheck, LayoutGrid, Maximize2, Users, CheckCircle2, User
 } from 'lucide-react';
+
+interface Attendee {
+  id: string;
+  name: string;
+  cpf: string;
+  selfie?: string;
+  createdAt: string;
+  exitReason?: string;
+}
 
 interface DdsConferenceProps {
   roomName: string;
   userName: string;
   isAdmin?: boolean;
+  attendees?: Attendee[];
 }
 
-export default function DdsConferenceRoom({ roomName, userName, isAdmin = false }: DdsConferenceProps) {
+export default function DdsConferenceRoom({ 
+  roomName, 
+  userName, 
+  isAdmin = false, 
+  attendees = [] 
+}: DdsConferenceProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
@@ -22,6 +37,9 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isMirrored, setIsMirrored] = useState(true);
 
+  // Alternância de Layout: 'MOSAIC' (Grade) ou 'SPOTLIGHT' (Foco no Apresentador)
+  const [viewMode, setViewMode] = useState<'MOSAIC' | 'SPOTLIGHT'>('MOSAIC');
+
   // Estados de Gravação
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -30,7 +48,6 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
 
   const finalUserName = userName?.trim() || (isAdmin ? 'Técnico de Segurança' : 'Colaborador');
 
-  // Inicia a Câmera e Microfone com resolução otimizada
   const startMedia = useCallback(async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -49,12 +66,11 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-    } catch (err: any) {
-      alert('Permita o acesso à câmera e ao microfone no navegador.');
+    } catch {
+      alert('Por favor, autorize o acesso à câmera e microfone no navegador.');
     }
   }, []);
 
-  // Compartilhamento de Tela (Slides / Normas / PDFs)
   const toggleScreenShare = async () => {
     if (!isScreenSharing) {
       try {
@@ -63,7 +79,6 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
           audio: true
         });
 
-        // Se o usuário fechar o compartilhamento pela barra do navegador
         screenStream.getVideoTracks()[0].onended = () => {
           startMedia();
         };
@@ -74,20 +89,17 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
 
         setStream(screenStream);
         setIsScreenSharing(true);
-        setIsMirrored(false); // Tela compartilhada não deve ser espelhada
+        setIsMirrored(false);
 
         if (videoRef.current) {
           videoRef.current.srcObject = screenStream;
         }
-      } catch {
-        // Cancelado pelo usuário
-      }
+      } catch {}
     } else {
       startMedia();
     }
   };
 
-  // Alternar Mudo
   const toggleMute = () => {
     if (stream) {
       const audioTrack = stream.getAudioTracks()[0];
@@ -98,7 +110,6 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     }
   };
 
-  // Parar Transmissão
   const stopMedia = () => {
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
@@ -108,10 +119,9 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     }
   };
 
-  // Gravação do DDS
   const startRecording = () => {
     if (!stream) {
-      alert('Ligue a câmera ou compartilhe a tela antes de iniciar a gravação.');
+      alert('Ligue a câmera ou compartilhe a tela antes de gravar.');
       return;
     }
 
@@ -134,7 +144,7 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
       mediaRecorderRef.current = mediaRecorder;
       setIsRecording(true);
     } catch {
-      alert('Seu navegador não suporta a gravação direta neste formato.');
+      alert('Navegador não suporta este formato de gravação.');
     }
   };
 
@@ -145,7 +155,6 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     }
   };
 
-  // Cronômetro da Gravação
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isRecording) {
@@ -154,7 +163,6 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     return () => clearInterval(timer);
   }, [isRecording]);
 
-  // Gera o arquivo final gravado
   useEffect(() => {
     if (!isRecording && recordedChunks.length > 0) {
       const blob = new Blob(recordedChunks, { type: 'video/webm' });
@@ -169,83 +177,192 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Calcula a quantidade de colunas do mosaico dinamicamente
+  const getGridCols = () => {
+    const totalTiles = 1 + attendees.length;
+    if (totalTiles <= 1) return 'grid-cols-1';
+    if (totalTiles === 2) return 'grid-cols-1 sm:grid-cols-2';
+    if (totalTiles <= 4) return 'grid-cols-1 sm:grid-cols-2';
+    return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+  };
+
   return (
-    <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col justify-between">
+    <div className="w-full h-full min-h-[480px] bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col justify-between">
       
-      {/* Topo do Estúdio */}
+      {/* Topo do Mosaico */}
       <div className="bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-800">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
           </span>
           <span className="text-white text-xs font-bold flex items-center gap-1.5">
-            <Video size={14} className="text-green-400" />
-            {isAdmin ? 'Estúdio de Transmissão AM TST' : `Conectado: ${finalUserName}`}
+            <Users size={15} className="text-green-400" />
+            Mosaico de Participantes ({1 + attendees.length})
           </span>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Botão de Alternar Layout Mosaico vs Foco */}
+          <button
+            onClick={() => setViewMode(viewMode === 'MOSAIC' ? 'SPOTLIGHT' : 'MOSAIC')}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors"
+            title="Alternar Modo de Exibição"
+          >
+            {viewMode === 'MOSAIC' ? (
+              <>
+                <Maximize2 size={13} /> Modo Foco
+              </>
+            ) : (
+              <>
+                <LayoutGrid size={13} /> Modo Grade
+              </>
+            )}
+          </button>
+
           {isAdmin ? (
             <span className="text-[11px] bg-green-500/20 text-green-300 px-2.5 py-0.5 rounded-full font-semibold border border-green-500/30 flex items-center gap-1">
-              <ShieldCheck size={12} /> Organizador Oficial
+              <ShieldCheck size={12} /> Organizador
             </span>
           ) : (
             <span className="text-[11px] bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/30">
-              🎙️ Transmissão Nativa
+              🎙️ Ao Vivo
             </span>
           )}
         </div>
       </div>
 
-      {/* Janela de Vídeo Principal */}
-      <div className="relative flex-1 w-full bg-black min-h-[380px] flex items-center justify-center overflow-hidden">
-        {recordedVideoUrl && !isCameraActive ? (
-          <video src={recordedVideoUrl} controls className="w-full h-full object-contain" />
-        ) : (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted={isAdmin} // Muta localmente para não dar eco no próprio técnico
-            className={`w-full h-full object-cover transition-transform duration-200 ${
-              isMirrored && !isScreenSharing ? '-scale-x-100' : 'scale-x-100'
-            } ${!isCameraActive ? 'hidden' : ''}`}
-          />
-        )}
+      {/* ÁREA DO MOSAICO DINÂMICO */}
+      <div className="relative flex-1 w-full bg-slate-950 p-3 overflow-y-auto">
+        
+        {/* LAYOUT 1: MODO GRADE / MOSAICO (TODOS LADO A LADO) */}
+        {viewMode === 'MOSAIC' && (
+          <div className={`grid ${getGridCols()} gap-3 w-full h-full min-h-[380px]`}>
+            
+            {/* QUADRO 1: CÂMERA DO ORGANIZADOR / APRESENTADOR */}
+            <div className="relative bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-lg flex items-center justify-center min-h-[200px]">
+              {recordedVideoUrl && !isCameraActive ? (
+                <video src={recordedVideoUrl} controls className="w-full h-full object-contain" />
+              ) : (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted={isAdmin}
+                  className={`w-full h-full object-cover ${
+                    isMirrored && !isScreenSharing ? '-scale-x-100' : 'scale-x-100'
+                  } ${!isCameraActive ? 'hidden' : ''}`}
+                />
+              )}
 
-        {!isCameraActive && !recordedVideoUrl && (
-          <div className="text-center p-6 text-slate-500 space-y-3">
-            <div className="p-4 bg-slate-900 rounded-full inline-flex border border-slate-800">
-              <VideoOff size={36} className="text-slate-600" />
+              {!isCameraActive && !recordedVideoUrl && (
+                <div className="text-center p-4 text-slate-500 space-y-2">
+                  <VideoOff size={28} className="mx-auto text-slate-600" />
+                  <p className="text-xs font-bold text-slate-400">Câmera do Organizador</p>
+                  <button
+                    onClick={startMedia}
+                    className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-[11px] transition-colors"
+                  >
+                    Ligar Câmera
+                  </button>
+                </div>
+              )}
+
+              {/* Tag do Organizador */}
+              <div className="absolute bottom-2 left-2 bg-slate-950/80 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-slate-800 flex items-center gap-1.5 z-10">
+                <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                <span className="text-[11px] font-bold text-white truncate max-w-[140px]">{finalUserName} (Organizador)</span>
+              </div>
+
+              {isRecording && (
+                <div className="absolute top-2 left-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 animate-pulse z-10">
+                  <Circle size={8} className="fill-white" /> REC {formatTime(recordingTime)}
+                </div>
+              )}
             </div>
-            <div>
-              <p className="text-sm font-bold text-slate-300">Câmera e Microfone Desligados</p>
-              <p className="text-xs text-slate-500 mt-0.5">Clique no botão abaixo para iniciar a transmissão</p>
+
+            {/* QUADROS DOS TRABALHADORES PRESENTES NO DDS */}
+            {attendees.map((attendee) => {
+              const isExited = Boolean(attendee.exitReason);
+              return (
+                <div 
+                  key={attendee.id} 
+                  className={`relative bg-slate-900 rounded-2xl overflow-hidden border shadow-lg flex items-center justify-center min-h-[200px] transition-all ${
+                    isExited ? 'border-amber-500/30 opacity-70' : 'border-green-500/30'
+                  }`}
+                >
+                  {/* Foto da Biometria Facial do Colaborador */}
+                  {attendee.selfie ? (
+                    <img 
+                      src={attendee.selfie} 
+                      alt={attendee.name} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-center p-4 text-slate-500">
+                      <User size={36} className="mx-auto text-slate-600" />
+                    </div>
+                  )}
+
+                  {/* Tag com Nome e Status do Colaborador */}
+                  <div className="absolute bottom-2 left-2 right-2 bg-slate-950/85 backdrop-blur-sm p-2 rounded-xl border border-slate-800/80 flex items-center justify-between z-10">
+                    <div className="truncate mr-2">
+                      <p className="text-xs font-bold text-white truncate">{attendee.name}</p>
+                      <p className="text-[10px] text-slate-400">
+                        {isExited ? `⚠️ Saída: ${attendee.exitReason}` : `Entrada: ${new Date(attendee.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                      </p>
+                    </div>
+
+                    <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${isExited ? 'bg-amber-400' : 'bg-green-500 animate-pulse'}`}></span>
+                  </div>
+                </div>
+              );
+            })}
+
+          </div>
+        )}
+
+        {/* LAYOUT 2: MODO FOCO (APRESENTADOR GRANDE + CARROSSEL EMBAIXO) */}
+        {viewMode === 'SPOTLIGHT' && (
+          <div className="flex flex-col h-full space-y-3">
+            {/* Tela Central Grande */}
+            <div className="relative flex-1 bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-xl flex items-center justify-center min-h-[280px]">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted={isAdmin}
+                className={`w-full h-full object-cover ${
+                  isMirrored && !isScreenSharing ? '-scale-x-100' : 'scale-x-100'
+                } ${!isCameraActive ? 'hidden' : ''}`}
+              />
+
+              {!isCameraActive && (
+                <div className="text-center p-4 text-slate-500 space-y-2">
+                  <p className="text-xs font-bold text-slate-400">Câmera Principal</p>
+                  <button onClick={startMedia} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold">
+                    Ligar Câmera
+                  </button>
+                </div>
+              )}
             </div>
-            <button
-              onClick={startMedia}
-              className="px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all"
-            >
-              Ligar Câmera e Microfone
-            </button>
+
+            {/* Fila de Participantes Embaixo */}
+            {attendees.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1 max-h-24">
+                {attendees.map(a => (
+                  <div key={a.id} className="relative w-20 h-20 bg-slate-900 rounded-xl overflow-hidden border border-green-500/30 shrink-0">
+                    {a.selfie && <img src={a.selfie} alt={a.name} className="w-full h-full object-cover" />}
+                    <span className="absolute bottom-1 left-1 right-1 text-[9px] font-bold text-white bg-slate-950/80 px-1 rounded truncate text-center">
+                      {a.name.split(' ')[0]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Badge "REC" quando estiver gravando */}
-        {isRecording && (
-          <div className="absolute top-4 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1.5 shadow-lg animate-pulse z-20">
-            <Circle size={10} className="fill-white" />
-            REC {formatTime(recordingTime)}
-          </div>
-        )}
-
-        {/* Badge de Tela Compartilhada */}
-        {isScreenSharing && (
-          <div className="absolute top-4 right-4 bg-blue-600 text-white text-[11px] px-3 py-1 rounded-full font-bold shadow-lg z-20 flex items-center gap-1">
-            <Monitor size={12} /> Apresentando Tela
-          </div>
-        )}
       </div>
 
       {/* Barra Inferior de Controles */}
@@ -253,7 +370,6 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
         <div className="flex items-center gap-2">
           {isCameraActive && (
             <>
-              {/* Botão Microfone */}
               <button
                 onClick={toggleMute}
                 className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
@@ -266,7 +382,6 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
                 {isMicMuted ? <MicOff size={16} /> : <Mic size={16} className="text-green-400" />}
               </button>
 
-              {/* Botão Apresentar Tela */}
               <button
                 onClick={toggleScreenShare}
                 className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
@@ -279,7 +394,6 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
                 <span className="hidden sm:inline">{isScreenSharing ? 'Parar Apresentação' : 'Apresentar Tela'}</span>
               </button>
 
-              {/* Botão Espelho */}
               {!isScreenSharing && (
                 <button
                   onClick={() => setIsMirrored(!isMirrored)}
@@ -327,7 +441,6 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
             </>
           )}
 
-          {/* Download do Vídeo Gravado */}
           {recordedVideoUrl && (
             <a
               href={recordedVideoUrl}

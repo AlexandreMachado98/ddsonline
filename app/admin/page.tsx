@@ -31,7 +31,7 @@ export default function AdminPanel() {
   const [remainingMinutes, setRemainingMinutes] = useState<number>(10);
   const [isLinkExpired, setIsLinkExpired] = useState<boolean>(false);
 
-  // Carrega a sessão sem loop
+  // 1. Carrega dados da sessão do organizador
   useEffect(() => {
     try {
       const auth = localStorage.getItem('dds_admin_auth');
@@ -47,6 +47,7 @@ export default function AdminPanel() {
     }
   }, []);
 
+  // 2. Busca e monitoramento em tempo real com anti-cache
   const fetchAllData = useCallback(async () => {
     try {
       const orgId = currentUser?.id || '';
@@ -184,7 +185,7 @@ export default function AdminPanel() {
 
   const handleDownloadActivePdf = () => {
     if (!activeMeeting || !activeMeeting.attendees || activeMeeting.attendees.length === 0) {
-      alert('Ainda não há presenças registradas.');
+      alert('Ainda não há presenças registradas nesta reunião.');
       return;
     }
     generateDdsPdf({
@@ -197,7 +198,7 @@ export default function AdminPanel() {
 
   const handleDownloadHistoryPdf = (meeting: any) => {
     if (!meeting.attendees || meeting.attendees.length === 0) {
-      alert('Esta reunião não possui presenças.');
+      alert('Esta reunião não possui presenças registradas.');
       return;
     }
     generateDdsPdf({
@@ -245,7 +246,9 @@ export default function AdminPanel() {
     window.location.replace('/');
   };
 
-  // SALA DO DDS AO VIVO
+  // =========================================================================
+  // SALA DO DDS AO VIVO (COM MOSAICO DE PARTICIPANTES CONECTADO)
+  // =========================================================================
   if (isLiveMode && activeMeeting) {
     return (
       <main className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans relative text-white">
@@ -326,14 +329,17 @@ export default function AdminPanel() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Mosaico de Vídeo + Colaboradores Conectados */}
             <div className="lg:col-span-7 space-y-4">
               <DdsConferenceRoom
                 roomName={activeMeeting.id}
                 userName={`${currentUser?.name || 'Técnico'} (DDS ON)`}
                 isAdmin={true}
+                attendees={activeMeeting.attendees || []}
               />
             </div>
 
+            {/* Métricas e Lista em Tempo Real */}
             <div className="lg:col-span-5 space-y-6">
               <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 flex items-center justify-around text-center">
                 <div>
@@ -400,7 +406,9 @@ export default function AdminPanel() {
     );
   }
 
+  // =========================================================================
   // DASHBOARD PRINCIPAL
+  // =========================================================================
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans">
       <div className="max-w-5xl mx-auto space-y-6">
