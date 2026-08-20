@@ -18,8 +18,8 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
 
   const finalUserName = userName?.trim() || (isAdmin ? 'Técnico de Segurança' : 'Colaborador');
 
-  // URL da sala Daily.co (Substitua 'amtst' pelo seu subdomínio do Daily se for diferente)
-  const dailyUrl = `https://amtst.daily.co/dds-aovivo?userName=${encodeURIComponent(finalUserName)}`;
+// Substitua 'amtst' pelo nome do subdomínio que você escolheu no Daily!
+  const dailyUrl = `https://ddsoline.daily.co/dds-aovivo?userName=${encodeURIComponent(finalUserName)}`;
 
   return (
     <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col">
