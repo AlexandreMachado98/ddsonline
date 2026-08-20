@@ -1,9 +1,13 @@
-import { NextResponse } from 'next/server';
+ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+
+// FORÇA A VERCEL A NUNCA CACHEAR ESTA ROTA (TEMPO REAL OBRIGATÓRIO)
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const prisma = new PrismaClient();
 
-// 1. GET: Busca reunião ativa e histórico filtrado
+// 1. GET: Busca reunião ativa e histórico em tempo real
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -23,7 +27,7 @@ export async function GET(req: Request) {
       status: 'ENDED'
     };
 
-    if (organizerId) {
+    if (organizerId && organizerId !== 'undefined' && organizerId !== 'null') {
       meetingWhere.organizerId = organizerId;
     }
 
@@ -31,10 +35,11 @@ export async function GET(req: Request) {
       meetingWhere.createdAt = dateFilter;
     }
 
-    const activeMeeting = await prisma.meeting.findFirst({
+    // Busca a reunião AO VIVO com todas as presenças atualizadas
+    const activeMeeting = await (prisma as any).meeting.findFirst({
       where: {
         status: 'LIVE',
-        ...(organizerId ? { organizerId } : {})
+        ...(organizerId && organizerId !== 'undefined' ? { organizerId } : {})
       },
       include: {
         attendees: {
@@ -43,7 +48,7 @@ export async function GET(req: Request) {
       }
     });
 
-    const history = await prisma.meeting.findMany({
+    const history = await (prisma as any).meeting.findMany({
       where: meetingWhere,
       include: {
         attendees: {
@@ -53,7 +58,16 @@ export async function GET(req: Request) {
       orderBy: { createdAt: 'desc' }
     });
 
-    return NextResponse.json({ success: true, meeting: activeMeeting, history });
+    return NextResponse.json(
+      { success: true, meeting: activeMeeting, history },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      }
+    );
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error?.message || 'Erro ao buscar dados' }, { status: 500 });
   }
@@ -70,7 +84,7 @@ export async function POST(req: Request) {
     }
 
     try {
-      await prisma.meeting.updateMany({
+      await (prisma as any).meeting.updateMany({
         where: {
           status: 'LIVE',
           ...(organizerId ? { organizerId } : {})
@@ -82,7 +96,7 @@ export async function POST(req: Request) {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     const inviteToken = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-    const newMeeting = await prisma.meeting.create({
+    const newMeeting = await (prisma as any).meeting.create({
       data: {
         topic: String(topic).trim(),
         farm: String(farm).trim(),
@@ -98,7 +112,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, meeting: newMeeting });
   } catch (error: any) {
-    console.error("Erro no POST /api/reuniao:", error);
     return NextResponse.json({ success: false, error: error?.message || 'Falha ao salvar no banco' }, { status: 500 });
   }
 }
@@ -110,7 +123,7 @@ export async function PATCH(req: Request) {
     const newExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
     const newToken = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-    const updated = await prisma.meeting.update({
+    const updated = await (prisma as any).meeting.update({
       where: { id: meetingId },
       data: {
         inviteExpiresAt: newExpiresAt,
@@ -133,7 +146,7 @@ export async function PUT(req: Request) {
     const body = await req.json().catch(() => ({}));
     const { meetingId } = body;
 
-    await prisma.meeting.updateMany({
+    await (prisma as any).meeting.updateMany({
       where: {
         status: 'LIVE',
         ...(meetingId ? { id: meetingId } : {})

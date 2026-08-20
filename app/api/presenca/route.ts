@@ -1,45 +1,54 @@
  import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, cpf, meetingId, exitReason, exitSignature } = body;
+    const { name, cpf, savedSelfie, savedSignature, meetingId } = body;
 
-    const cleanCpf = String(cpf || '').replace(/\D/g, '');
+    let meeting = null;
 
-    // 1. Busca as presenças desta reunião
-    const attendances = await (prisma as any).attendance.findMany({
-      where: {
-        meetingId: meetingId
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    // 2. Localiza o registro do colaborador por CPF ou Nome
-    const target = attendances.find((a: any) => 
-      a.cpf.replace(/\D/g, '') === cleanCpf ||
-      a.name.toLowerCase().trim() === String(name || '').toLowerCase().trim()
-    );
-
-    if (target) {
-      const updated = await (prisma as any).attendance.update({
-        where: { id: target.id },
-        data: {
-          exitReason: String(exitReason || 'Não informado').trim(),
-          exitSignature: exitSignature || null,
-          leftAt: new Date()
-        }
+    if (meetingId && meetingId !== 'dds-principal') {
+      meeting = await (prisma as any).meeting.findUnique({
+        where: { id: meetingId }
       });
-
-      return NextResponse.json({ success: true, data: updated });
     }
 
-    return NextResponse.json({ success: false, error: 'Presença não localizada' }, { status: 404 });
+    if (!meeting) {
+      meeting = await (prisma as any).meeting.findFirst({
+        where: { status: 'LIVE' },
+        orderBy: { createdAt: 'desc' }
+      });
+    }
+
+    if (!meeting) {
+      meeting = await (prisma as any).meeting.create({
+        data: {
+          topic: 'DDS Diário',
+          farm: 'Fazenda Geral',
+          status: 'LIVE'
+        }
+      });
+    }
+
+    const attendance = await (prisma as any).attendance.create({
+      data: {
+        name: String(name).trim(),
+        cpf: String(cpf).trim(),
+        selfie: savedSelfie,
+        signature: savedSignature,
+        meetingId: meeting.id
+      }
+    });
+
+    return NextResponse.json({ success: true, data: attendance, meetingId: meeting.id });
   } catch (error: any) {
-    console.error("Erro no registro de saída:", error);
-    return NextResponse.json({ success: false, error: error?.message || 'Erro ao registrar saída' }, { status: 500 });
+    console.error("Erro no POST /api/presenca:", error);
+    return NextResponse.json({ success: false, error: error?.message || 'Erro ao salvar presença' }, { status: 500 });
   }
 }

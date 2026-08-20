@@ -1,4 +1,4 @@
-'use client';
+ 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
@@ -35,7 +35,7 @@ export default function AdminPanel() {
   const [remainingMinutes, setRemainingMinutes] = useState<number>(10);
   const [isLinkExpired, setIsLinkExpired] = useState<boolean>(false);
 
-  // 1. Carrega dados do Usuário Logado no Banco de Dados
+  // 1. Carrega dados do Usuário Logado
   useEffect(() => {
     const auth = localStorage.getItem('dds_admin_auth');
     if (!auth) {
@@ -49,16 +49,22 @@ export default function AdminPanel() {
     }
   }, [router]);
 
-  // 2. Busca dados de reuniões filtradas por usuário e datas (com leitura segura de JSON)
+  // 2. Busca em TEMPO REAL REAL com destruidor de cache (_t=timestamp)
   const fetchAllData = useCallback(async () => {
-    if (!currentUser?.id) return;
-
     try {
-      let url = `/api/reuniao?organizerId=${currentUser.id}`;
+      const orgId = currentUser?.id || '';
+      let url = `/api/reuniao?organizerId=${orgId}&_t=${Date.now()}`;
       if (startDate) url += `&startDate=${startDate}`;
       if (endDate) url += `&endDate=${endDate}`;
 
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+      
       if (!res.ok) return;
 
       const responseText = await res.text();
@@ -66,7 +72,7 @@ export default function AdminPanel() {
       try {
         data = JSON.parse(responseText);
       } catch {
-        return; // Ignora se o servidor devolver algo que não seja JSON durante o polling
+        return;
       }
       
       if (data.success) {
@@ -94,17 +100,17 @@ export default function AdminPanel() {
         }
       }
     } catch (error) {
-      console.error(error);
+      console.error("Erro na busca em tempo real:", error);
     }
   }, [currentUser, startDate, endDate, exitNotification]);
 
   useEffect(() => {
     fetchAllData();
-    const interval = setInterval(fetchAllData, 3000);
+    const interval = setInterval(fetchAllData, 2000); // Atualiza a cada 2 segundos!
     return () => clearInterval(interval);
   }, [fetchAllData]);
 
-  // Iniciar Novo DDS com Leitura Segura de JSON/HTML
+  // Iniciar Novo DDS
   const handleStartNewMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic.trim() || !farm.trim()) {
@@ -130,8 +136,8 @@ export default function AdminPanel() {
       
       try {
         data = JSON.parse(responseText);
-      } catch (parseError) {
-        throw new Error(`O servidor retornou status ${res.status}. Verifique se a rota src/app/api/reuniao/route.ts existe e a DATABASE_URL na Vercel.`);
+      } catch {
+        throw new Error('Falha ao processar resposta do servidor.');
       }
       
       if (res.ok && data.success && data.meeting) {
@@ -139,10 +145,10 @@ export default function AdminPanel() {
         setIsLiveMode(true);
         setTopic('');
       } else {
-        alert('Erro ao iniciar reunião: ' + (data.error || 'Falha ao salvar no banco de dados.'));
+        alert('Erro ao iniciar reunião: ' + (data.error || 'Falha ao salvar no banco.'));
       }
     } catch (err: any) {
-      alert('Aviso do Sistema: ' + (err?.message || 'Falha de comunicação com a API.'));
+      alert('Aviso: ' + (err?.message || 'Falha de comunicação com a API.'));
     } finally {
       setIsCreatingMeeting(false);
     }
@@ -201,7 +207,6 @@ export default function AdminPanel() {
     });
   };
 
-  // Baixar Relatório Consolidado de todo o Período
   const handleDownloadConsolidatedPdf = () => {
     if (meetingHistory.length === 0) {
       alert('Não há reuniões no período selecionado para gerar o dossiê.');
@@ -354,7 +359,7 @@ export default function AdminPanel() {
                 ) : (
                   <ul className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
                     {activeMeeting.attendees.map((person: any) => {
-                      const isExited = person.name.includes('(Saída:');
+                      const isExited = Boolean(person.exitReason || person.name.includes('(Saída:'));
                       return (
                         <li key={person.id} className={`flex items-center justify-between p-3.5 rounded-xl border ${
                           isExited ? 'bg-amber-50/70 border-amber-200' : 'bg-slate-50 border-slate-100'
@@ -370,7 +375,9 @@ export default function AdminPanel() {
                                 {person.name.replace(/\(Saída:.*\)/, '')}
                               </p>
                               {isExited ? (
-                                <p className="text-[11px] font-semibold text-amber-700">⚠️ Saída Justificada</p>
+                                <p className="text-[11px] font-semibold text-amber-700">
+                                  ⚠️ Saída: {person.exitReason || 'Justificada'}
+                                </p>
                               ) : (
                                 <p className="text-xs text-slate-500">CPF: {person.cpf}</p>
                               )}
@@ -393,7 +400,7 @@ export default function AdminPanel() {
   }
 
   // =========================================================================
-  // DASHBOARD PRINCIPAL (INICIAR DDS + HISTÓRICO COM FILTRO DE DATAS)
+  // DASHBOARD PRINCIPAL
   // =========================================================================
   return (
     <main className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
@@ -518,7 +525,6 @@ export default function AdminPanel() {
         {activeTab === 'HISTORY' && (
           <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6">
             
-            {/* Barra de Filtros por Período */}
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -571,7 +577,6 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            {/* Listagem de Reuniões do Histórico */}
             <div className="space-y-3">
               {meetingHistory.length === 0 ? (
                 <div className="text-center py-16 text-slate-400 space-y-2">
