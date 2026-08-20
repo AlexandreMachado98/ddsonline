@@ -1,9 +1,8 @@
  'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Lock, Mail, ArrowRight, CheckCircle2, User, Building, Briefcase, Sparkles, KeyRound } from 'lucide-react';
+import { Lock, Mail, ArrowRight, CheckCircle2, User, Building, Briefcase, Sparkles, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import BrandLogo from '@/components/BrandLogo';
 
 export default function HomePage() {
   const router = useRouter();
@@ -64,14 +63,15 @@ export default function HomePage() {
       } else {
         setError(data.error || 'Falha ao autenticar.');
       }
-    } catch (err: any) {
+    } catch {
       setError('Erro de conexão com o servidor.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickDemo = () => {
+  // Botão auxiliar que preenche os dados de teste locais
+  const handleQuickFill = () => {
     setIsRegisterMode(false);
     setEmail('admin@dds.com.br');
     setPassword('123456');
@@ -80,34 +80,29 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
       
-      {/* Brilho de fundo Verde AM TST */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-green-600/20 blur-[130px] rounded-full pointer-events-none"></div>
+      {/* Brilho Verde de Fundo */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-green-600/15 blur-[140px] rounded-full pointer-events-none"></div>
 
-      <div className="w-full max-w-md bg-slate-900/90 border border-slate-800/90 rounded-3xl p-8 shadow-2xl relative z-10 space-y-6 backdrop-blur-sm">
+      <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10 space-y-6 backdrop-blur-md">
         
-        {/* Logotipo Oficial AM TST */}
+        {/* Cabeçalho da Marca DDS ON */}
         <div className="text-center space-y-2">
-          <BrandLogo size="lg" showSlogan={true} theme="dark" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-xs font-bold tracking-wide mb-1">
+            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+            Plataforma Digital de SST
+          </div>
+
+          <h1 className="text-3xl font-black tracking-tight text-white">
+            DDS <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">ON</span>
+          </h1>
+
+          <p className="text-xs text-slate-300 font-medium max-w-xs mx-auto leading-relaxed">
+            A nova forma de realizar, auditar e transmitir o Diálogo Diário de Segurança.
+          </p>
         </div>
 
-        {/* Card de Teste Rápido */}
-        {!isRegisterMode && (
-          <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-3.5 flex items-center justify-between">
-            <span className="text-[11px] font-bold text-green-400 flex items-center gap-1.5">
-              <KeyRound size={13} /> Demo: admin@dds.com.br
-            </span>
-            <button
-              type="button"
-              onClick={handleQuickDemo}
-              className="text-[11px] text-green-300 hover:text-white font-bold bg-green-600/30 hover:bg-green-600/50 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 border border-green-400/20"
-            >
-              <Sparkles size={11} /> Preencher
-            </button>
-          </div>
-        )}
-
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl text-center">
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl text-center font-medium">
             {error}
           </div>
         )}
@@ -116,7 +111,7 @@ export default function HomePage() {
           {isRegisterMode && (
             <>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Seu Nome Completo</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
                 <div className="relative flex items-center">
                   <User className="absolute left-3.5 text-slate-500" size={17} />
                   <input
@@ -124,7 +119,7 @@ export default function HomePage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Ex: Alexandre Santos"
-                    className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none"
+                    className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
                   />
                 </div>
               </div>
@@ -138,7 +133,7 @@ export default function HomePage() {
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
                     placeholder="Ex: Técnico em Segurança do Trabalho"
-                    className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none"
+                    className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
                   />
                 </div>
               </div>
@@ -151,8 +146,8 @@ export default function HomePage() {
                     type="text"
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
-                    placeholder="Ex: Agropecuária Santa Maria"
-                    className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none"
+                    placeholder="Ex: Agropecuária Progresso"
+                    className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
                   />
                 </div>
               </div>
@@ -168,13 +163,13 @@ export default function HomePage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seuemail@empresa.com.br"
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none"
+                className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Senha</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Senha de Acesso</label>
             <div className="relative flex items-center">
               <Lock className="absolute left-3.5 text-slate-500" size={17} />
               <input
@@ -182,40 +177,64 @@ export default function HomePage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none"
+                className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
               />
             </div>
           </div>
 
+          {/* Botão Auxiliar Discreto */}
+          {!isRegisterMode && (
+            <div className="flex justify-end pt-0.5">
+              <button
+                type="button"
+                onClick={handleQuickFill}
+                className="text-[11px] text-slate-400 hover:text-green-400 font-medium flex items-center gap-1 transition-colors"
+              >
+                <Sparkles size={12} className="text-green-500" /> Preencher acesso rápido
+              </button>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 active:scale-[0.99] text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-600/25 mt-2"
+            className="w-full py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 active:scale-[0.99] text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-600/25 mt-1"
           >
-            {loading ? 'Processando...' : isRegisterMode ? 'Cadastrar na AM TST' : 'Entrar no Portal AM TST'}
+            {loading ? 'Acessando...' : isRegisterMode ? 'Cadastrar Organizador' : 'Acessar o Painel'}
             {!loading && <ArrowRight size={16} />}
           </button>
         </form>
 
-        <div className="pt-2 text-center">
+        <div className="pt-1 text-center">
           <button
             type="button"
             onClick={() => {
               setIsRegisterMode(!isRegisterMode);
               setError('');
             }}
-            className="text-xs text-green-400 hover:text-green-300 font-semibold"
+            className="text-xs text-green-400 hover:text-green-300 font-semibold transition-colors"
           >
-            {isRegisterMode ? 'Já possui conta? Clique para Entrar' : 'Não tem conta? Cadastre-se na AM TST'}
+            {isRegisterMode ? 'Já possui cadastro? Fazer login' : 'Primeiro acesso? Cadastre-se como organizador'}
           </button>
         </div>
 
-        <div className="pt-4 border-t border-slate-800/80 text-center">
-          <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1">
-            <CheckCircle2 size={13} className="text-green-500" />
-            AM TST • Plataforma Segura & Conforme NR (LGPD)
+        {/* Rodapé com Direitos Autorais e Link AM TST */}
+        <footer className="pt-5 border-t border-slate-800/80 text-center space-y-1.5">
+          <p className="text-[11px] text-slate-400 font-normal">
+            © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
           </p>
-        </div>
+          <div className="flex items-center justify-center gap-1 text-[11px] text-slate-400">
+            <span>Desenvolvido por</span>
+            <a
+              href="https://amtst.vercel.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-green-400 hover:text-green-300 font-bold inline-flex items-center gap-1 transition-colors underline underline-offset-2"
+            >
+              AM TST <ExternalLink size={10} />
+            </a>
+          </div>
+        </footer>
 
       </div>
     </main>

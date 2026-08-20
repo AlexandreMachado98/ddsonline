@@ -10,7 +10,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
-import BrandLogo from '@/components/BrandLogo';
 
 export default function AdminPanel() {
   const router = useRouter();
@@ -20,15 +19,12 @@ export default function AdminPanel() {
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
 
-  // Formulário do Novo DDS
   const [topic, setTopic] = useState('');
   const [farm, setFarm] = useState('');
 
-  // Filtros de Data no Histórico
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Reunião Ativa e Histórico
   const [activeMeeting, setActiveMeeting] = useState<any>(null);
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -217,7 +213,7 @@ export default function AdminPanel() {
   };
 
   const handleEndMeeting = async () => {
-    if (confirm('Encerrar este DDS? A ata oficial da AM TST será gerada.')) {
+    if (confirm('Encerrar este DDS? A ata oficial do DDS ON será arquivada.')) {
       if (activeMeeting && activeMeeting.attendees && activeMeeting.attendees.length > 0) {
         handleDownloadActivePdf();
       }
@@ -238,18 +234,23 @@ export default function AdminPanel() {
     router.push('/');
   };
 
-  // TELA DO DDS AO VIVO COM A MARCA AM TST
+  // SALA DO DDS AO VIVO
   if (isLiveMode && activeMeeting) {
     return (
-      <main className="min-h-screen bg-slate-900 p-4 md:p-8 font-sans relative text-white">
+      <main className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans relative text-white">
         <div className="max-w-7xl mx-auto space-y-6">
           
-          <header className="flex items-center justify-between bg-slate-950 p-5 rounded-3xl border border-slate-800 shadow-lg">
-            <BrandLogo size="sm" theme="dark" />
+          <header className="flex items-center justify-between bg-slate-900 p-5 rounded-3xl border border-slate-800 shadow-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-black tracking-tight">
+                <span className="text-white">DDS </span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">ON</span>
+              </span>
+            </div>
 
             <div className="flex items-center gap-3">
               <span className="text-xs text-slate-400 hidden sm:inline">
-                Técnico: <strong className="text-white">{currentUser?.name}</strong>
+                Organizador: <strong className="text-white">{currentUser?.name}</strong>
               </span>
               <button
                 onClick={() => setIsLiveMode(false)}
@@ -260,7 +261,6 @@ export default function AdminPanel() {
             </div>
           </header>
 
-          {/* Banner Verde AM TST */}
           <div className="bg-gradient-to-r from-green-700 via-emerald-700 to-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-green-500/30">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -268,7 +268,7 @@ export default function AdminPanel() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-green-400"></span>
                 </span>
-                <span className="font-semibold text-green-200 uppercase tracking-wider text-xs">AM TST • Treinamento Ao Vivo</span>
+                <span className="font-semibold text-green-200 uppercase tracking-wider text-xs">DDS ON • Treinamento Ao Vivo</span>
                 <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
                   isLinkExpired ? 'bg-red-500 text-white' : 'bg-green-950/80 text-green-300 border border-green-500/30'
                 }`}>
@@ -302,7 +302,7 @@ export default function AdminPanel() {
                 onClick={handleDownloadActivePdf}
                 className="px-4 py-3 bg-green-800 hover:bg-green-700 border border-green-400/30 text-white rounded-xl font-bold transition-all flex items-center gap-2 shadow-sm text-sm"
               >
-                <Download size={18} /> Baixar Ata Oficial
+                <Download size={18} /> Baixar Ata
               </button>
 
               <button 
@@ -318,13 +318,13 @@ export default function AdminPanel() {
             <div className="lg:col-span-7 space-y-4">
               <DdsConferenceRoom
                 roomName={activeMeeting.id}
-                userName={`${currentUser?.name || 'Técnico'} (AM TST)`}
+                userName={`${currentUser?.name || 'Técnico'} (DDS ON)`}
                 isAdmin={true}
               />
             </div>
 
             <div className="lg:col-span-5 space-y-6">
-              <div className="bg-slate-950 p-5 rounded-3xl border border-slate-800 flex items-center justify-around text-center">
+              <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 flex items-center justify-around text-center">
                 <div>
                   <span className="text-3xl font-black text-white">{activeMeeting.attendees?.length || 0}</span>
                   <span className="text-slate-400 text-xs block mt-1">Presenças Auditadas</span>
@@ -336,7 +336,7 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800">
+              <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800">
                 <h3 className="font-bold text-white mb-4 flex items-center gap-2 text-sm">
                   <FileText size={18} className="text-green-400" /> Lista de Presença em Tempo Real
                 </h3>
@@ -344,7 +344,7 @@ export default function AdminPanel() {
                 {!activeMeeting.attendees || activeMeeting.attendees.length === 0 ? (
                   <div className="text-center py-12 text-slate-500">
                     <p>Nenhum colaborador assinou ainda.</p>
-                    <p className="text-xs text-slate-600 mt-1">Envie o link do WhatsApp para a equipe.</p>
+                    <p className="text-xs text-slate-600 mt-1">Envie o link copiado para a equipe.</p>
                   </div>
                 ) : (
                   <ul className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
@@ -352,7 +352,7 @@ export default function AdminPanel() {
                       const isExited = Boolean(person.exitReason || person.name.includes('(Saída:'));
                       return (
                         <li key={person.id} className={`flex items-center justify-between p-3.5 rounded-2xl border ${
-                          isExited ? 'bg-amber-500/10 border-amber-500/30 text-amber-200' : 'bg-slate-900 border-slate-800'
+                          isExited ? 'bg-amber-500/10 border-amber-500/30 text-amber-200' : 'bg-slate-950 border-slate-800'
                         }`}>
                           <div className="flex items-center gap-3">
                             {isExited ? (
@@ -389,19 +389,27 @@ export default function AdminPanel() {
     );
   }
 
-  // DASHBOARD PRINCIPAL COM A MARCA AM TST
+  // DASHBOARD PRINCIPAL
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans">
       <div className="max-w-5xl mx-auto space-y-6">
         
-        {/* Cabeçalho Principal AM TST */}
+        {/* Cabeçalho Principal */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/90 p-6 rounded-3xl border border-slate-800 shadow-xl backdrop-blur-sm">
-          <BrandLogo size="md" theme="dark" />
+          <div>
+            <span className="text-2xl font-black tracking-tight">
+              <span className="text-white">DDS </span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">ON</span>
+            </span>
+            <p className="text-slate-400 text-xs mt-0.5">
+              Portal do Organizador • Gestão Diária de Segurança
+            </p>
+          </div>
 
           <div className="flex items-center gap-3 self-end sm:self-auto">
             <div className="text-right hidden sm:block">
               <p className="text-xs font-bold text-white">{currentUser?.name}</p>
-              <p className="text-[11px] text-green-400">{currentUser?.company || 'AM TST Parceiro'}</p>
+              <p className="text-[11px] text-green-400">{currentUser?.company || 'Unidade'}</p>
             </div>
 
             <button
@@ -415,13 +423,13 @@ export default function AdminPanel() {
 
         {/* Alerta de DDS Ativo */}
         {activeMeeting && (
-          <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-5 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-green-400/30 animate-in fade-in duration-300">
+          <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-5 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-green-400/30">
             <div className="flex items-center gap-3.5">
               <div className="p-3 bg-white/20 rounded-2xl">
                 <Radio size={24} className="animate-pulse" />
               </div>
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-green-200">DDS Ativo na Unidade</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-green-200">DDS Ativo no Momento</span>
                 <h3 className="text-lg font-black">{activeMeeting.topic} ({activeMeeting.farm})</h3>
               </div>
             </div>
@@ -443,7 +451,7 @@ export default function AdminPanel() {
               activeTab === 'NEW_DDS' ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
             }`}
           >
-            <PlusCircle size={16} /> Novo Treinamento DDS
+            <PlusCircle size={16} /> Novo DDS
           </button>
 
           <button
@@ -460,18 +468,18 @@ export default function AdminPanel() {
         {activeTab === 'NEW_DDS' && (
           <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl max-w-2xl mx-auto space-y-6">
             <div>
-              <h2 className="text-xl font-black text-white">Iniciar Diálogo de Segurança (DDS)</h2>
-              <p className="text-slate-400 text-xs">Cria a ata de presença oficial com validade jurídica da AM TST</p>
+              <h2 className="text-xl font-black text-white">Iniciar Novo DDS</h2>
+              <p className="text-slate-400 text-xs">Gera a sala ao vivo e o link temporário de 10 minutos para a equipe</p>
             </div>
 
             <form onSubmit={handleStartNewMeeting} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Tema do Diálogo de Segurança</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Tema do Treinamento / Diálogo</label>
                 <input 
                   type="text" 
                   value={topic} 
                   onChange={(e) => setTopic(e.target.value)}
-                  placeholder="Ex: NR-31 / Procedimentos de Segurança na Colheita"
+                  placeholder="Ex: NR-31 / Manuseio Seguro de Máquinas"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none"
                 />
               </div>
@@ -482,7 +490,7 @@ export default function AdminPanel() {
                   type="text" 
                   value={farm} 
                   onChange={(e) => setFarm(e.target.value)}
-                  placeholder="Ex: Fazenda Progresso - Setor de Máquinas 02"
+                  placeholder="Ex: Fazenda Santa Maria - Setor Agrícola 02"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none"
                 />
               </div>
@@ -494,11 +502,11 @@ export default function AdminPanel() {
               >
                 {isCreatingMeeting ? (
                   <>
-                    <Loader2 size={18} className="animate-spin" /> Gerando Sala AM TST...
+                    <Loader2 size={18} className="animate-spin" /> Gerando Sala DDS ON...
                   </>
                 ) : (
                   <>
-                    <Play size={18} /> Iniciar DDS e Abrir Videoconferência
+                    <Play size={18} /> Iniciar DDS e Gerar Link de 10 Minutos
                   </>
                 )}
               </button>
@@ -506,14 +514,14 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* ABA 2: HISTÓRICO COM DOSSIÊ */}
+        {/* ABA 2: HISTÓRICO */}
         {activeTab === 'HISTORY' && (
           <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
             
             <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <Filter size={14} className="text-green-400" /> Filtrar Arquivo por Período
+                  <Filter size={14} className="text-green-400" /> Filtrar Histórico por Período
                 </span>
 
                 {(startDate || endDate) && (
@@ -553,7 +561,7 @@ export default function AdminPanel() {
                     className="w-full py-2.5 bg-gradient-to-r from-green-700 to-emerald-700 hover:from-green-600 hover:to-emerald-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md transition-all border border-green-500/30"
                   >
                     <FileSpreadsheet size={15} className="text-green-300" />
-                    Baixar Dossiê do Período (PDF)
+                    Baixar Dossiê Consolidado (PDF)
                   </button>
                 </div>
               </div>
@@ -584,7 +592,7 @@ export default function AdminPanel() {
                       <h3 className="text-base font-bold text-white">{meeting.topic}</h3>
                       <p className="text-xs text-slate-400 flex items-center gap-1.5">
                         <Users size={14} className="text-green-400" />
-                        <strong>{meeting.attendees?.length || 0}</strong> colaboradores com presença e biometria AM TST
+                        <strong>{meeting.attendees?.length || 0}</strong> colaboradores com presença e biometria
                       </p>
                     </div>
 
@@ -592,7 +600,7 @@ export default function AdminPanel() {
                       onClick={() => handleDownloadHistoryPdf(meeting)}
                       className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-green-300 border border-green-500/30 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm self-start md:self-auto"
                     >
-                      <Download size={15} /> Baixar Ata Oficial AM TST
+                      <Download size={15} /> Baixar Ata Individual
                     </button>
                   </div>
                 ))
