@@ -1,6 +1,6 @@
  'use client';
 
-import React, { useEffect, useState, useRef, memo } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { Loader2, Video, ShieldCheck, AlertCircle } from 'lucide-react';
@@ -11,14 +11,11 @@ interface DdsConferenceProps {
   isAdmin?: boolean;
 }
 
-function DdsConferenceRoomComponent({ roomName, userName, isAdmin = false }: DdsConferenceProps) {
+export default function DdsConferenceRoom({ roomName, userName, isAdmin = false }: DdsConferenceProps) {
   const [token, setToken] = useState<string>('');
   const [wsUrl, setWsUrl] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
-
-  // Trava para não reconectar quando o painel atualizar a lista de presença
-  const lastFetchedRoomRef = useRef<string>('');
 
   const cleanRoom = (roomName || 'dds-principal')
     .normalize('NFD')
@@ -29,11 +26,6 @@ function DdsConferenceRoomComponent({ roomName, userName, isAdmin = false }: Dds
   const finalUserName = userName?.trim() || (isAdmin ? 'Técnico de Segurança' : 'Colaborador');
 
   useEffect(() => {
-    // Se já estiver conectado a esta sala, não busca token repetido
-    if (lastFetchedRoomRef.current === cleanRoom && token) {
-      return;
-    }
-
     let isMounted = true;
 
     const fetchToken = async () => {
@@ -50,11 +42,10 @@ function DdsConferenceRoomComponent({ roomName, userName, isAdmin = false }: Dds
         const data = await res.json();
 
         if (!res.ok || !data.token) {
-          throw new Error(data.error || 'Não foi possível autenticar na sala de vídeo.');
+          throw new Error(data.error || 'Não foi possível obter o token da sala.');
         }
 
         if (isMounted) {
-          lastFetchedRoomRef.current = cleanRoom;
           setToken(data.token);
           setWsUrl(data.wsUrl);
         }
@@ -74,14 +65,14 @@ function DdsConferenceRoomComponent({ roomName, userName, isAdmin = false }: Dds
     return () => {
       isMounted = false;
     };
-  }, [cleanRoom, finalUserName, isAdmin, token]);
+  }, [cleanRoom, finalUserName, isAdmin]);
 
   if (loading) {
     return (
       <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-3xl border border-slate-800 flex flex-col items-center justify-center space-y-3 p-6 text-center shadow-xl">
         <Loader2 className="w-8 h-8 text-green-400 animate-spin" />
-        <p className="text-sm font-bold text-white">Conectando à Transmissão Ao Vivo...</p>
-        <p className="text-xs text-slate-400">Estabelecendo conexão WebRTC de alta performance</p>
+        <p className="text-sm font-bold text-white">Iniciando Transmissão Ao Vivo...</p>
+        <p className="text-xs text-slate-400">Conectando aos servidores WebRTC da AM TST</p>
       </div>
     );
   }
@@ -124,22 +115,22 @@ function DdsConferenceRoomComponent({ roomName, userName, isAdmin = false }: Dds
         </div>
       </div>
 
-      {/* Reprodutor Nativo LiveKit */}
+      {/* LiveKit Room com conexão ativa */}
       <div className="relative flex-1 w-full bg-black min-h-[400px]" data-lk-theme="default">
-        <LiveKitRoom
-          video={true}
-          audio={true}
-          token={token}
-          serverUrl={wsUrl}
-          connect={true}
-          className="w-full h-full"
-          data-lk-theme="default"
-        >
-          <VideoConference />
-        </LiveKitRoom>
+        {token && wsUrl && (
+          <LiveKitRoom
+            video={true}
+            audio={true}
+            token={token}
+            serverUrl={wsUrl}
+            connect={true}
+            className="w-full h-full"
+            data-lk-theme="default"
+          >
+            <VideoConference />
+          </LiveKitRoom>
+        )}
       </div>
     </div>
   );
 }
-
-export default memo(DdsConferenceRoomComponent);
