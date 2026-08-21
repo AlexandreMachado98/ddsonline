@@ -1,8 +1,8 @@
  'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { CheckCircle, Users, LogOut, AlertTriangle, X, Loader2, Send, PhoneOff, Clock, ShieldCheck, UserX, ArrowRight } from 'lucide-react';
+import { CheckCircle, Users, LogOut, AlertTriangle, X, Loader2, Send, PhoneOff, ShieldCheck } from 'lucide-react';
 import SignaturePad from '@/components/SignaturePad';
 import SelfieCapture from '@/components/SelfieCapture';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
@@ -11,19 +11,18 @@ export default function MeetingRoomPage() {
   const params = useParams();
   const meetingId = params?.id as string;
 
-  const [currentStep, setCurrentStep] = useState<'FORM' | 'LOBBY' | 'ROOM' | 'REJECTED' | 'EXIT_SUCCESS'>('FORM');
-  const [attendanceId, setAttendanceId] = useState<string | null>(null);
+  // Etapas: 'FORM' (Preenchimento) -> 'ROOM' (Sala do DDS) -> 'EXIT_SUCCESS' (Saída)
+  const [currentStep, setCurrentStep] = useState<'FORM' | 'ROOM' | 'EXIT_SUCCESS'>('FORM');
 
   const [name, setName] = useState('');
   const [cpf, setCpf] = useState('');
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [savedSelfie, setSavedSelfie] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [topic, setTopic] = useState('DDS ON');
   const [farm, setFarm] = useState('');
 
-  // Busca detalhes do DDS
+  // Busca dados da reunião
   useEffect(() => {
     const fetchMeetingDetails = async () => {
       try {
@@ -37,47 +36,6 @@ export default function MeetingRoomPage() {
     };
     fetchMeetingDetails();
   }, [meetingId]);
-
-  // Função central de checagem do Lobby
-  const verifyAdmissionStatus = useCallback(async () => {
-    try {
-      const storedId = attendanceId || (typeof window !== 'undefined' ? localStorage.getItem(`dds_att_${meetingId}`) : null);
-      const url = `/api/presenca/status?attendanceId=${storedId || ''}&cpf=${encodeURIComponent(cpf)}&meetingId=${meetingId}&_t=${Date.now()}`;
-      
-      const res = await fetch(url, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
-      });
-      
-      const data = await res.json();
-
-      if (data.success) {
-        if (data.status === 'ADMITTED') {
-          setCurrentStep('ROOM'); // DESBLOQUEIO INSTANTÂNEO!
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else if (data.status === 'REJECTED') {
-          setCurrentStep('REJECTED');
-        }
-      }
-    } catch {}
-  }, [attendanceId, cpf, meetingId]);
-
-  // Polling automático da Sala de Espera a cada 1.5 segundos
-  useEffect(() => {
-    if (currentStep !== 'LOBBY') return;
-
-    verifyAdmissionStatus();
-    const interval = setInterval(verifyAdmissionStatus, 1500);
-
-    return () => clearInterval(interval);
-  }, [currentStep, verifyAdmissionStatus]);
-
-  // Botão manual de verificação (Caso o colaborador queira forçar a entrada)
-  const handleManualCheck = async () => {
-    setIsCheckingStatus(true);
-    await verifyAdmissionStatus();
-    setTimeout(() => setIsCheckingStatus(false), 500);
-  };
 
   const [showExitModal, setShowExitModal] = useState(false);
   const [exitReason, setExitReason] = useState('Chamado Operacional no Campo');
@@ -93,6 +51,7 @@ export default function MeetingRoomPage() {
     setCpf(value);
   };
 
+  // ENVIO DA PRESENÇA E ENTRADA DIRETA NA SALA
   const handleSubmit = async () => {
     if (!name.trim()) {
       alert('⚠️ Por favor, digite seu Nome Completo.');
@@ -122,20 +81,19 @@ export default function MeetingRoomPage() {
     };
 
     try {
-      const res = await fetch('/api/presenca', {
+      await fetch('/api/presenca', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      if (data.success && data.attendanceId) {
-        setAttendanceId(data.attendanceId);
-        localStorage.setItem(`dds_att_${meetingId}`, data.attendanceId);
-      }
-    } catch {}
+    } catch (err) {
+      console.error("Erro ao salvar presença:", err);
+    }
 
     setIsSubmitting(false);
-    setCurrentStep('LOBBY'); // ENTRA NA SALA DE ESPERA
+
+    // ENTRA DIRETO NA SALA DE TRANSMISSÃO SEM NENHUMA TRAVA!
+    setCurrentStep('ROOM');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -148,10 +106,11 @@ export default function MeetingRoomPage() {
     const finalReason = exitReason === 'Outro' ? customReason || 'Não especificado' : exitReason;
 
     try {
-      await fetch('/api/presenca/saida', {
+      await fetch('/api/presenca', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'register_exit',
           name,
           cpf,
           meetingId,
@@ -172,107 +131,12 @@ export default function MeetingRoomPage() {
     setSavedSignature(null);
     setSavedSelfie(null);
     setExitSignature(null);
-    setAttendanceId(null);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(`dds_att_${meetingId}`);
-    }
     setShowExitModal(false);
     setCurrentStep('FORM');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // =========================================================================
-  // TELA 2: SALA DE ESPERA (LOBBY) COM VERIFICAÇÃO AUTOMÁTICA E MANUAL
-  // =========================================================================
-  if (currentStep === 'LOBBY') {
-    return (
-      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-6 shadow-2xl animate-in fade-in zoom-in">
-          
-          <div className="relative p-5 bg-green-500/10 text-green-400 rounded-3xl inline-flex border border-green-500/20">
-            <Clock size={44} className="animate-pulse text-green-400" />
-            <span className="absolute -top-1 -right-1 flex h-4 w-4">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
-            </span>
-          </div>
-
-          <div className="space-y-1.5">
-            <span className="text-[11px] font-bold text-green-400 uppercase tracking-widest bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20 inline-block">
-              Presença Registrada
-            </span>
-            <h1 className="text-2xl font-black text-white">Sala de Espera</h1>
-            <p className="text-xs text-slate-300 font-medium">Aguardando o organizador liberar sua entrada...</p>
-          </div>
-
-          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs text-slate-400 space-y-2 text-left">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <span className="text-slate-400">Participante:</span>
-              <strong className="text-white">{name}</strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">DDS:</span>
-              <span className="text-green-400 font-semibold truncate max-w-[200px]">{topic}</span>
-            </div>
-          </div>
-
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-              <Loader2 size={15} className="animate-spin text-green-500" />
-              <span>Conectando automaticamente assim que for autorizado...</span>
-            </div>
-
-            {/* Botão de Verificação Manual (Garante que nunca trave) */}
-            <button
-              onClick={handleManualCheck}
-              disabled={isCheckingStatus}
-              className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
-            >
-              {isCheckingStatus ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" /> Verificando Autorização...
-                </>
-              ) : (
-                <>
-                  Já foi autorizado pelo técnico? Entrar Agora <ArrowRight size={14} />
-                </>
-              )}
-            </button>
-          </div>
-
-        </div>
-      </main>
-    );
-  }
-
-  // TELA 3: ENTRADA RECUSADA
-  if (currentStep === 'REJECTED') {
-    return (
-      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-5 shadow-2xl">
-          <div className="bg-red-500/10 text-red-400 p-4 rounded-2xl inline-flex border border-red-500/20">
-            <UserX size={36} />
-          </div>
-
-          <div className="space-y-1.5">
-            <h1 className="text-xl font-bold text-white">Entrada Não Autorizada</h1>
-            <p className="text-slate-300 text-xs leading-relaxed">
-              O organizador não autorizou sua entrada nesta reunião de DDS.
-            </p>
-          </div>
-
-          <button
-            onClick={() => setCurrentStep('FORM')}
-            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-all"
-          >
-            Tentar Novamente
-          </button>
-        </div>
-      </main>
-    );
-  }
-
-  // TELA 4: SAÍDA REGISTRADA
+  // TELA 3: SAÍDA REGISTRADA
   if (currentStep === 'EXIT_SUCCESS') {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
@@ -301,7 +165,7 @@ export default function MeetingRoomPage() {
     );
   }
 
-  // TELA 5: SALA DO DDS AO VIVO (LIBERADO PELO ORGANIZADOR)
+  // TELA 2: SALA DO DDS AO VIVO (LIBERADA DIRETO)
   if (currentStep === 'ROOM') {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center p-3 md:p-6 font-sans relative">
@@ -312,7 +176,7 @@ export default function MeetingRoomPage() {
                 <CheckCircle size={22} />
               </div>
               <div>
-                <p className="text-[11px] text-slate-400">DDS ON • Entrada Autorizada</p>
+                <p className="text-[11px] text-slate-400">DDS ON • Presença Validada</p>
                 <h2 className="text-sm font-bold text-white">{name} ({topic})</h2>
               </div>
             </div>
@@ -441,7 +305,7 @@ export default function MeetingRoomPage() {
       <div className="w-full max-w-md space-y-6 pb-20">
         <div className="bg-slate-900 border border-slate-800 text-slate-300 text-xs p-3.5 rounded-xl text-center flex items-center justify-center gap-2">
           <ShieldCheck size={16} className="text-green-400 shrink-0" />
-          <span>Valide sua presença abaixo para solicitar entrada na transmissão.</span>
+          <span>Valide sua presença abaixo para entrar na transmissão ao vivo.</span>
         </div>
 
         <section className="space-y-4 bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
@@ -485,11 +349,11 @@ export default function MeetingRoomPage() {
         >
           {isSubmitting ? (
             <>
-              <Loader2 size={20} className="animate-spin" /> Registrando...
+              <Loader2 size={20} className="animate-spin" /> Confirmando Presença...
             </>
           ) : (
             <>
-              <Send size={20} /> Solicitar Entrada no DDS ON
+              <Send size={20} /> Confirmar Presença e Entrar no DDS ON
             </>
           )}
         </button>

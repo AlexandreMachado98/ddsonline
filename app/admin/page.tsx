@@ -5,7 +5,7 @@ import {
   Play, Users, FileText, CheckCircle2, 
   Smartphone, Download, Copy, Check, LogOut, 
   History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet,
-  Camera, Image as ImageIcon, Trash2, Bell, UserCheck, UserX, Target, CheckCheck
+  Camera, Image as ImageIcon, Trash2, Target
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
@@ -37,9 +37,6 @@ export default function AdminPanel() {
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
   const [exitNotification, setExitNotification] = useState<string | null>(null);
-
-  // Fila de Espera de Colaboradores (Lobby)
-  const [pendingAdmission, setPendingAdmission] = useState<any[]>([]);
 
   useEffect(() => {
     const auth = localStorage.getItem('dds_admin_auth');
@@ -76,13 +73,6 @@ export default function AdminPanel() {
         if (data.meeting && data.meeting.status === 'LIVE') {
           setActiveMeeting(data.meeting);
 
-          const allAttendees = data.meeting.attendees || [];
-          
-          // Separa quem está no Lobby aguardando sua autorização
-          const waiting = allAttendees.filter((a: any) => a.status === 'PENDING');
-          setPendingAdmission(waiting);
-
-          // Fotos salvas
           if (data.meeting.teamPhotos) {
             try {
               const parsed = JSON.parse(data.meeting.teamPhotos);
@@ -92,16 +82,16 @@ export default function AdminPanel() {
             } catch {}
           }
 
-          // Notificação de saída
-          allAttendees.forEach((person: any) => {
-            if (person.name.includes('(Saída:') && !exitNotification) {
-              setExitNotification(`⚠️ ${person.name.replace(/\(Saída:.*\)/, '')} precisou se ausentar.`);
-              setTimeout(() => setExitNotification(null), 8000);
-            }
-          });
+          if (data.meeting.attendees) {
+            data.meeting.attendees.forEach((person: any) => {
+              if (person.name.includes('(Saída:') && !exitNotification) {
+                setExitNotification(`⚠️ ${person.name.replace(/\(Saída:.*\)/, '')} precisou se ausentar.`);
+                setTimeout(() => setExitNotification(null), 8000);
+              }
+            });
+          }
         } else {
           setActiveMeeting(null);
-          setPendingAdmission([]);
         }
 
         setMeetingHistory(data.history || []);
@@ -120,48 +110,6 @@ export default function AdminPanel() {
       return () => clearInterval(interval);
     }
   }, [currentUser, fetchAllData]);
-
-  // AÇÃO: Permitir ou Recusar entrada com liberação instantânea e remoção imediata da fila
-  const handleAdmitUser = async (attendanceId: string, action: 'ADMIT' | 'REJECT') => {
-    try {
-      // Remove visualmente da fila na hora para resposta imediata
-      setPendingAdmission(prev => prev.filter(p => p.id !== attendanceId));
-
-      const res = await fetch('/api/presenca/admit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attendanceId, action })
-      });
-      
-      const data = await res.json();
-      if (data.success) {
-        fetchAllData();
-      }
-    } catch {
-      alert('Erro ao processar permissão de entrada.');
-      fetchAllData();
-    }
-  };
-
-  // AÇÃO: Permitir TODOS de uma vez
-  const handleAdmitAll = async () => {
-    try {
-      const toAdmit = [...pendingAdmission];
-      setPendingAdmission([]); // Limpa a fila na hora
-
-      for (const pending of toAdmit) {
-        await fetch('/api/presenca/admit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ attendanceId: pending.id, action: 'ADMIT' })
-        });
-      }
-      fetchAllData();
-    } catch {
-      alert('Erro ao permitir todos.');
-      fetchAllData();
-    }
-  };
 
   const handleStartNewMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -331,7 +279,6 @@ export default function AdminPanel() {
       setIsLiveMode(false);
       setActiveMeeting(null);
       setTeamPhotos([]);
-      setPendingAdmission([]);
       fetchAllData();
       alert('✅ DDS Encerrado! Ata e anexo fotográfico arquivados com sucesso.');
     }
@@ -343,11 +290,10 @@ export default function AdminPanel() {
   };
 
   // =========================================================================
-  // SALA DO DDS EM ANDAMENTO (PRESENCIAL OU REMOTO COM LOBBY)
+  // SALA DO DDS EM ANDAMENTO (PRESENCIAL OU REMOTO)
   // =========================================================================
   if (isLiveMode && activeMeeting) {
     const isPresential = activeMeeting.type === 'PRESENTIAL';
-    const admittedAttendees = (activeMeeting.attendees || []).filter((a: any) => a.status === 'ADMITTED');
 
     return (
       <main className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans relative text-white">
@@ -376,57 +322,6 @@ export default function AdminPanel() {
               </button>
             </div>
           </header>
-
-          {/* BARRA DE SOLICITAÇÃO DE ENTRADA (LOBBY DO GOOGLE MEET) */}
-          {pendingAdmission.length > 0 && (
-            <div className="bg-gradient-to-r from-amber-600 via-amber-700 to-slate-900 border border-amber-500/40 p-4 rounded-3xl shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-300">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-amber-500/20 text-white rounded-2xl">
-                  <Bell size={24} className="animate-bounce" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-white">
-                    {pendingAdmission.length === 1 ? '1 Colaborador aguarda sua permissão para entrar' : `${pendingAdmission.length} Colaboradores aguardam no Lobby`}
-                  </h4>
-                  <p className="text-xs text-amber-100">Autorize para liberar a entrada do participante no DDS.</p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {pendingAdmission.length > 1 && (
-                  <button
-                    onClick={handleAdmitAll}
-                    className="px-3.5 py-2 bg-white text-slate-950 hover:bg-slate-100 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-md"
-                  >
-                    <CheckCheck size={16} className="text-green-600" /> Permitir Todos ({pendingAdmission.length})
-                  </button>
-                )}
-
-                {pendingAdmission.map((pending) => (
-                  <div key={pending.id} className="flex items-center gap-2 bg-slate-950/90 p-2 rounded-xl border border-amber-500/40 shadow-sm">
-                    {pending.selfie && (
-                      <img src={pending.selfie} alt={pending.name} className="w-7 h-7 rounded-lg object-cover border border-amber-400" />
-                    )}
-                    <span className="text-xs font-bold text-white px-1 truncate max-w-[130px]">{pending.name}</span>
-                    
-                    <button
-                      onClick={() => handleAdmitUser(pending.id, 'ADMIT')}
-                      className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
-                    >
-                      <UserCheck size={13} /> Permitir
-                    </button>
-                    <button
-                      onClick={() => handleAdmitUser(pending.id, 'REJECT')}
-                      className="p-1.5 bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white rounded-lg text-xs transition-colors"
-                      title="Recusar entrada"
-                    >
-                      <UserX size={13} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Banner de Reunião Ativa */}
           <div className="bg-gradient-to-r from-green-700 via-emerald-700 to-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-green-500/30">
@@ -474,7 +369,7 @@ export default function AdminPanel() {
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            {/* Coluna Esquerda: Presencial ou Vídeo com Mosaico dos Admitidos */}
+            {/* Coluna Esquerda: Módulo Presencial ou Mosaico de Vídeo */}
             <div className="lg:col-span-7 space-y-4">
               {isPresential ? (
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-xl">
@@ -553,17 +448,17 @@ export default function AdminPanel() {
                   roomName={activeMeeting.id}
                   userName={`${currentUser?.name || 'Técnico'} (DDS ON)`}
                   isAdmin={true}
-                  attendees={admittedAttendees}
+                  attendees={activeMeeting.attendees || []}
                 />
               )}
             </div>
 
-            {/* Coluna Direita: Lista de Presença */}
+            {/* Coluna Direita: Lista de Presença em Tempo Real */}
             <div className="lg:col-span-5 space-y-6">
               <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 flex items-center justify-around text-center">
                 <div>
-                  <span className="text-3xl font-black text-white">{admittedAttendees.length}</span>
-                  <span className="text-slate-400 text-xs block mt-1">Presenças Auditadas</span>
+                  <span className="text-3xl font-black text-white">{activeMeeting.attendees?.length || 0}</span>
+                  <span className="text-slate-400 text-xs block mt-1">Presenças Coletadas</span>
                 </div>
                 <div className="h-10 w-[1px] bg-slate-800"></div>
                 <div>
@@ -585,20 +480,15 @@ export default function AdminPanel() {
                 ) : (
                   <ul className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
                     {activeMeeting.attendees.map((person: any) => {
-                      const isPending = person.status === 'PENDING';
                       const isExited = Boolean(person.exitReason || person.name.includes('(Saída:'));
                       return (
                         <li key={person.id} className={`flex items-center justify-between p-3.5 rounded-2xl border ${
-                          isPending 
-                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
-                            : isExited 
+                          isExited 
                             ? 'bg-red-500/10 border-red-500/30 text-red-200' 
                             : 'bg-slate-950 border-slate-800'
                         }`}>
                           <div className="flex items-center gap-3">
-                            {isPending ? (
-                              <Clock size={20} className="text-amber-400 shrink-0 animate-pulse" />
-                            ) : isExited ? (
+                            {isExited ? (
                               <AlertTriangle size={20} className="text-red-400 shrink-0" />
                             ) : (
                               <CheckCircle2 size={22} className="text-green-400 shrink-0" />
@@ -608,9 +498,7 @@ export default function AdminPanel() {
                                 {person.name.replace(/\(Saída:.*\)/, '')}
                               </p>
                               <p className="text-[11px]">
-                                {isPending ? (
-                                  <span className="text-amber-400 font-semibold">⏳ No Lobby (Aguardando)</span>
-                                ) : isExited ? (
+                                {isExited ? (
                                   <span className="text-red-300 font-semibold">⚠️ Saída: {person.exitReason || 'Justificada'}</span>
                                 ) : (
                                   <span className="text-slate-400">CPF: {person.cpf}</span>
@@ -619,18 +507,9 @@ export default function AdminPanel() {
                             </div>
                           </div>
                           
-                          {isPending ? (
-                            <button
-                              onClick={() => handleAdmitUser(person.id, 'ADMIT')}
-                              className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold"
-                            >
-                              Permitir
-                            </button>
-                          ) : (
-                            <span className="text-xs text-slate-400 font-medium bg-slate-800 px-2.5 py-1 rounded-lg">
-                              {new Date(person.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          )}
+                          <span className="text-xs text-slate-400 font-medium bg-slate-800 px-2.5 py-1 rounded-lg">
+                            {new Date(person.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         </li>
                       );
                     })}
@@ -652,7 +531,6 @@ export default function AdminPanel() {
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans">
       <div className="max-w-5xl mx-auto space-y-6">
         
-        {/* Cabeçalho Principal */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/90 p-6 rounded-3xl border border-slate-800 shadow-xl backdrop-blur-sm">
           <div>
             <span className="text-2xl font-black tracking-tight">
@@ -679,7 +557,7 @@ export default function AdminPanel() {
           </div>
         </header>
 
-        {/* Alerta de DDS Ativo (Blindado contra flash) */}
+        {/* Alerta de DDS Ativo */}
         {isInitialLoadDone && activeMeeting && (
           <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-5 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-green-400/30 animate-in fade-in duration-300">
             <div className="flex items-center gap-3.5">
