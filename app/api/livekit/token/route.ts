@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+ import { NextResponse } from 'next/server';
 import { AccessToken } from 'livekit-server-sdk';
 
 export const dynamic = 'force-dynamic';
@@ -14,9 +14,9 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Parâmetro "room" é obrigatório.' }, { status: 400 });
     }
 
-    const apiKey = process.env.LIVEKIT_API_KEY;
-    const apiSecret = process.env.LIVEKIT_API_SECRET;
-    const wsUrl = process.env.LIVEKIT_URL;
+    const apiKey = (process.env.LIVEKIT_API_KEY || '').trim();
+    const apiSecret = (process.env.LIVEKIT_API_SECRET || '').trim();
+    let wsUrl = (process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL || '').trim();
 
     if (!apiKey || !apiSecret || !wsUrl) {
       return NextResponse.json(
@@ -25,14 +25,23 @@ export async function GET(req: Request) {
       );
     }
 
-    // Cria o token criptografado de acesso à sala
+    // Garante protocolo wss:// sem barras no final
+    if (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
+      wsUrl = wsUrl.replace(/^http:\/\//, 'ws://').replace(/^https:\/\//, 'wss://');
+    }
+    wsUrl = wsUrl.replace(/\/$/, '');
+
+    // Identidade única para evitar o erro de desconexão por identidade duplicada
+    const uniqueIdentity = `${username.replace(/[^a-zA-Z0-9]/g, '_')}_${Math.random().toString(36).substring(2, 7)}`;
+
     const at = new AccessToken(apiKey, apiSecret, {
-      identity: username,
+      identity: uniqueIdentity,
       name: username,
+      ttl: '4h', // Token válido por 4 horas
     });
 
     at.addGrant({
-      room,
+      room: room,
       roomJoin: true,
       canPublish: true,
       canSubscribe: true,

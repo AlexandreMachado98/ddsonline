@@ -1,6 +1,6 @@
  'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, memo } from 'react';
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { Loader2, Video, ShieldCheck, AlertCircle } from 'lucide-react';
@@ -11,11 +11,14 @@ interface DdsConferenceProps {
   isAdmin?: boolean;
 }
 
-export default function DdsConferenceRoom({ roomName, userName, isAdmin = false }: DdsConferenceProps) {
+function DdsConferenceRoomComponent({ roomName, userName, isAdmin = false }: DdsConferenceProps) {
   const [token, setToken] = useState<string>('');
   const [wsUrl, setWsUrl] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Trava para não reconectar quando o painel atualizar a lista de presença
+  const lastFetchedRoomRef = useRef<string>('');
 
   const cleanRoom = (roomName || 'dds-principal')
     .normalize('NFD')
@@ -26,6 +29,11 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
   const finalUserName = userName?.trim() || (isAdmin ? 'Técnico de Segurança' : 'Colaborador');
 
   useEffect(() => {
+    // Se já estiver conectado a esta sala, não busca token repetido
+    if (lastFetchedRoomRef.current === cleanRoom && token) {
+      return;
+    }
+
     let isMounted = true;
 
     const fetchToken = async () => {
@@ -42,10 +50,11 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
         const data = await res.json();
 
         if (!res.ok || !data.token) {
-          throw new Error(data.error || 'Não foi possível autenticar na sala de transmissão.');
+          throw new Error(data.error || 'Não foi possível autenticar na sala de vídeo.');
         }
 
         if (isMounted) {
+          lastFetchedRoomRef.current = cleanRoom;
           setToken(data.token);
           setWsUrl(data.wsUrl);
         }
@@ -65,32 +74,32 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     return () => {
       isMounted = false;
     };
-  }, [cleanRoom, finalUserName, isAdmin]);
+  }, [cleanRoom, finalUserName, isAdmin, token]);
 
   if (loading) {
     return (
-      <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-center justify-center space-y-3 p-6 text-center shadow-xl">
+      <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-3xl border border-slate-800 flex flex-col items-center justify-center space-y-3 p-6 text-center shadow-xl">
         <Loader2 className="w-8 h-8 text-green-400 animate-spin" />
-        <p className="text-sm font-semibold text-white">Iniciando Transmissão Nativa DDS ON...</p>
-        <p className="text-xs text-slate-400">Otimizando conexão WebRTC de alta performance</p>
+        <p className="text-sm font-bold text-white">Conectando à Transmissão Ao Vivo...</p>
+        <p className="text-xs text-slate-400">Estabelecendo conexão WebRTC de alta performance</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-2xl border border-red-500/30 flex flex-col items-center justify-center space-y-3 p-6 text-center shadow-xl">
+      <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-3xl border border-red-500/30 flex flex-col items-center justify-center space-y-3 p-6 text-center shadow-xl">
         <AlertCircle className="w-10 h-10 text-red-400" />
-        <p className="text-sm font-bold text-white">Falha ao Iniciar a Transmissão</p>
+        <p className="text-sm font-bold text-white">Falha na Conexão do Vídeo</p>
         <p className="text-xs text-slate-400 max-w-md">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-2xl overflow-hidden shadow-xl border border-slate-800 flex flex-col">
-      {/* Topo Oficial */}
-      <div className="bg-slate-900 px-4 py-2.5 flex items-center justify-between border-b border-slate-800">
+    <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col">
+      {/* Topo da Transmissão */}
+      <div className="bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-800">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -115,7 +124,7 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
         </div>
       </div>
 
-      {/* Reprodutor de Vídeo Nativo LiveKit */}
+      {/* Reprodutor Nativo LiveKit */}
       <div className="relative flex-1 w-full bg-black min-h-[400px]" data-lk-theme="default">
         <LiveKitRoom
           video={true}
@@ -124,6 +133,7 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
           serverUrl={wsUrl}
           connect={true}
           className="w-full h-full"
+          data-lk-theme="default"
         >
           <VideoConference />
         </LiveKitRoom>
@@ -131,3 +141,5 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     </div>
   );
 }
+
+export default memo(DdsConferenceRoomComponent);
