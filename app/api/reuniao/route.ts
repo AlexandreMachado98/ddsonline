@@ -71,7 +71,7 @@ export async function GET(req: Request) {
   }
 }
 
-// 2. POST: Cria novo DDS (Presencial ou Remoto)
+// 2. POST: Cria novo DDS
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -112,7 +112,7 @@ export async function POST(req: Request) {
   }
 }
 
-// 3. PATCH: Atualiza fotos da equipe ou dados durante a reunião presencial
+// 3. PATCH: Atualiza fotos da equipe ou dados
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
@@ -150,5 +150,32 @@ export async function PUT(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error?.message }, { status: 500 });
+  }
+}
+
+// 5. DELETE: Exclui permanentemente um DDS e suas presenças vinculadas
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const meetingId = searchParams.get('meetingId');
+
+    if (!meetingId) {
+      return NextResponse.json({ success: false, error: 'ID da reunião é obrigatório.' }, { status: 400 });
+    }
+
+    // 1. Apaga primeiro as presenças para respeitar a integridade do banco
+    await (prisma as any).attendance.deleteMany({
+      where: { meetingId: meetingId }
+    });
+
+    // 2. Apaga o DDS
+    await (prisma as any).meeting.delete({
+      where: { id: meetingId }
+    });
+
+    return NextResponse.json({ success: true, message: 'DDS excluído com sucesso.' });
+  } catch (error: any) {
+    console.error("Erro ao excluir DDS:", error);
+    return NextResponse.json({ success: false, error: error?.message || 'Erro ao excluir DDS' }, { status: 500 });
   }
 }

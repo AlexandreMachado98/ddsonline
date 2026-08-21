@@ -5,7 +5,7 @@ import {
   Play, Users, FileText, CheckCircle2, 
   Smartphone, Download, Copy, Check, LogOut, 
   History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet,
-  Camera, Image as ImageIcon, Trash2, MapPin, Target, Sparkles
+  Camera, Image as ImageIcon, Trash2, Bell, UserCheck, UserX, Target, CheckCheck
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
@@ -37,6 +37,9 @@ export default function AdminPanel() {
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
   const [exitNotification, setExitNotification] = useState<string | null>(null);
+
+  // Fila de Espera de Colaboradores (Lobby)
+  const [pendingAdmission, setPendingAdmission] = useState<any[]>([]);
 
   useEffect(() => {
     const auth = localStorage.getItem('dds_admin_auth');
@@ -73,7 +76,13 @@ export default function AdminPanel() {
         if (data.meeting && data.meeting.status === 'LIVE') {
           setActiveMeeting(data.meeting);
 
-          // Carrega fotos já salvas se houver
+          const allAttendees = data.meeting.attendees || [];
+          
+          // Separa quem está no Lobby aguardando sua autorização
+          const waiting = allAttendees.filter((a: any) => a.status === 'PENDING');
+          setPendingAdmission(waiting);
+
+          // Fotos salvas
           if (data.meeting.teamPhotos) {
             try {
               const parsed = JSON.parse(data.meeting.teamPhotos);
@@ -82,8 +91,17 @@ export default function AdminPanel() {
               }
             } catch {}
           }
+
+          // Notificação de saída
+          allAttendees.forEach((person: any) => {
+            if (person.name.includes('(Saída:') && !exitNotification) {
+              setExitNotification(`⚠️ ${person.name.replace(/\(Saída:.*\)/, '')} precisou se ausentar.`);
+              setTimeout(() => setExitNotification(null), 8000);
+            }
+          });
         } else {
           setActiveMeeting(null);
+          setPendingAdmission([]);
         }
 
         setMeetingHistory(data.history || []);
@@ -93,17 +111,46 @@ export default function AdminPanel() {
     } finally {
       setIsInitialLoadDone(true);
     }
-  }, [currentUser, startDate, endDate, teamPhotos.length]);
+  }, [currentUser, startDate, endDate, exitNotification, teamPhotos.length]);
 
   useEffect(() => {
     if (currentUser) {
       fetchAllData();
-      const interval = setInterval(fetchAllData, 2500);
+      const interval = setInterval(fetchAllData, 2000);
       return () => clearInterval(interval);
     }
   }, [currentUser, fetchAllData]);
 
-  // Iniciar Novo DDS (Presencial ou Remoto)
+  // Ação: Permitir ou Recusar entrada do Colaborador
+  const handleAdmitUser = async (attendanceId: string, action: 'ADMIT' | 'REJECT') => {
+    try {
+      await fetch('/api/presenca/admit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attendanceId, action })
+      });
+      fetchAllData();
+    } catch {
+      alert('Erro ao processar permissão de entrada.');
+    }
+  };
+
+  // Ação: Permitir TODOS de uma vez
+  const handleAdmitAll = async () => {
+    try {
+      for (const pending of pendingAdmission) {
+        await fetch('/api/presenca/admit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ attendanceId: pending.id, action: 'ADMIT' })
+        });
+      }
+      fetchAllData();
+    } catch {
+      alert('Erro ao permitir todos.');
+    }
+  };
+
   const handleStartNewMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic.trim() || !farm.trim()) {
@@ -144,7 +191,6 @@ export default function AdminPanel() {
     }
   };
 
-  // Adicionar Foto da Equipe (Tirada da Câmera ou Galeria)
   const handleAddTeamPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -155,7 +201,6 @@ export default function AdminPanel() {
       const updatedPhotos = [...teamPhotos, base64];
       setTeamPhotos(updatedPhotos);
 
-      // Salva imediatamente no banco se a reunião estiver aberta
       if (activeMeeting?.id) {
         await fetch('/api/reuniao', {
           method: 'PATCH',
@@ -226,6 +271,26 @@ export default function AdminPanel() {
     });
   };
 
+  const handleDeleteMeeting = async (meetingId: string, meetingTopic: string) => {
+    if (confirm(`⚠️ Tem certeza que deseja excluir permanentemente o DDS "${meetingTopic}" e todas as suas presenças auditadas? Esta ação não pode ser desfeita.`)) {
+      try {
+        const res = await fetch(`/api/reuniao?meetingId=${meetingId}`, {
+          method: 'DELETE'
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          alert('✅ DDS excluído do histórico com sucesso!');
+          fetchAllData();
+        } else {
+          alert('Erro ao excluir: ' + (data.error || 'Falha no servidor.'));
+        }
+      } catch {
+        alert('Erro de conexão ao tentar excluir o DDS.');
+      }
+    }
+  };
+
   const handleDownloadConsolidatedPdf = () => {
     if (meetingHistory.length === 0) {
       alert('Não há reuniões no período selecionado.');
@@ -254,8 +319,9 @@ export default function AdminPanel() {
       setIsLiveMode(false);
       setActiveMeeting(null);
       setTeamPhotos([]);
+      setPendingAdmission([]);
       fetchAllData();
-      alert('✅ DDS Encerrado! Ata e anexo fotográfico arquivados com sucesso.');
+      alert('✅ DDS Encerrado! Ata arquivada com sucesso.');
     }
   };
 
@@ -265,10 +331,11 @@ export default function AdminPanel() {
   };
 
   // =========================================================================
-  // SALA DO DDS EM ANDAMENTO (PRESENCIAL OU REMOTO)
+  // SALA DO DDS EM ANDAMENTO (PRESENCIAL OU REMOTO COM LOBBY)
   // =========================================================================
   if (isLiveMode && activeMeeting) {
     const isPresential = activeMeeting.type === 'PRESENTIAL';
+    const admittedAttendees = (activeMeeting.attendees || []).filter((a: any) => a.status === 'ADMITTED');
 
     return (
       <main className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans relative text-white">
@@ -297,6 +364,57 @@ export default function AdminPanel() {
               </button>
             </div>
           </header>
+
+          {/* BARRA DE SOLICITAÇÃO DE ENTRADA (LOBBY DO GOOGLE MEET) */}
+          {pendingAdmission.length > 0 && (
+            <div className="bg-gradient-to-r from-amber-600 via-amber-700 to-slate-900 border border-amber-500/40 p-4 rounded-3xl shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-300">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-500/20 text-white rounded-2xl">
+                  <Bell size={24} className="animate-bounce" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">
+                    {pendingAdmission.length === 1 ? '1 Colaborador aguarda sua permissão para entrar' : `${pendingAdmission.length} Colaboradores aguardam no Lobby`}
+                  </h4>
+                  <p className="text-xs text-amber-100">Autorize para liberar a entrada do participante no DDS.</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {pendingAdmission.length > 1 && (
+                  <button
+                    onClick={handleAdmitAll}
+                    className="px-3.5 py-2 bg-white text-slate-950 hover:bg-slate-100 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-md"
+                  >
+                    <CheckCheck size={16} className="text-green-600" /> Permitir Todos ({pendingAdmission.length})
+                  </button>
+                )}
+
+                {pendingAdmission.map((pending) => (
+                  <div key={pending.id} className="flex items-center gap-2 bg-slate-950/90 p-2 rounded-xl border border-amber-500/40 shadow-sm">
+                    {pending.selfie && (
+                      <img src={pending.selfie} alt={pending.name} className="w-7 h-7 rounded-lg object-cover border border-amber-400" />
+                    )}
+                    <span className="text-xs font-bold text-white px-1 truncate max-w-[130px]">{pending.name}</span>
+                    
+                    <button
+                      onClick={() => handleAdmitUser(pending.id, 'ADMIT')}
+                      className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
+                    >
+                      <UserCheck size={13} /> Permitir
+                    </button>
+                    <button
+                      onClick={() => handleAdmitUser(pending.id, 'REJECT')}
+                      className="p-1.5 bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white rounded-lg text-xs transition-colors"
+                      title="Recusar entrada"
+                    >
+                      <UserX size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Banner de Reunião Ativa */}
           <div className="bg-gradient-to-r from-green-700 via-emerald-700 to-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-green-500/30">
@@ -344,20 +462,16 @@ export default function AdminPanel() {
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            {/* COLUNA ESQUERDA: MÓDULO PRESENCIAL OU VIDEOCONFERÊNCIA */}
+            {/* Coluna Esquerda: Presencial ou Vídeo com Mosaico dos Admitidos */}
             <div className="lg:col-span-7 space-y-4">
-              
               {isPresential ? (
-                // --- MÓDULO EXCLUSIVO DO DDS PRESENCIAL (FOTOS DA EQUIPE + PASS THE PHONE) ---
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-xl">
-                  
-                  {/* Botão Pass the phone em destaque */}
                   <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <h3 className="text-sm font-bold text-white flex items-center gap-2">
                         <Smartphone size={18} className="text-green-400" /> Coleta de Presença no Aparelho
                       </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">Passe o celular/tablet para os trabalhadores assinarem em sequência.</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Passe o aparelho para os trabalhadores assinarem em sequência.</p>
                     </div>
 
                     <Link href={`/reuniao/${activeMeeting.id}`}>
@@ -367,14 +481,13 @@ export default function AdminPanel() {
                     </Link>
                   </div>
 
-                  {/* Anexo Fotográfico da Equipe */}
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="text-sm font-bold text-white flex items-center gap-2">
                           <Camera size={16} className="text-green-400" /> Registro Fotográfico da Equipe ({teamPhotos.length})
                         </h4>
-                        <p className="text-xs text-slate-400">Tire fotos da equipe reunida no campo para anexar na ata em PDF.</p>
+                        <p className="text-xs text-slate-400">Fotos anexadas na ata oficial em PDF.</p>
                       </div>
 
                       <button
@@ -393,7 +506,6 @@ export default function AdminPanel() {
                       />
                     </div>
 
-                    {/* Grade de Fotos da Equipe Anexadas */}
                     {teamPhotos.length === 0 ? (
                       <div 
                         onClick={() => fileInputRef.current?.click()}
@@ -401,7 +513,7 @@ export default function AdminPanel() {
                       >
                         <ImageIcon size={32} className="mx-auto text-slate-600" />
                         <p className="text-xs font-semibold text-slate-400">Nenhuma foto da equipe anexada ainda.</p>
-                        <p className="text-[11px] text-slate-500">Clique para tirar uma foto com a câmera do celular ou escolher da galeria.</p>
+                        <p className="text-[11px] text-slate-500">Clique para tirar foto com a câmera ou escolher da galeria.</p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -423,26 +535,23 @@ export default function AdminPanel() {
                       </div>
                     )}
                   </div>
-
                 </div>
               ) : (
-                // --- MÓDULO DE TRANSMISSÃO REMOTA ---
                 <DdsConferenceRoom
                   roomName={activeMeeting.id}
                   userName={`${currentUser?.name || 'Técnico'} (DDS ON)`}
                   isAdmin={true}
-                  attendees={activeMeeting.attendees || []}
+                  attendees={admittedAttendees}
                 />
               )}
-
             </div>
 
-            {/* COLUNA DIREITA: LISTA DE PRESENÇA EM TEMPO REAL */}
+            {/* Coluna Direita: Lista de Presença */}
             <div className="lg:col-span-5 space-y-6">
               <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 flex items-center justify-around text-center">
                 <div>
-                  <span className="text-3xl font-black text-white">{activeMeeting.attendees?.length || 0}</span>
-                  <span className="text-slate-400 text-xs block mt-1">Presenças Coletadas</span>
+                  <span className="text-3xl font-black text-white">{admittedAttendees.length}</span>
+                  <span className="text-slate-400 text-xs block mt-1">Presenças Auditadas</span>
                 </div>
                 <div className="h-10 w-[1px] bg-slate-800"></div>
                 <div>
@@ -456,22 +565,29 @@ export default function AdminPanel() {
                   <FileText size={18} className="text-green-400" /> Lista de Presença do DDS
                 </h3>
                 
-                {!activeMeeting.attendees || activeMeeting.attendees.length === 0 ? (
+                {(!activeMeeting.attendees || activeMeeting.attendees.length === 0) ? (
                   <div className="text-center py-12 text-slate-500">
                     <p>Nenhum colaborador assinou ainda.</p>
-                    <p className="text-xs text-slate-600 mt-1">Passe o aparelho para a equipe ou compartilhe o link.</p>
+                    <p className="text-xs text-slate-600 mt-1">Envie o link para a equipe.</p>
                   </div>
                 ) : (
                   <ul className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
                     {activeMeeting.attendees.map((person: any) => {
+                      const isPending = person.status === 'PENDING';
                       const isExited = Boolean(person.exitReason || person.name.includes('(Saída:'));
                       return (
                         <li key={person.id} className={`flex items-center justify-between p-3.5 rounded-2xl border ${
-                          isExited ? 'bg-amber-500/10 border-amber-500/30 text-amber-200' : 'bg-slate-950 border-slate-800'
+                          isPending 
+                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                            : isExited 
+                            ? 'bg-red-500/10 border-red-500/30 text-red-200' 
+                            : 'bg-slate-950 border-slate-800'
                         }`}>
                           <div className="flex items-center gap-3">
-                            {isExited ? (
-                              <AlertTriangle size={20} className="text-amber-400 shrink-0" />
+                            {isPending ? (
+                              <Clock size={20} className="text-amber-400 shrink-0 animate-pulse" />
+                            ) : isExited ? (
+                              <AlertTriangle size={20} className="text-red-400 shrink-0" />
                             ) : (
                               <CheckCircle2 size={22} className="text-green-400 shrink-0" />
                             )}
@@ -479,18 +595,30 @@ export default function AdminPanel() {
                               <p className="font-bold text-white text-sm">
                                 {person.name.replace(/\(Saída:.*\)/, '')}
                               </p>
-                              {isExited ? (
-                                <p className="text-[11px] font-semibold text-amber-300">
-                                  ⚠️ Saída: {person.exitReason || 'Justificada'}
-                                </p>
-                              ) : (
-                                <p className="text-xs text-slate-400">CPF: {person.cpf}</p>
-                              )}
+                              <p className="text-[11px]">
+                                {isPending ? (
+                                  <span className="text-amber-400 font-semibold">⏳ No Lobby (Aguardando)</span>
+                                ) : isExited ? (
+                                  <span className="text-red-300 font-semibold">⚠️ Saída: {person.exitReason || 'Justificada'}</span>
+                                ) : (
+                                  <span className="text-slate-400">CPF: {person.cpf}</span>
+                                )}
+                              </p>
                             </div>
                           </div>
-                          <span className="text-xs text-slate-400 font-medium bg-slate-800 px-2.5 py-1 rounded-lg">
-                            {new Date(person.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                          
+                          {isPending ? (
+                            <button
+                              onClick={() => handleAdmitUser(person.id, 'ADMIT')}
+                              className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold"
+                            >
+                              Permitir
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-400 font-medium bg-slate-800 px-2.5 py-1 rounded-lg">
+                              {new Date(person.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
                         </li>
                       );
                     })}
@@ -506,13 +634,13 @@ export default function AdminPanel() {
   }
 
   // =========================================================================
-  // DASHBOARD PRINCIPAL COM SELETOR DE MODALIDADE (PRESENCIAL / REMOTO)
+  // DASHBOARD PRINCIPAL
   // =========================================================================
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans">
       <div className="max-w-5xl mx-auto space-y-6">
         
-        {/* Topo */}
+        {/* Cabeçalho Principal */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/90 p-6 rounded-3xl border border-slate-800 shadow-xl backdrop-blur-sm">
           <div>
             <span className="text-2xl font-black tracking-tight">
@@ -563,7 +691,6 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* Abas */}
         <div className="flex bg-slate-900 border border-slate-800 p-1.5 rounded-2xl max-w-md">
           <button
             onClick={() => setActiveTab('NEW_DDS')}
@@ -592,7 +719,6 @@ export default function AdminPanel() {
               <p className="text-slate-400 text-xs">Selecione se o DDS será realizado no campo presencialmente ou por transmissão</p>
             </div>
 
-            {/* SELETOR DE MODALIDADE: PRESENCIAL VS REMOTO */}
             <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-950 rounded-2xl border border-slate-800">
               <button
                 type="button"
@@ -652,7 +778,7 @@ export default function AdminPanel() {
                   rows={3}
                   value={objective} 
                   onChange={(e) => setObjective(e.target.value)}
-                  placeholder="Descreva resumidamente o objetivo deste DDS (Ex: Conscientizar a equipe sobre o uso obrigatório de EPIs completos durante a aplicação de defensivos e orientar procedimentos de primeiros socorros em caso de contato)..."
+                  placeholder="Descreva resumidamente o objetivo deste DDS..."
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none resize-none leading-relaxed"
                 />
               </div>
@@ -745,7 +871,7 @@ export default function AdminPanel() {
                         <span className="text-xs font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-2.5 py-0.5 rounded-md">
                           {meeting.farm || 'Unidade'}
                         </span>
-                        <span className="text-[11px] font-semibold text-slate-300 bg-slate-800 px-2 py-0.5 rounded-md">
+                        <span className="text-[11px] font-semibold text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded-md">
                           {meeting.type === 'PRESENTIAL' ? '👥 Presencial' : '🎙️ Remoto'}
                         </span>
                         <span className="text-xs text-slate-400 flex items-center gap-1">
@@ -763,12 +889,22 @@ export default function AdminPanel() {
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => handleDownloadHistoryPdf(meeting)}
-                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-green-300 border border-green-500/30 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm self-start md:self-auto"
-                    >
-                      <Download size={15} /> Baixar Ata Oficial
-                    </button>
+                    <div className="flex items-center gap-2 self-start md:self-auto">
+                      <button
+                        onClick={() => handleDownloadHistoryPdf(meeting)}
+                        className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-green-300 border border-green-500/30 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
+                      >
+                        <Download size={15} /> Baixar Ata
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteMeeting(meeting.id, meeting.topic)}
+                        className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 rounded-xl transition-colors"
+                        title="Excluir este DDS permanentemente"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
