@@ -18,7 +18,7 @@ interface MeetingData {
   farm: string;
   type?: string;
   objective?: string;
-  teamPhotos?: string; // JSON string ou Array
+  teamPhotos?: string;
   createdAt?: string;
   attendees: Attendee[];
 }
@@ -32,17 +32,13 @@ interface ConsolidatedReportData {
   meetings: MeetingData[];
 }
 
-// 1. ATA OFICIAL DE DDS (PRESENCIAL OU REMOTO) COM OBJETIVO E ANEXO FOTOGRÁFICO
 export function generateDdsPdf(meeting: MeetingData) {
   const doc = new jsPDF();
-
   const isPresential = meeting.type === 'PRESENTIAL';
 
-  // 1. Topo Oficial AM TST
-  doc.setFillColor(15, 23, 42); // Grafite escuro
+  doc.setFillColor(15, 23, 42);
   doc.rect(0, 0, 210, 28, 'F');
-
-  doc.setFillColor(22, 163, 74); // Verde DDS ON
+  doc.setFillColor(22, 163, 74);
   doc.rect(0, 26, 210, 2, 'F');
 
   doc.setTextColor(255, 255, 255);
@@ -64,9 +60,8 @@ export function generateDdsPdf(meeting: MeetingData) {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
-  doc.text(isPresential ? 'MODALIDADE: PRESENCIAL' : 'MODALIDADE: REMOTO', 200, 16, { align: 'right' });
+  doc.text('REGISTRO DE CONFORMIDADE NR', 200, 16, { align: 'right' });
 
-  // 2. Metadados do Treinamento
   doc.setTextColor(31, 41, 55);
   doc.setFontSize(9);
   
@@ -94,7 +89,6 @@ export function generateDdsPdf(meeting: MeetingData) {
 
   currentY += 24;
 
-  // Bloco: Objetivo do Treinamento (Se houver)
   if (meeting.objective) {
     doc.setFillColor(248, 250, 252);
     doc.roundedRect(14, currentY - 2, 182, 14, 2, 2, 'F');
@@ -117,7 +111,6 @@ export function generateDdsPdf(meeting: MeetingData) {
   doc.setLineWidth(0.3);
   doc.line(14, currentY, 196, currentY);
 
-  // 3. Tabela de Presenças com Fotos e Assinaturas
   const tableRows = meeting.attendees.map(a => {
     const isEarlyExit = Boolean(a.exitReason || a.exitSignature);
     const exitTime = a.leftAt ? new Date(a.leftAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
@@ -173,13 +166,11 @@ export function generateDdsPdf(meeting: MeetingData) {
             doc.addImage(attendee.selfie, 'JPEG', data.cell.x + 4, data.cell.y + 2, 14, 14);
           } catch (e) {}
         }
-
         if (data.column.index === 4 && attendee.signature) {
           try {
             doc.addImage(attendee.signature, 'PNG', data.cell.x + 3, data.cell.y + 3, 24, 12);
           } catch (e) {}
         }
-
         if (data.column.index === 6 && attendee.exitSignature) {
           try {
             doc.addImage(attendee.exitSignature, 'PNG', data.cell.x + 3, data.cell.y + 3, 24, 12);
@@ -189,7 +180,6 @@ export function generateDdsPdf(meeting: MeetingData) {
     }
   });
 
-  // 4. ANEXO FOTOGRÁFICO DA EQUIPE PRESENCIAL (Se houver fotos anexadas)
   let photosArray: string[] = [];
   if (meeting.teamPhotos) {
     try {
@@ -199,8 +189,6 @@ export function generateDdsPdf(meeting: MeetingData) {
 
   if (Array.isArray(photosArray) && photosArray.length > 0) {
     doc.addPage();
-
-    // Topo do Anexo Fotográfico
     doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, 210, 24, 'F');
     doc.setFillColor(22, 163, 74);
@@ -231,14 +219,11 @@ export function generateDdsPdf(meeting: MeetingData) {
         doc.setTextColor(100, 116, 139);
         doc.text(`Foto da Equipe #${index + 1}`, photoX + 2, photoY + photoHeight + 5);
 
-        // Alterna entre coluna da esquerda e direita
         if (index % 2 === 0) {
           photoX = 108;
         } else {
           photoX = 14;
           photoY += photoHeight + 14;
-
-          // Se passar da página, adiciona nova página de fotos
           if (photoY > 230 && index < photosArray.length - 1) {
             doc.addPage();
             photoY = 20;
@@ -249,16 +234,17 @@ export function generateDdsPdf(meeting: MeetingData) {
     });
   }
 
-  // Rodapé em todas as páginas
+  // Rodapé Profissional Centralizado
   const pageCount = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(7.5);
     doc.setTextColor(100, 116, 139);
     doc.text(
-      `DDS ON • Consultoria e Tecnologia: AM TST (amtst.vercel.app) | Página ${i} de ${pageCount}`,
-      14,
-      doc.internal.pageSize.height - 8
+      `DDS ON • Tecnologia e Conformidade em Saúde e Segurança do Trabalho | © ${new Date().getFullYear()} AM TST | amtst.vercel.app | Página ${i} de ${pageCount}`,
+      105,
+      doc.internal.pageSize.height - 8,
+      { align: 'center' }
     );
   }
 
@@ -266,13 +252,11 @@ export function generateDdsPdf(meeting: MeetingData) {
   doc.save(`DDS_ON_${isPresential ? 'Presencial' : 'Remoto'}_${cleanTopic}_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
-// 2. RELATÓRIO CONSOLIDADO DO PERÍODO
 export function generateConsolidatedDdsPdf(report: ConsolidatedReportData) {
   const doc = new jsPDF();
 
   doc.setFillColor(15, 23, 42);
   doc.rect(0, 0, 210, 28, 'F');
-
   doc.setFillColor(22, 163, 74);
   doc.rect(0, 26, 210, 2, 'F');
 
@@ -359,15 +343,17 @@ export function generateConsolidatedDdsPdf(report: ConsolidatedReportData) {
     }
   });
 
+  // Rodapé Profissional Centralizado
   const pageCount = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(7.5);
     doc.setTextColor(100, 116, 139);
     doc.text(
-      `DDS ON • Consultoria e Tecnologia: AM TST (amtst.vercel.app) | Página ${i} de ${pageCount}`,
-      14,
-      doc.internal.pageSize.height - 8
+      `DDS ON • Tecnologia e Conformidade em Saúde e Segurança do Trabalho | © ${new Date().getFullYear()} AM TST | amtst.vercel.app | Página ${i} de ${pageCount}`,
+      105,
+      doc.internal.pageSize.height - 8,
+      { align: 'center' }
     );
   }
 
