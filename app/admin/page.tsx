@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Play, Users, FileText, CheckCircle2, 
   Smartphone, Download, Copy, Check, LogOut, 
-  History, PlusCircle, Calendar, AlertTriangle, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet,
+  History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet,
   Camera, Image as ImageIcon, Trash2, Target, ExternalLink
 } from 'lucide-react';
 import Link from 'next/link';
@@ -25,7 +25,7 @@ export default function AdminPanel() {
   const [farm, setFarm] = useState('');
   const [objective, setObjective] = useState('');
 
-  // Fotos da Equipe no Modo Presencial
+  // Fotos da Equipe no Modo Presencial (Base64)
   const [teamPhotos, setTeamPhotos] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -120,7 +120,7 @@ export default function AdminPanel() {
   const handleStartNewMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic.trim() || !farm.trim()) {
-      alert('Por favor, preencha o Tema do DDS e o Local da fazenda.');
+      window.alert('Por favor, preencha o Tema do DDS e o Local da fazenda.');
       return;
     }
 
@@ -140,7 +140,13 @@ export default function AdminPanel() {
         })
       });
       
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        throw new Error('Falha ao ler resposta da API.');
+      }
       
       if (res.ok && data.success && data.meeting) {
         setActiveMeeting(data.meeting);
@@ -148,10 +154,10 @@ export default function AdminPanel() {
         setTopic('');
         setObjective('');
       } else {
-        alert('Erro ao iniciar reunião: ' + (data.error || 'Falha no banco.'));
+        window.alert('Erro ao iniciar reunião: ' + (data.error || 'Falha no banco.'));
       }
     } catch (err: any) {
-      alert('Aviso: ' + (err?.message || 'Falha de comunicação.'));
+      window.alert('Aviso: ' + (err?.message || 'Falha de comunicação.'));
     } finally {
       setIsCreatingMeeting(false);
     }
@@ -207,7 +213,7 @@ export default function AdminPanel() {
 
   const handleDownloadActivePdf = () => {
     if (!activeMeeting || !activeMeeting.attendees || activeMeeting.attendees.length === 0) {
-      alert('Ainda não há presenças registradas nesta reunião.');
+      window.alert('Ainda não há presenças registradas nesta reunião.');
       return;
     }
     generateDdsPdf({
@@ -223,7 +229,7 @@ export default function AdminPanel() {
 
   const handleDownloadHistoryPdf = (meeting: any) => {
     if (!meeting.attendees || meeting.attendees.length === 0) {
-      alert('Esta reunião não possui presenças registradas.');
+      window.alert('Esta reunião não possui presenças registradas.');
       return;
     }
     generateDdsPdf({
@@ -237,8 +243,9 @@ export default function AdminPanel() {
     });
   };
 
+  // FUNÇÃO CORRIGIDA (com window.confirm e try/catch isolado)
   const handleDeleteMeeting = async (meetingId: string, meetingTopic: string) => {
-    if (confirm(`⚠️ Tem certeza que deseja excluir permanentemente o DDS "${meetingTopic}" e todas as suas presenças auditadas? Esta ação não pode ser desfeita.`)) {
+    if (window.confirm(`⚠️ Tem certeza que deseja excluir permanentemente o DDS "${meetingTopic}" e todas as suas presenças auditadas? Esta ação não pode ser desfeita.`)) {
       try {
         const res = await fetch(`/api/reuniao?meetingId=${meetingId}`, {
           method: 'DELETE'
@@ -246,20 +253,20 @@ export default function AdminPanel() {
         const data = await res.json();
         
         if (data.success) {
-          alert('✅ DDS excluído do histórico com sucesso!');
+          window.alert('✅ DDS excluído do histórico com sucesso!');
           fetchAllData();
         } else {
-          alert('Erro ao excluir: ' + (data.error || 'Falha no servidor.'));
+          window.alert('Erro ao excluir: ' + (data.error || 'Falha no servidor.'));
         }
       } catch {
-        alert('Erro de conexão ao tentar excluir o DDS.');
+        window.alert('Erro de conexão ao tentar excluir o DDS.');
       }
     }
   };
 
   const handleDownloadConsolidatedPdf = () => {
     if (meetingHistory.length === 0) {
-      alert('Não há reuniões no período selecionado.');
+      window.alert('Não há reuniões no período selecionado.');
       return;
     }
     generateConsolidatedDdsPdf({
@@ -273,7 +280,7 @@ export default function AdminPanel() {
   };
 
   const handleEndMeeting = async () => {
-    if (confirm('Encerrar este DDS? A ata oficial do DDS ON será arquivada.')) {
+    if (window.confirm('Encerrar este DDS? A ata oficial do DDS ON será arquivada.')) {
       if (activeMeeting && activeMeeting.attendees && activeMeeting.attendees.length > 0) {
         handleDownloadActivePdf();
       }
@@ -286,7 +293,7 @@ export default function AdminPanel() {
       setActiveMeeting(null);
       setTeamPhotos([]);
       fetchAllData();
-      alert('✅ DDS Encerrado! Ata arquivada com sucesso.');
+      window.alert('✅ DDS Encerrado! Ata arquivada com sucesso.');
     }
   };
 
@@ -302,21 +309,21 @@ export default function AdminPanel() {
     const isPresential = activeMeeting.type === 'PRESENTIAL';
 
     return (
-      <main className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans relative text-white flex flex-col justify-between">
-        <div className="max-w-7xl w-full mx-auto space-y-6">
+      <main className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans relative text-white">
+        <div className="max-w-7xl mx-auto space-y-6">
           
-          <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-lg">
+          <header className="flex items-center justify-between bg-slate-900 p-5 rounded-3xl border border-slate-800 shadow-lg">
             <div className="flex items-center gap-2">
               <span className="text-2xl font-black tracking-tight">
                 <span className="text-white">DDS </span>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">ON</span>
               </span>
-              <span className="text-[11px] bg-slate-800 text-slate-300 font-bold px-2.5 py-1 rounded-lg border border-slate-700 ml-2">
+              <span className="text-xs bg-slate-800 text-slate-300 font-bold px-2.5 py-1 rounded-lg border border-slate-700 ml-2">
                 {isPresential ? '👥 Modo Presencial' : '🎙️ Modo Remoto'}
               </span>
             </div>
 
-            <div className="flex items-center gap-3 self-end sm:self-auto">
+            <div className="flex items-center gap-3">
               <span className="text-xs text-slate-400 hidden sm:inline">
                 Organizador: <strong className="text-white">{currentUser?.name}</strong>
               </span>
@@ -343,7 +350,7 @@ export default function AdminPanel() {
               <h2 className="text-2xl font-black">{activeMeeting.topic}</h2>
               <p className="text-green-100 text-sm mt-0.5">📍 {activeMeeting.farm}</p>
               {activeMeeting.objective && (
-                <p className="text-green-200/90 text-xs mt-1.5 italic">🎯 Objetivo: {activeMeeting.objective}</p>
+                <p className="text-green-200/90 text-xs mt-1 italic">🎯 Objetivo: {activeMeeting.objective}</p>
               )}
             </div>
             
@@ -360,7 +367,7 @@ export default function AdminPanel() {
                 onClick={handleDownloadActivePdf}
                 className="px-4 py-3 bg-green-800 hover:bg-green-700 border border-green-400/30 text-white rounded-xl font-bold transition-all flex items-center gap-2 shadow-sm text-sm"
               >
-                <Download size={18} /> Baixar Ata
+                <Download size={18} /> Baixar Ata Oficial
               </button>
 
               <button 
@@ -374,14 +381,14 @@ export default function AdminPanel() {
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            {/* Coluna Esquerda: Presencial ou Vídeo */}
+            {/* Coluna Esquerda: Presencial ou Vídeo com Mosaico dos Admitidos */}
             <div className="lg:col-span-7 space-y-4">
               {isPresential ? (
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-xl">
                   <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <Smartphone size={18} className="text-green-400" /> Coleta de Presença
+                        <Smartphone size={18} className="text-green-400" /> Coleta de Presença no Aparelho
                       </h3>
                       <p className="text-xs text-slate-400 mt-0.5">Passe o aparelho para os trabalhadores assinarem em sequência.</p>
                     </div>
@@ -397,7 +404,7 @@ export default function AdminPanel() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                          <Camera size={16} className="text-green-400" /> Registro Fotográfico ({teamPhotos.length})
+                          <Camera size={16} className="text-green-400" /> Registro Fotográfico da Equipe ({teamPhotos.length})
                         </h4>
                         <p className="text-xs text-slate-400">Fotos anexadas na ata oficial em PDF.</p>
                       </div>
@@ -424,7 +431,7 @@ export default function AdminPanel() {
                         className="border-2 border-dashed border-slate-800 hover:border-green-500/50 bg-slate-950/50 rounded-2xl p-8 text-center space-y-2 cursor-pointer transition-colors"
                       >
                         <ImageIcon size={32} className="mx-auto text-slate-600" />
-                        <p className="text-xs font-semibold text-slate-400">Nenhuma foto da equipe anexada.</p>
+                        <p className="text-xs font-semibold text-slate-400">Nenhuma foto da equipe anexada ainda.</p>
                         <p className="text-[11px] text-slate-500">Clique para tirar foto com a câmera ou escolher da galeria.</p>
                       </div>
                     ) : (
@@ -453,7 +460,6 @@ export default function AdminPanel() {
                   roomName={activeMeeting.id}
                   userName={`${currentUser?.name || 'Técnico'} (DDS ON)`}
                   isAdmin={true}
-                  attendees={activeMeeting.attendees || []}
                 />
               )}
             </div>
@@ -463,7 +469,7 @@ export default function AdminPanel() {
               <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 flex items-center justify-around text-center">
                 <div>
                   <span className="text-3xl font-black text-white">{activeMeeting.attendees?.length || 0}</span>
-                  <span className="text-slate-400 text-xs block mt-1">Presenças Auditadas</span>
+                  <span className="text-slate-400 text-xs block mt-1">Presenças Coletadas</span>
                 </div>
                 <div className="h-10 w-[1px] bg-slate-800"></div>
                 <div>
@@ -502,13 +508,13 @@ export default function AdminPanel() {
                               <p className="font-bold text-white text-sm">
                                 {person.name.replace(/\(Saída:.*\)/, '')}
                               </p>
-                              {isExited ? (
-                                <p className="text-[11px] font-semibold text-red-300">
-                                  ⚠️ Saída: {person.exitReason || 'Justificada'}
-                                </p>
-                              ) : (
-                                <p className="text-xs text-slate-400">CPF: {person.cpf}</p>
-                              )}
+                              <p className="text-[11px]">
+                                {isExited ? (
+                                  <span className="text-red-300 font-semibold">⚠️ Saída: {person.exitReason || 'Justificada'}</span>
+                                ) : (
+                                  <span className="text-slate-400">CPF: {person.cpf}</span>
+                                )}
+                              </p>
                             </div>
                           </div>
                           
@@ -525,24 +531,6 @@ export default function AdminPanel() {
 
           </div>
         </div>
-
-        {/* Rodapé Oficial (Fixo no final da tela) */}
-        <footer className="mt-8 pt-5 border-t border-slate-800 text-center space-y-1.5 w-full max-w-7xl mx-auto">
-          <p className="text-[11px] text-slate-500 font-normal">
-            © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
-          </p>
-          <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500">
-            <span>Desenvolvido e Auditado por</span>
-            <a
-              href="https://amtst.vercel.app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-green-400 hover:text-green-300 font-bold inline-flex items-center gap-1 transition-colors underline underline-offset-2"
-            >
-              AM TST <ExternalLink size={10} />
-            </a>
-          </div>
-        </footer>
       </main>
     );
   }
@@ -552,16 +540,16 @@ export default function AdminPanel() {
   // =========================================================================
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans flex flex-col justify-between">
-      <div className="max-w-5xl w-full mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6 w-full">
         
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-lg">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/90 p-6 rounded-3xl border border-slate-800 shadow-xl backdrop-blur-sm">
           <div>
             <span className="text-2xl font-black tracking-tight">
               <span className="text-white">DDS </span>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">ON</span>
             </span>
             <p className="text-slate-400 text-xs mt-0.5">
-              Portal do Organizador • Gestão de Segurança
+              Portal do Organizador • Gestão Diária de Segurança
             </p>
           </div>
 
@@ -629,7 +617,7 @@ export default function AdminPanel() {
           <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl max-w-2xl mx-auto space-y-6">
             <div>
               <h2 className="text-xl font-black text-white">Criar Novo Diálogo de Segurança</h2>
-              <p className="text-slate-400 text-xs mt-1">Selecione a modalidade e configure a ata oficial</p>
+              <p className="text-slate-400 text-xs">Selecione a modalidade e configure a ata oficial</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-950 rounded-2xl border border-slate-800">
@@ -666,7 +654,7 @@ export default function AdminPanel() {
                   required
                   value={topic} 
                   onChange={(e) => setTopic(e.target.value)}
-                  placeholder="Digite o tema principal"
+                  placeholder="Digite o tema abordado"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
                 />
               </div>
@@ -685,7 +673,7 @@ export default function AdminPanel() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1">
-                  <Target size={13} className="text-green-400" /> Objetivo do Treinamento (Aparecerá na Ata)
+                  <Target size={13} className="text-green-400" /> Objetivo do Treinamento (Aparecerá na Ata Oficial)
                 </label>
                 <textarea 
                   rows={3}
@@ -715,19 +703,19 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* ABA 2: HISTÓRICO */}
+        {/* ABA 2: HISTÓRICO COM DOWNLOAD */}
         {activeTab === 'HISTORY' && (
           <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
             <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                   <Filter size={14} className="text-green-400" /> Filtrar Histórico por Período
                 </span>
 
                 {(startDate || endDate) && (
                   <button
                     onClick={() => { setStartDate(''); setEndDate(''); }}
-                    className="text-[11px] text-red-400 hover:text-red-300 font-bold"
+                    className="text-[11px] text-red-400 hover:text-red-300 font-bold transition-colors"
                   >
                     Limpar Filtro
                   </button>
