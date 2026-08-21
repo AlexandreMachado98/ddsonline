@@ -1,7 +1,9 @@
  'use client';
 
-import React from 'react';
-import { Video, ShieldCheck } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { LiveKitRoom, VideoConference } from '@livekit/components-react';
+import '@livekit/components-styles';
+import { Loader2, Video, ShieldCheck, AlertCircle } from 'lucide-react';
 
 interface DdsConferenceProps {
   roomName: string;
@@ -10,59 +12,121 @@ interface DdsConferenceProps {
 }
 
 export default function DdsConferenceRoom({ roomName, userName, isAdmin = false }: DdsConferenceProps) {
+  const [token, setToken] = useState<string>('');
+  const [wsUrl, setWsUrl] = useState<string>('');
+  const [error, setError] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+
   const cleanRoom = (roomName || 'dds-principal')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-zA-Z0-9-_]/g, '-')
     .toLowerCase();
 
-  const finalUserName = userName?.trim() || (isAdmin ? 'Técnico de Segurança (Organizador)' : 'Colaborador');
+  const finalUserName = userName?.trim() || (isAdmin ? 'Técnico de Segurança' : 'Colaborador');
 
-  const adminButtons = "['microphone','camera','desktop','tileview','chat','raisehand','mute-everyone','fullscreen']";
-  const userButtons = "['microphone','camera','raisehand','chat','tileview','fullscreen']";
+  useEffect(() => {
+    let isMounted = true;
 
-  const jitsiUrl = `https://meet.jit.si/dds-seguranca-${cleanRoom}#userInfo.displayName="${encodeURIComponent(
-    finalUserName
-  )}"&config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.requireDisplayName=false&config.startWithAudioMuted=${!isAdmin}&config.startWithVideoMuted=false&config.disableDeepLinking=true&interfaceConfig.TOOLBAR_BUTTONS=${
-    isAdmin ? adminButtons : userButtons
-  }`;
+    const fetchToken = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        const res = await fetch(
+          `/api/livekit/token?room=${encodeURIComponent(cleanRoom)}&username=${encodeURIComponent(
+            finalUserName
+          )}&isAdmin=${isAdmin}`
+        );
+
+        const data = await res.json();
+
+        if (!res.ok || !data.token) {
+          throw new Error(data.error || 'Não foi possível autenticar na sala de transmissão.');
+        }
+
+        if (isMounted) {
+          setToken(data.token);
+          setWsUrl(data.wsUrl);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setError(err?.message || 'Erro ao conectar à sala de vídeo.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchToken();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [cleanRoom, finalUserName, isAdmin]);
+
+  if (loading) {
+    return (
+      <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-center justify-center space-y-3 p-6 text-center shadow-xl">
+        <Loader2 className="w-8 h-8 text-green-400 animate-spin" />
+        <p className="text-sm font-semibold text-white">Iniciando Transmissão Nativa DDS ON...</p>
+        <p className="text-xs text-slate-400">Otimizando conexão WebRTC de alta performance</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-2xl border border-red-500/30 flex flex-col items-center justify-center space-y-3 p-6 text-center shadow-xl">
+        <AlertCircle className="w-10 h-10 text-red-400" />
+        <p className="text-sm font-bold text-white">Falha ao Iniciar a Transmissão</p>
+        <p className="text-xs text-slate-400 max-w-md">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full min-h-[440px] bg-slate-950 rounded-2xl overflow-hidden shadow-xl border border-slate-800 flex flex-col">
-      {/* Topo da Sala */}
+      {/* Topo Oficial */}
       <div className="bg-slate-900 px-4 py-2.5 flex items-center justify-between border-b border-slate-800">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
           </span>
           <span className="text-white text-xs font-bold flex items-center gap-1.5">
-            <Video size={14} className="text-blue-400" />
-            {isAdmin ? 'Mosaico de Transmissão e Apresentação' : `Conectado: ${finalUserName}`}
+            <Video size={14} className="text-green-400" />
+            {isAdmin ? 'Transmissão Ao Vivo (Organizador)' : `Conectado: ${finalUserName}`}
           </span>
         </div>
 
         <div className="flex items-center gap-2">
           {isAdmin ? (
-            <span className="text-[11px] bg-blue-500/20 text-blue-300 px-2.5 py-0.5 rounded-full font-semibold border border-blue-500/30 flex items-center gap-1">
-              <ShieldCheck size={12} /> Moderador do DDS
+            <span className="text-[11px] bg-green-500/20 text-green-300 px-2.5 py-0.5 rounded-full font-semibold border border-green-500/30 flex items-center gap-1">
+              <ShieldCheck size={12} /> Moderador Oficial
             </span>
           ) : (
             <span className="text-[11px] bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/30">
-              ✋ Use o botão da mão para falar
+              🎙️ Transmissão Nativa
             </span>
           )}
         </div>
       </div>
 
-      {/* Frame de Videoconferência */}
-      <div className="relative flex-1 w-full bg-black min-h-[400px]">
-        <iframe
-          src={jitsiUrl}
-          allow="camera; microphone; fullscreen; display-capture; autoplay"
-          className="w-full h-full border-0 min-h-[400px]"
-          title="Videoconferência DDS Online"
-        />
+      {/* Reprodutor de Vídeo Nativo LiveKit */}
+      <div className="relative flex-1 w-full bg-black min-h-[400px]" data-lk-theme="default">
+        <LiveKitRoom
+          video={true}
+          audio={true}
+          token={token}
+          serverUrl={wsUrl}
+          connect={true}
+          className="w-full h-full"
+        >
+          <VideoConference />
+        </LiveKitRoom>
       </div>
     </div>
   );
