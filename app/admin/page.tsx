@@ -4,8 +4,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Play, Users, FileText, CheckCircle2, 
   Smartphone, Download, Copy, Check, LogOut, 
-  History, PlusCircle, Calendar, AlertTriangle, X, Radio, Filter, FileSpreadsheet,
-  Camera, Image as ImageIcon, Trash2, Target, ExternalLink, Info, Loader2
+  History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet,
+  Camera, Image as ImageIcon, Trash2, Target, ExternalLink, Info, CheckSquare, Square
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
@@ -19,16 +19,20 @@ export default function AdminPanel() {
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
 
+  // Formulário do Novo DDS
   const [meetingType, setMeetingType] = useState<'PRESENTIAL' | 'REMOTE'>('PRESENTIAL');
   const [topic, setTopic] = useState('');
   const [farm, setFarm] = useState('');
   const [objective, setObjective] = useState('');
 
+  // Fotos da Equipe no Modo Presencial
   const [teamPhotos, setTeamPhotos] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Filtros e Seleção Múltipla
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [selectedMeetings, setSelectedMeetings] = useState<string[]>([]);
 
   const [activeMeeting, setActiveMeeting] = useState<any>(null);
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
@@ -75,9 +79,7 @@ export default function AdminPanel() {
 
       const responseText = await res.text();
       let data: any = {};
-      try {
-        data = JSON.parse(responseText);
-      } catch { return; }
+      try { data = JSON.parse(responseText); } catch { return; }
       
       if (data.success) {
         if (data.meeting && data.meeting.status === 'LIVE') {
@@ -86,9 +88,7 @@ export default function AdminPanel() {
           if (data.meeting.teamPhotos) {
             try {
               const parsed = JSON.parse(data.meeting.teamPhotos);
-              if (Array.isArray(parsed) && teamPhotos.length === 0) {
-                setTeamPhotos(parsed);
-              }
+              if (Array.isArray(parsed) && teamPhotos.length === 0) setTeamPhotos(parsed);
             } catch {}
           }
 
@@ -146,11 +146,7 @@ export default function AdminPanel() {
       
       const responseText = await res.text();
       let data: any = {};
-      try {
-        data = JSON.parse(responseText);
-      } catch {
-        throw new Error('Falha ao ler resposta da API.');
-      }
+      try { data = JSON.parse(responseText); } catch { throw new Error('Falha ao ler resposta da API.'); }
       
       if (res.ok && data.success && data.meeting) {
         setActiveMeeting(data.meeting);
@@ -182,13 +178,10 @@ export default function AdminPanel() {
         await fetch('/api/reuniao', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            meetingId: activeMeeting.id,
-            teamPhotos: updatedPhotos
-          })
+          body: JSON.stringify({ meetingId: activeMeeting.id, teamPhotos: updatedPhotos })
         });
       }
-      showToast('Foto da equipe anexada com sucesso!', 'success');
+      showToast('Foto adicionada com sucesso!', 'success');
     };
     reader.readAsDataURL(file);
   };
@@ -201,10 +194,7 @@ export default function AdminPanel() {
       await fetch('/api/reuniao', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          meetingId: activeMeeting.id,
-          teamPhotos: updatedPhotos
-        })
+        body: JSON.stringify({ meetingId: activeMeeting.id, teamPhotos: updatedPhotos })
       });
     }
     showToast('Foto removida.', 'info');
@@ -215,7 +205,7 @@ export default function AdminPanel() {
     const inviteUrl = `${window.location.origin}/reuniao/${activeMeeting.id}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
-    showToast('Link do DDS copiado para a área de transferência!', 'success');
+    showToast('Link copiado! Envie no grupo da equipe.', 'success');
     setTimeout(() => setCopiedLink(false), 3000);
   };
 
@@ -253,26 +243,48 @@ export default function AdminPanel() {
     });
   };
 
-  const handleDeleteMeeting = (meetingId: string, meetingTopic: string) => {
+  // Exclusão Múltipla
+  const handleDeleteMeetings = (ids: string[], isMultiple = false, topic = '') => {
     setConfirmDialog({
-      title: 'Excluir DDS Permanentemente',
-      message: `⚠️ Tem certeza que deseja excluir o DDS "${meetingTopic}" e todas as suas presenças auditadas? Esta ação não pode ser desfeita.`,
+      title: isMultiple ? 'Exclusão Múltipla' : 'Excluir DDS',
+      message: `⚠️ Tem certeza que deseja excluir permanentemente ${isMultiple ? `${ids.length} reuniões selecionadas` : `o DDS "${topic}"`} e todas as presenças vinculadas? Esta ação não pode ser desfeita.`,
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/reuniao?meetingId=${meetingId}`, { method: 'DELETE' });
+          const res = await fetch('/api/reuniao', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ meetingIds: ids })
+          });
           const data = await res.json();
           if (data.success) {
-            showToast('DDS excluído do histórico com sucesso!', 'success');
+            showToast(isMultiple ? 'Reuniões excluídas com sucesso!' : 'DDS excluído do histórico com sucesso!', 'success');
+            setSelectedMeetings([]);
             fetchAllData();
           } else {
             showToast('Erro ao excluir: ' + (data.error || 'Falha no servidor.'), 'error');
           }
         } catch {
-          showToast('Erro de conexão ao tentar excluir o DDS.', 'error');
+          showToast('Erro de conexão ao tentar excluir.', 'error');
         }
         setConfirmDialog(null);
       }
     });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedMeetings.length === meetingHistory.length) {
+      setSelectedMeetings([]);
+    } else {
+      setSelectedMeetings(meetingHistory.map(m => m.id));
+    }
+  };
+
+  const toggleSelectMeeting = (id: string) => {
+    if (selectedMeetings.includes(id)) {
+      setSelectedMeetings(prev => prev.filter(mId => mId !== id));
+    } else {
+      setSelectedMeetings(prev => [...prev, id]);
+    }
   };
 
   const handleDownloadConsolidatedPdf = () => {
@@ -294,7 +306,7 @@ export default function AdminPanel() {
   const handleEndMeeting = () => {
     setConfirmDialog({
       title: 'Encerrar DDS em Andamento',
-      message: 'Tem certeza que deseja encerrar este DDS? A ata oficial da AM TST será arquivada e a sala será fechada.',
+      message: 'Tem certeza que deseja encerrar este DDS? A ata oficial da AM TST será arquivada e a sala de vídeo será fechada.',
       onConfirm: async () => {
         if (activeMeeting && activeMeeting.attendees && activeMeeting.attendees.length > 0) {
           handleDownloadActivePdf();
@@ -319,9 +331,219 @@ export default function AdminPanel() {
     window.location.replace('/');
   };
 
-  // INÍCIO DO RENDER (JSX)
+  // =========================================================================
+  // SALA DO DDS EM ANDAMENTO (PRESENCIAL OU REMOTO)
+  // =========================================================================
+  if (isLiveMode && activeMeeting) {
+    const isPresential = activeMeeting.type === 'PRESENTIAL';
+
+    return (
+      <main className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans relative text-white flex flex-col justify-between">
+        
+        {toast.show && (
+          <div className={`fixed top-6 right-6 z-[9999] px-5 py-3 rounded-2xl shadow-2xl border flex items-center gap-3 animate-in slide-in-from-top-5 duration-300 ${
+            toast.type === 'success' ? 'bg-green-950/90 border-green-500/50 text-green-100' :
+            toast.type === 'error' ? 'bg-red-950/90 border-red-500/50 text-red-100' :
+            'bg-slate-900 border-slate-700 text-slate-100'
+          }`}>
+            {toast.type === 'success' && <CheckCircle2 size={20} className="text-green-400" />}
+            {toast.type === 'error' && <AlertTriangle size={20} className="text-red-400" />}
+            {toast.type === 'info' && <Info size={20} className="text-blue-400" />}
+            <p className="text-sm font-semibold">{toast.message}</p>
+          </div>
+        )}
+
+        {confirmDialog && (
+          <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-3 mb-4 text-amber-400">
+                <AlertTriangle size={24} />
+                <h2 className="text-lg font-bold text-white">{confirmDialog.title}</h2>
+              </div>
+              <p className="text-sm text-slate-300 mb-6 leading-relaxed">{confirmDialog.message}</p>
+              <div className="flex gap-3">
+                <button onClick={() => setConfirmDialog(null)} className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors">Cancelar</button>
+                <button onClick={confirmDialog.onConfirm} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/20 transition-all">Confirmar</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="max-w-7xl w-full mx-auto space-y-6">
+          <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 p-5 rounded-3xl border border-slate-800 shadow-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-black tracking-tight">
+                <span className="text-white">DDS </span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">ON</span>
+              </span>
+              <span className="text-xs bg-slate-800 text-slate-300 font-bold px-2.5 py-1 rounded-lg border border-slate-700 ml-2">
+                {isPresential ? '👥 Modo Presencial' : '🎙️ Modo Remoto'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 self-end sm:self-auto">
+              <span className="text-xs text-slate-400 hidden sm:inline">
+                Organizador: <strong className="text-white">{currentUser?.name}</strong>
+              </span>
+              <button onClick={() => setIsLiveMode(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-colors border border-slate-700 flex items-center gap-2">
+                Voltar ao Painel
+              </button>
+            </div>
+          </header>
+
+          <div className="bg-gradient-to-r from-green-700 via-emerald-700 to-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-green-500/30">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-400"></span>
+                </span>
+                <span className="font-semibold text-green-200 uppercase tracking-wider text-xs">
+                  {isPresential ? 'DDS Presencial em Andamento' : 'DDS Remoto Ao Vivo'}
+                </span>
+              </div>
+              <h2 className="text-2xl font-black">{activeMeeting.topic}</h2>
+              <p className="text-green-100 text-sm mt-0.5">📍 {activeMeeting.farm}</p>
+              {activeMeeting.objective && (
+                <p className="text-green-200/90 text-xs mt-1 italic">🎯 Objetivo: {activeMeeting.objective}</p>
+              )}
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              <button onClick={handleCopyInviteLink} className="px-4 py-3 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold transition-all flex items-center gap-2 shadow-md text-sm">
+                {copiedLink ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
+                {copiedLink ? 'Link Copiado!' : 'Copiar Link'}
+              </button>
+              <button onClick={handleDownloadActivePdf} className="px-4 py-3 bg-green-800 hover:bg-green-700 border border-green-400/30 text-white rounded-xl font-bold transition-all flex items-center gap-2 shadow-sm text-sm">
+                <Download size={18} /> Baixar Ata Oficial
+              </button>
+              <button onClick={handleEndMeeting} className="px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all text-sm shadow-md">
+                Encerrar DDS
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-7 space-y-4">
+              {isPresential ? (
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-xl">
+                  <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Smartphone size={18} className="text-green-400" /> Coleta de Presença
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Passe o aparelho para os trabalhadores assinarem em sequência.</p>
+                    </div>
+
+                    <Link href={`/reuniao/${activeMeeting.id}`}>
+                      <button className="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-md">
+                        <Smartphone size={16} /> Abrir Coleta
+                      </button>
+                    </Link>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                          <Camera size={16} className="text-green-400" /> Registro Fotográfico ({teamPhotos.length})
+                        </h4>
+                        <p className="text-xs text-slate-400">Fotos anexadas na ata oficial em PDF.</p>
+                      </div>
+                      <button onClick={() => fileInputRef.current?.click()} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-colors">
+                        <Camera size={14} className="text-green-400" /> + Adicionar
+                      </button>
+                      <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleAddTeamPhoto} className="hidden" />
+                    </div>
+
+                    {teamPhotos.length === 0 ? (
+                      <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-slate-800 hover:border-green-500/50 bg-slate-950/50 rounded-2xl p-8 text-center space-y-2 cursor-pointer transition-colors">
+                        <ImageIcon size={32} className="mx-auto text-slate-600" />
+                        <p className="text-xs font-semibold text-slate-400">Nenhuma foto da equipe anexada ainda.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {teamPhotos.map((photo, index) => (
+                          <div key={index} className="relative aspect-video bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 group shadow-md">
+                            <img src={photo} alt={`Foto Equipe ${index + 1}`} className="w-full h-full object-cover" />
+                            <button onClick={() => handleRemovePhoto(index)} className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-lg opacity-90 hover:opacity-100 transition-opacity">
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <DdsConferenceRoom
+                  roomName={activeMeeting.id}
+                  userName={`${currentUser?.name || 'Técnico'} (DDS ON)`}
+                  isAdmin={true}
+                  attendees={activeMeeting.attendees || []}
+                />
+              )}
+            </div>
+
+            <div className="lg:col-span-5 space-y-6">
+              <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 flex items-center justify-around text-center">
+                <div>
+                  <span className="text-3xl font-black text-white">{activeMeeting.attendees?.length || 0}</span>
+                  <span className="text-slate-400 text-xs block mt-1">Presenças Auditadas</span>
+                </div>
+                <div className="h-10 w-[1px] bg-slate-800"></div>
+                <div>
+                  <span className="text-3xl font-black text-green-400">100%</span>
+                  <span className="text-slate-400 text-xs block mt-1">Conformidade NR</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800">
+                <h3 className="font-bold text-white mb-4 flex items-center gap-2 text-sm">
+                  <FileText size={18} className="text-green-400" /> Lista de Presença do DDS
+                </h3>
+                
+                {(!activeMeeting.attendees || activeMeeting.attendees.length === 0) ? (
+                  <div className="text-center py-12 text-slate-500">
+                    <p>Nenhum colaborador assinou ainda.</p>
+                    <p className="text-xs text-slate-600 mt-1">Envie o link para a equipe.</p>
+                  </div>
+                ) : (
+                  <ul className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                    {activeMeeting.attendees.map((person: any) => {
+                      const isExited = Boolean(person.exitReason || person.name.includes('(Saída:'));
+                      return (
+                        <li key={person.id} className={`flex items-center justify-between p-3.5 rounded-2xl border ${
+                          isExited ? 'bg-red-500/10 border-red-500/30 text-red-200' : 'bg-slate-950 border-slate-800'
+                        }`}>
+                          <div className="flex items-center gap-3">
+                            {isExited ? <AlertTriangle size={20} className="text-red-400 shrink-0" /> : <CheckCircle2 size={22} className="text-green-400 shrink-0" />}
+                            <div>
+                              <p className="font-bold text-white text-sm">{person.name.replace(/\(Saída:.*\)/, '')}</p>
+                              <p className="text-[11px]">{isExited ? <span className="text-red-300 font-semibold">⚠️ Saída: {person.exitReason || 'Justificada'}</span> : <span className="text-slate-400">CPF: {person.cpf}</span>}</p>
+                            </div>
+                          </div>
+                          <span className="text-xs text-slate-400 font-medium bg-slate-800 px-2.5 py-1 rounded-lg">
+                            {new Date(person.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // =========================================================================
+  // DASHBOARD PRINCIPAL
+  // =========================================================================
   return (
-    <main className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans relative text-white flex flex-col justify-between">
+    <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans flex flex-col justify-between">
       
       {toast.show && (
         <div className={`fixed top-6 right-6 z-[9999] px-5 py-3 rounded-2xl shadow-2xl border flex items-center gap-3 animate-in slide-in-from-top-5 duration-300 ${
@@ -345,485 +567,226 @@ export default function AdminPanel() {
             </div>
             <p className="text-sm text-slate-300 mb-6 leading-relaxed">{confirmDialog.message}</p>
             <div className="flex gap-3">
-              <button 
-                onClick={() => setConfirmDialog(null)}
-                className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={confirmDialog.onConfirm}
-                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/20 transition-all"
-              >
-                Confirmar
-              </button>
+              <button onClick={() => setConfirmDialog(null)} className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors">Cancelar</button>
+              <button onClick={confirmDialog.onConfirm} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/20 transition-all">Confirmar</button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="max-w-7xl w-full mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6 w-full">
         
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 p-5 rounded-3xl border border-slate-800 shadow-lg">
-          <div className="flex items-center gap-2">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/90 p-6 rounded-3xl border border-slate-800 shadow-xl backdrop-blur-sm">
+          <div>
             <span className="text-2xl font-black tracking-tight">
               <span className="text-white">DDS </span>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">ON</span>
             </span>
-            {isLiveMode && activeMeeting && (
-              <span className="text-xs bg-slate-800 text-slate-300 font-bold px-2.5 py-1 rounded-lg border border-slate-700 ml-2">
-                {activeMeeting.type === 'PRESENTIAL' ? '👥 Presencial' : '🎙️ Remoto'}
-              </span>
-            )}
+            <p className="text-slate-400 text-xs mt-0.5">Portal do Organizador • Gestão Diária de Segurança</p>
           </div>
 
           <div className="flex items-center gap-3 self-end sm:self-auto">
-            <span className="text-xs text-slate-400 hidden sm:inline">
-              Organizador: <strong className="text-white">{currentUser?.name}</strong>
-            </span>
-            <button
-              onClick={isLiveMode ? () => setIsLiveMode(false) : handleLogout}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-colors border border-slate-700 flex items-center gap-2"
-            >
-              {isLiveMode ? 'Voltar ao Painel' : <><LogOut size={15} /> Sair</>}
+            <div className="text-right hidden sm:block">
+              <p className="text-xs font-bold text-white">{currentUser?.name}</p>
+              <p className="text-[11px] text-green-400">{currentUser?.company || 'Unidade'}</p>
+            </div>
+            <button onClick={handleLogout} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-2 border border-slate-700">
+              <LogOut size={15} /> Sair
             </button>
           </div>
         </header>
 
-        {isLiveMode && activeMeeting ? (
-          <>
-            <div className="bg-gradient-to-r from-green-700 via-emerald-700 to-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-green-500/30">
+        {isInitialLoadDone && activeMeeting && (
+          <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-5 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-green-400/30 animate-in fade-in duration-300">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 bg-white/20 rounded-2xl"><Radio size={24} className="animate-pulse" /></div>
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-green-400"></span>
-                  </span>
-                  <span className="font-semibold text-green-200 uppercase tracking-wider text-xs">
-                    {activeMeeting.type === 'PRESENTIAL' ? 'DDS Presencial em Andamento' : 'DDS Remoto Ao Vivo'}
-                  </span>
-                </div>
-                <h2 className="text-2xl font-black">{activeMeeting.topic}</h2>
-                <p className="text-green-100 text-sm mt-0.5">📍 {activeMeeting.farm}</p>
-                {activeMeeting.objective && (
-                  <p className="text-green-200/90 text-xs mt-1 italic">🎯 Objetivo: {activeMeeting.objective}</p>
-                )}
-              </div>
-              
-              <div className="flex flex-wrap gap-2">
-                <button 
-                  onClick={handleCopyInviteLink}
-                  className="px-4 py-3 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold transition-all flex items-center gap-2 shadow-md text-sm"
-                >
-                  {copiedLink ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
-                  {copiedLink ? 'Link Copiado!' : 'Copiar Link'}
-                </button>
-
-                <button 
-                  onClick={handleDownloadActivePdf}
-                  className="px-4 py-3 bg-green-800 hover:bg-green-700 border border-green-400/30 text-white rounded-xl font-bold transition-all flex items-center gap-2 shadow-sm text-sm"
-                >
-                  <Download size={18} /> Baixar Ata
-                </button>
-
-                <button 
-                  onClick={handleEndMeeting} 
-                  className="px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all text-sm shadow-md"
-                >
-                  Encerrar DDS
-                </button>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-green-200">
+                  {activeMeeting.type === 'PRESENTIAL' ? 'DDS Presencial Ativo' : 'DDS Remoto Ativo'}
+                </span>
+                <h3 className="text-lg font-black">{activeMeeting.topic} ({activeMeeting.farm})</h3>
               </div>
             </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-7 space-y-4">
-                {activeMeeting.type === 'PRESENTIAL' ? (
-                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-xl">
-                    <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div>
-                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                          <Smartphone size={18} className="text-green-400" /> Coleta de Presença
-                        </h3>
-                        <p className="text-xs text-slate-400 mt-0.5">Passe o aparelho para os trabalhadores assinarem em sequência.</p>
-                      </div>
-
-                      <Link href={`/reuniao/${activeMeeting.id}`}>
-                        <button className="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-md">
-                          <Smartphone size={16} /> Abrir Coleta
-                        </button>
-                      </Link>
-                    </div>
-
-                    <div className="space-y-3 pt-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                            <Camera size={16} className="text-green-400" /> Registro Fotográfico ({teamPhotos.length})
-                          </h4>
-                          <p className="text-xs text-slate-400">Fotos anexadas na ata oficial em PDF.</p>
-                        </div>
-                        <button
-                          onClick={() => fileInputRef.current?.click()}
-                          className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-colors"
-                        >
-                          <Camera size={14} className="text-green-400" /> + Adicionar
-                        </button>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          ref={fileInputRef}
-                          onChange={handleAddTeamPhoto}
-                          className="hidden"
-                        />
-                      </div>
-
-                      {teamPhotos.length === 0 ? (
-                        <div 
-                          onClick={() => fileInputRef.current?.click()}
-                          className="border-2 border-dashed border-slate-800 hover:border-green-500/50 bg-slate-950/50 rounded-2xl p-8 text-center space-y-2 cursor-pointer transition-colors"
-                        >
-                          <ImageIcon size={32} className="mx-auto text-slate-600" />
-                          <p className="text-xs font-semibold text-slate-400">Nenhuma foto da equipe anexada ainda.</p>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                          {teamPhotos.map((photo, index) => (
-                            <div key={index} className="relative aspect-video bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 group shadow-md">
-                              <img src={photo} alt={`Foto Equipe ${index + 1}`} className="w-full h-full object-cover" />
-                              <button
-                                onClick={() => handleRemovePhoto(index)}
-                                className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-lg opacity-90 hover:opacity-100 transition-opacity"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <DdsConferenceRoom
-                    roomName={activeMeeting.id}
-                    userName={`${currentUser?.name || 'Técnico'} (DDS ON)`}
-                    isAdmin={true}
-                    attendees={activeMeeting.attendees || []}
-                  />
-                )}
-              </div>
-
-              <div className="lg:col-span-5 space-y-6">
-                <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 flex items-center justify-around text-center">
-                  <div>
-                    <span className="text-3xl font-black text-white">{activeMeeting.attendees?.length || 0}</span>
-                    <span className="text-slate-400 text-xs block mt-1">Presenças Auditadas</span>
-                  </div>
-                  <div className="h-10 w-[1px] bg-slate-800"></div>
-                  <div>
-                    <span className="text-3xl font-black text-green-400">100%</span>
-                    <span className="text-slate-400 text-xs block mt-1">Conformidade NR</span>
-                  </div>
-                </div>
-
-                <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800">
-                  <h3 className="font-bold text-white mb-4 flex items-center gap-2 text-sm">
-                    <FileText size={18} className="text-green-400" /> Lista de Presença do DDS
-                  </h3>
-                  
-                  {(!activeMeeting.attendees || activeMeeting.attendees.length === 0) ? (
-                    <div className="text-center py-12 text-slate-500">
-                      <p>Nenhum colaborador assinou ainda.</p>
-                      <p className="text-xs text-slate-600 mt-1">Envie o link para a equipe.</p>
-                    </div>
-                  ) : (
-                    <ul className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
-                      {activeMeeting.attendees.map((person: any) => {
-                        const isExited = Boolean(person.exitReason || person.name.includes('(Saída:'));
-                        return (
-                          <li key={person.id} className={`flex items-center justify-between p-3.5 rounded-2xl border ${
-                            isExited 
-                              ? 'bg-red-500/10 border-red-500/30 text-red-200' 
-                              : 'bg-slate-950 border-slate-800'
-                          }`}>
-                            <div className="flex items-center gap-3">
-                              {isExited ? (
-                                <AlertTriangle size={20} className="text-red-400 shrink-0" />
-                              ) : (
-                                <CheckCircle2 size={22} className="text-green-400 shrink-0" />
-                              )}
-                              <div>
-                                <p className="font-bold text-white text-sm">
-                                  {person.name.replace(/\(Saída:.*\)/, '')}
-                                </p>
-                                <p className="text-[11px]">
-                                  {isExited ? (
-                                    <span className="text-red-300 font-semibold">⚠️ Saída: {person.exitReason || 'Justificada'}</span>
-                                  ) : (
-                                    <span className="text-slate-400">CPF: {person.cpf}</span>
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-                            <span className="text-xs text-slate-400 font-medium bg-slate-800 px-2.5 py-1 rounded-lg">
-                              {new Date(person.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="max-w-5xl mx-auto space-y-6 w-full">
-            
-            {isInitialLoadDone && activeMeeting && (
-              <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-5 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-green-400/30 animate-in fade-in duration-300">
-                <div className="flex items-center gap-3.5">
-                  <div className="p-3 bg-white/20 rounded-2xl">
-                    <Radio size={24} className="animate-pulse" />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-green-200">
-                      {activeMeeting.type === 'PRESENTIAL' ? 'DDS Presencial Ativo' : 'DDS Remoto Ativo'}
-                    </span>
-                    <h3 className="text-lg font-black">{activeMeeting.topic} ({activeMeeting.farm})</h3>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setIsLiveMode(true)}
-                  className="px-6 py-3 bg-white text-green-900 hover:bg-green-50 font-bold text-xs rounded-xl transition-all shadow-md"
-                >
-                  Abrir Painel do DDS ➡️
-                </button>
-              </div>
-            )}
-
-            <div className="flex bg-slate-900 border border-slate-800 p-1.5 rounded-2xl max-w-md mx-auto">
-              <button
-                onClick={() => setActiveTab('NEW_DDS')}
-                className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                  activeTab === 'NEW_DDS' ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <PlusCircle size={16} /> Novo DDS
-              </button>
-
-              <button
-                onClick={() => setActiveTab('HISTORY')}
-                className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                  activeTab === 'HISTORY' ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <History size={16} /> Histórico ({meetingHistory.length})
-              </button>
-            </div>
-
-            {activeTab === 'NEW_DDS' && (
-              <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl max-w-2xl mx-auto space-y-6">
-                <div className="text-center sm:text-left">
-                  <h2 className="text-xl font-black text-white">Criar Novo Diálogo de Segurança</h2>
-                  <p className="text-slate-400 text-xs mt-1">Selecione a modalidade e configure a ata oficial</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-950 rounded-2xl border border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setMeetingType('PRESENTIAL')}
-                    className={`py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                      meetingType === 'PRESENTIAL'
-                        ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Users size={16} /> DDS Presencial
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setMeetingType('REMOTE')}
-                    className={`py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                      meetingType === 'REMOTE'
-                        ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Radio size={16} /> DDS Remoto
-                  </button>
-                </div>
-
-                <form onSubmit={handleStartNewMeeting} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">Tema do Treinamento / Diálogo *</label>
-                    <input 
-                      type="text" 
-                      required
-                      value={topic} 
-                      onChange={(e) => setTopic(e.target.value)}
-                      placeholder="Tema abordado na reunião"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">Local / Fazenda / Galpão *</label>
-                    <input 
-                      type="text" 
-                      required
-                      value={farm} 
-                      onChange={(e) => setFarm(e.target.value)}
-                      placeholder="Local da realização"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1">
-                      <Target size={13} className="text-green-400" /> Objetivo do Treinamento (Aparecerá na Ata)
-                    </label>
-                    <textarea 
-                      rows={3}
-                      value={objective} 
-                      onChange={(e) => setObjective(e.target.value)}
-                      placeholder="Descreva o objetivo deste DDS..."
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none resize-none leading-relaxed transition-all"
-                    />
-                  </div>
-
-                  <button 
-                    type="submit"
-                    disabled={isCreatingMeeting}
-                    className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-green-600/25 text-sm transition-all active:scale-[0.99] mt-2"
-                  >
-                    {isCreatingMeeting ? (
-                      <>
-                        <Loader2 size={18} className="animate-spin" /> Gerando Sala DDS ON...
-                      </>
-                    ) : (
-                      <>
-                        <Play size={18} /> {meetingType === 'PRESENTIAL' ? 'Abrir Lista de Presença Presencial' : 'Iniciar DDS e Abrir Transmissão'}
-                      </>
-                    )}
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {activeTab === 'HISTORY' && (
-              <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
-                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                      <Filter size={14} className="text-green-400" /> Filtrar Histórico por Período
-                    </span>
-
-                    {(startDate || endDate) && (
-                      <button
-                        onClick={() => { setStartDate(''); setEndDate(''); fetchAllData(); showToast('Filtro removido.', 'info'); }}
-                        className="text-[11px] text-red-400 hover:text-red-300 font-bold transition-colors"
-                      >
-                        Limpar Filtro
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Inicial</label>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full bg-slate-900 px-3 py-2.5 rounded-xl border border-slate-800 text-xs text-white outline-none focus:ring-2 focus:ring-green-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Final</label>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full bg-slate-900 px-3 py-2.5 rounded-xl border border-slate-800 text-xs text-white outline-none focus:ring-2 focus:ring-green-500"
-                      />
-                    </div>
-
-                    <div className="flex items-end">
-                      <button
-                        onClick={handleDownloadConsolidatedPdf}
-                        className="w-full py-2.5 bg-gradient-to-r from-green-700 to-emerald-700 hover:from-green-600 hover:to-emerald-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md transition-all border border-green-500/30"
-                      >
-                        <FileSpreadsheet size={15} className="text-green-300" />
-                        Baixar Dossiê (PDF)
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {meetingHistory.length === 0 ? (
-                    <div className="text-center py-16 text-slate-500 space-y-2">
-                      <History size={40} className="mx-auto opacity-30 text-green-400" />
-                      <p className="text-sm font-semibold text-slate-300">Nenhum DDS arquivado para este período.</p>
-                    </div>
-                  ) : (
-                    meetingHistory.map((meeting) => (
-                      <div 
-                        key={meeting.id} 
-                        className="p-5 rounded-2xl border border-slate-800 bg-slate-950/70 hover:bg-slate-950 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
-                      >
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-2.5 py-0.5 rounded-md">
-                              {meeting.farm || 'Unidade'}
-                            </span>
-                            <span className="text-[11px] font-semibold text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded-md">
-                              {meeting.type === 'PRESENTIAL' ? '👥 Presencial' : '🎙️ Remoto'}
-                            </span>
-                            <span className="text-xs text-slate-400 flex items-center gap-1 border-l border-slate-700 pl-2">
-                              <Calendar size={13} />
-                              {new Date(meeting.createdAt).toLocaleDateString('pt-BR')} às {new Date(meeting.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                          <h3 className="text-base font-bold text-white">{meeting.topic}</h3>
-                          {meeting.objective && (
-                            <p className="text-xs text-slate-400 line-clamp-1 italic">🎯 {meeting.objective}</p>
-                          )}
-                          <p className="text-xs text-slate-400 flex items-center gap-1.5 pt-1">
-                            <Users size={14} className="text-green-400" />
-                            <strong>{meeting.attendees?.length || 0}</strong> presenças auditadas
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-2 self-start md:self-auto">
-                          <button
-                            onClick={() => handleDownloadHistoryPdf(meeting)}
-                            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-green-300 border border-green-500/30 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
-                          >
-                            <Download size={15} /> Baixar Ata
-                          </button>
-
-                          <button
-                            onClick={() => handleDeleteMeeting(meeting.id, meeting.topic)}
-                            className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 rounded-xl transition-colors"
-                            title="Excluir este DDS permanentemente"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-              </div>
-            )}
+            <button onClick={() => setIsLiveMode(true)} className="px-6 py-3 bg-white text-green-900 hover:bg-green-50 font-bold text-xs rounded-xl shadow-md">
+              Abrir Painel do DDS ➡️
+            </button>
           </div>
         )}
+
+        <div className="flex bg-slate-900 border border-slate-800 p-1.5 rounded-2xl max-w-md mx-auto">
+          <button onClick={() => setActiveTab('NEW_DDS')} className={`flex-1 py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${activeTab === 'NEW_DDS' ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+            <PlusCircle size={16} /> Novo DDS
+          </button>
+          <button onClick={() => setActiveTab('HISTORY')} className={`flex-1 py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${activeTab === 'HISTORY' ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+            <History size={16} /> Histórico ({meetingHistory.length})
+          </button>
+        </div>
+
+        {activeTab === 'NEW_DDS' && (
+          <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl max-w-2xl mx-auto space-y-6">
+            <div className="text-center sm:text-left">
+              <h2 className="text-xl font-black text-white">Criar Novo Diálogo de Segurança</h2>
+              <p className="text-slate-400 text-xs mt-1">Selecione a modalidade e configure a ata oficial</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-950 rounded-2xl border border-slate-800">
+              <button type="button" onClick={() => setMeetingType('PRESENTIAL')} className={`py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${meetingType === 'PRESENTIAL' ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                <Users size={16} /> DDS Presencial
+              </button>
+              <button type="button" onClick={() => setMeetingType('REMOTE')} className={`py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${meetingType === 'REMOTE' ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                <Radio size={16} /> DDS Remoto
+              </button>
+            </div>
+
+            <form onSubmit={handleStartNewMeeting} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Tema do Treinamento / Diálogo *</label>
+                <input type="text" required value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Tema abordado na reunião" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none transition-all" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Local / Fazenda / Galpão *</label>
+                <input type="text" required value={farm} onChange={(e) => setFarm(e.target.value)} placeholder="Local da realização" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none transition-all" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1"><Target size={13} className="text-green-400" /> Objetivo do Treinamento (Aparecerá na Ata)</label>
+                <textarea rows={3} value={objective} onChange={(e) => setObjective(e.target.value)} placeholder="Descreva o objetivo deste DDS..." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:ring-2 focus:ring-green-500 outline-none resize-none leading-relaxed transition-all" />
+              </div>
+
+              <button type="submit" disabled={isCreatingMeeting} className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-green-600/25 text-sm transition-all active:scale-[0.99] mt-2">
+                {isCreatingMeeting ? <><Loader2 size={18} className="animate-spin" /> Gerando Sala...</> : <><Play size={18} /> {meetingType === 'PRESENTIAL' ? 'Abrir Lista Presencial' : 'Iniciar Transmissão'}</>}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* ABA 2: HISTÓRICO COM EXCLUSÃO MÚLTIPLA */}
+        {activeTab === 'HISTORY' && (
+          <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
+            
+            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Filter size={14} className="text-green-400" /> Filtrar Histórico por Período
+                </span>
+
+                {(startDate || endDate) && (
+                  <button onClick={() => { setStartDate(''); setEndDate(''); fetchAllData(); showToast('Filtro removido.', 'info'); }} className="text-[11px] text-red-400 hover:text-red-300 font-bold transition-colors">
+                    Limpar Filtro
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Inicial</label>
+                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-slate-900 px-3 py-2.5 rounded-xl border border-slate-800 text-xs text-white outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Final</label>
+                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-slate-900 px-3 py-2.5 rounded-xl border border-slate-800 text-xs text-white outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div className="flex items-end">
+                  <button onClick={handleDownloadConsolidatedPdf} className="w-full py-2.5 bg-gradient-to-r from-green-700 to-emerald-700 hover:from-green-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md transition-all border border-green-500/30">
+                    <FileSpreadsheet size={15} className="text-green-300" /> Baixar Dossiê (PDF)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {/* BOTÕES DE SELEÇÃO E EXCLUSÃO MÚLTIPLA */}
+              {meetingHistory.length > 0 && (
+                <div className="flex items-center justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                  <button 
+                    onClick={toggleSelectAll}
+                    className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white transition-colors"
+                  >
+                    {selectedMeetings.length === meetingHistory.length && meetingHistory.length > 0 ? (
+                      <><CheckSquare size={16} className="text-green-400" /> Desmarcar Todos</>
+                    ) : (
+                      <><Square size={16} /> Selecionar Todos</>
+                    )}
+                  </button>
+
+                  {selectedMeetings.length > 0 && (
+                    <button
+                      onClick={() => handleDeleteMeetings(selectedMeetings, true)}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 animate-in fade-in zoom-in duration-200"
+                    >
+                      <Trash2 size={14} /> Excluir ({selectedMeetings.length})
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {meetingHistory.length === 0 ? (
+                <div className="text-center py-16 text-slate-500 space-y-2">
+                  <History size={40} className="mx-auto opacity-30 text-green-400" />
+                  <p className="text-sm font-semibold text-slate-300">Nenhum DDS arquivado para este período.</p>
+                </div>
+              ) : (
+                meetingHistory.map((meeting) => (
+                  <div 
+                    key={meeting.id} 
+                    onClick={() => toggleSelectMeeting(meeting.id)}
+                    className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                      selectedMeetings.includes(meeting.id) ? 'bg-green-950/20 border-green-500/50 shadow-md shadow-green-900/10' : 'bg-slate-950/70 hover:bg-slate-950 border-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="mt-1">
+                        {selectedMeetings.includes(meeting.id) ? (
+                          <CheckSquare size={20} className="text-green-500" />
+                        ) : (
+                          <Square size={20} className="text-slate-600" />
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-2.5 py-0.5 rounded-md">
+                            {meeting.farm || 'Unidade'}
+                          </span>
+                          <span className="text-[11px] font-semibold text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded-md">
+                            {meeting.type === 'PRESENTIAL' ? '👥 Presencial' : '🎙️ Remoto'}
+                          </span>
+                          <span className="text-xs text-slate-400 flex items-center gap-1 border-l border-slate-700 pl-2">
+                            <Calendar size={13} />
+                            {new Date(meeting.createdAt).toLocaleDateString('pt-BR')} às {new Date(meeting.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <h3 className="text-base font-bold text-white">{meeting.topic}</h3>
+                        <p className="text-xs text-slate-400 flex items-center gap-1.5 pt-1">
+                          <Users size={14} className="text-green-400" />
+                          <strong>{meeting.attendees?.length || 0}</strong> presenças auditadas
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-start md:self-auto" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleDownloadHistoryPdf(meeting)}
+                        className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-green-300 border border-green-500/30 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
+                      >
+                        <Download size={15} /> Baixar Ata
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteMeetings([meeting.id], false, meeting.topic)}
+                        className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 rounded-xl transition-colors"
+                        title="Excluir este DDS"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+          </div>
+        )}
+
       </div>
 
       <footer className="mt-8 pt-5 border-t border-slate-800 text-center space-y-1.5 w-full max-w-7xl mx-auto">
@@ -832,12 +795,7 @@ export default function AdminPanel() {
         </p>
         <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500">
           <span>Desenvolvido e Auditado por</span>
-          <a
-            href="https://amtst.vercel.app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-green-400 hover:text-green-300 font-bold inline-flex items-center gap-1 transition-colors underline underline-offset-2"
-          >
+          <a href="https://amtst.vercel.app" target="_blank" rel="noopener noreferrer" className="text-green-400 hover:text-green-300 font-bold inline-flex items-center gap-1 transition-colors underline underline-offset-2">
             AM TST <ExternalLink size={10} />
           </a>
         </div>
