@@ -24,7 +24,7 @@ export default function MeetingRoomPage() {
   const [farm, setFarm] = useState('');
   const [meetingType, setMeetingType] = useState<'PRESENTIAL' | 'REMOTE'>('PRESENTIAL');
 
-  // Busca detalhes apenas para exibir no cabeçalho
+  // 1. Busca detalhes da reunião ao entrar no link
   useEffect(() => {
     const fetchMeetingDetails = async () => {
       try {
@@ -39,6 +39,28 @@ export default function MeetingRoomPage() {
     };
     fetchMeetingDetails();
   }, [meetingId]);
+
+  // =========================================================================
+  // RADAR KILL-SWITCH: Derruba a chamada se o Admin encerrar o DDS
+  // =========================================================================
+  useEffect(() => {
+    if (currentStep !== 'ROOM') return; // Só monitora se o usuário estiver na sala de vídeo
+
+    const checkMeetingEnded = async () => {
+      try {
+        const res = await fetch(`/api/reuniao?meetingId=${meetingId}&_t=${Date.now()}`, { cache: 'no-store' });
+        const data = await res.json();
+        
+        // Se a API confirmar que o status mudou para ENDED
+        if (data.success && data.status === 'ENDED') {
+          setCurrentStep('EXIT_SUCCESS');
+        }
+      } catch {}
+    };
+
+    const interval = setInterval(checkMeetingEnded, 3000); // Checa a cada 3 segundos
+    return () => clearInterval(interval);
+  }, [currentStep, meetingId]);
 
   const [showExitModal, setShowExitModal] = useState(false);
   const [exitReason, setExitReason] = useState('Chamado Operacional no Campo');
@@ -94,18 +116,16 @@ export default function MeetingRoomPage() {
       setIsSubmitting(false);
 
       if (data.success) {
-        // LÓGICA BLINDADA: O SERVIDOR DECIDE A TELA
         if (data.meetingType === 'REMOTE') {
-          setCurrentStep('ROOM'); // Abre a sala de vídeo
+          setCurrentStep('ROOM'); 
         } else {
-          setCurrentStep('SUCCESS'); // Abre a tela verde de sucesso (Presencial)
+          setCurrentStep('SUCCESS'); 
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         alert('Erro ao registrar: ' + data.error);
       }
     } catch (err) {
-      console.error("Erro ao salvar presença:", err);
       setIsSubmitting(false);
       alert('Erro de conexão. Tente novamente.');
     }
@@ -184,7 +204,7 @@ export default function MeetingRoomPage() {
   }
 
   // =========================================================================
-  // TELA DE SAÍDA REGISTRADA (CHAMADA ENCERRADA)
+  // TELA DE CHAMADA ENCERRADA (PELO COLABORADOR OU PELO TÉCNICO)
   // =========================================================================
   if (currentStep === 'EXIT_SUCCESS') {
     return (
@@ -198,11 +218,11 @@ export default function MeetingRoomPage() {
             <span className="text-[11px] font-bold text-red-400 uppercase tracking-widest bg-red-500/10 px-3 py-1 rounded-full border border-red-500/20 inline-block">
               Chamada Encerrada
             </span>
-            <h1 className="text-xl font-bold text-white tracking-tight">Saída Registrada com Sucesso</h1>
+            <h1 className="text-xl font-bold text-white tracking-tight">Reunião Finalizada</h1>
           </div>
 
           <p className="text-slate-300 text-xs leading-relaxed">
-            Obrigado, <strong>{name}</strong>. Sua saída foi comunicada ao técnico e arquivada na ata oficial de auditoria.
+            A participação foi concluída. A reunião foi encerrada e a sua presença/saída foi arquivada na ata oficial de auditoria da AM TST.
           </p>
         </div>
       </main>
@@ -316,7 +336,7 @@ export default function MeetingRoomPage() {
   }
 
   // =========================================================================
-  // TELA 1: FORMULÁRIO DE ENTRADA (PRIMEIRA TELA)
+  // TELA 1: FORMULÁRIO DE ENTRADA
   // =========================================================================
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center py-6 px-4 font-sans">
@@ -337,7 +357,7 @@ export default function MeetingRoomPage() {
         </div>
       </header>
 
-      <div className="w-full max-w-md bg-gradient-to-r from-green-700 to-emerald-800 text-white p-5 rounded-3xl shadow-lg mb-6 text-center border border-green-500/30">
+      <div className="w-full max-w-md bg-gradient-to-r from-green-700 to-emerald-800 text-white p-5 rounded-2xl shadow-lg mb-6 text-center border border-green-500/30">
         <span className="text-[10px] font-bold uppercase tracking-wider text-green-200">
           {meetingType === 'PRESENTIAL' ? 'DDS Presencial' : 'Diálogo Diário de Segurança'}
         </span>
@@ -345,13 +365,13 @@ export default function MeetingRoomPage() {
         {farm && <p className="text-xs text-green-100 mt-0.5">📍 {farm}</p>}
       </div>
 
-      <div className="w-full max-w-md space-y-6 pb-8">
-        <div className="bg-slate-900 border border-slate-800 text-slate-300 text-xs p-3.5 rounded-2xl text-center flex items-center justify-center gap-2">
+      <div className="w-full max-w-md space-y-6 pb-20">
+        <div className="bg-slate-900 border border-slate-800 text-slate-300 text-xs p-3.5 rounded-xl text-center flex items-center justify-center gap-2">
           <ShieldCheck size={16} className="text-green-400 shrink-0" />
           <span>Valide sua presença abaixo para registrar sua conformidade.</span>
         </div>
 
-        <section className="space-y-4 bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
+        <section className="space-y-4 bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
           <h2 className="text-sm font-bold text-white">1. Seus Dados</h2>
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1.5">Nome Completo</label>
@@ -375,12 +395,12 @@ export default function MeetingRoomPage() {
           </div>
         </section>
 
-        <section className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
+        <section className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
           <h2 className="text-sm font-bold text-white mb-3">2. Biometria Facial</h2>
           <SelfieCapture onConfirm={(selfie) => setSavedSelfie(selfie)} />
         </section>
 
-        <section className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
+        <section className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
           <h2 className="text-sm font-bold text-white mb-3">3. Assinatura Digital</h2>
           <SignaturePad onSave={(signature) => setSavedSignature(signature)} />
         </section>
