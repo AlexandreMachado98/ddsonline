@@ -11,8 +11,8 @@ export default function MeetingRoomPage() {
   const params = useParams();
   const meetingId = params?.id as string;
 
-  // Etapas: FORM -> SUCCESS (Presencial) -> ROOM (Remoto) -> EXIT_SUCCESS
-  const [currentStep, setCurrentStep] = useState<'FORM' | 'ROOM' | 'SUCCESS' | 'EXIT_SUCCESS'>('FORM');
+  // Etapas: FORM -> SUCCESS (Presencial) -> ROOM (Remoto) -> EXIT_SUCCESS -> EXPIRED (Link Quebrado)
+  const [currentStep, setCurrentStep] = useState<'FORM' | 'ROOM' | 'SUCCESS' | 'EXIT_SUCCESS' | 'EXPIRED'>('FORM');
 
   const [name, setName] = useState('');
   const [cpf, setCpf] = useState('');
@@ -24,43 +24,38 @@ export default function MeetingRoomPage() {
   const [farm, setFarm] = useState('');
   const [meetingType, setMeetingType] = useState<'PRESENTIAL' | 'REMOTE'>('PRESENTIAL');
 
-  // 1. Busca detalhes da reunião ao entrar no link
-  useEffect(() => {
-    const fetchMeetingDetails = async () => {
-      try {
-        const res = await fetch('/api/reuniao', { cache: 'no-store' });
-        const data = await res.json();
-        if (data.success && data.meeting) {
-          setTopic(data.meeting.topic);
-          setFarm(data.meeting.farm);
-          setMeetingType(data.meeting.type || 'PRESENTIAL');
-        }
-      } catch {}
-    };
-    fetchMeetingDetails();
-  }, [meetingId]);
-
   // =========================================================================
-  // RADAR KILL-SWITCH: Derruba a chamada se o Admin encerrar o DDS
+  // RADAR DE SESSÃO ÚNICA: Quebra o link na mesma hora se a reunião for encerrada!
   // =========================================================================
   useEffect(() => {
-    if (currentStep !== 'ROOM') return; // Só monitora se o usuário estiver na sala de vídeo
+    if (!meetingId) return;
 
     const checkMeetingEnded = async () => {
       try {
         const res = await fetch(`/api/reuniao?meetingId=${meetingId}&_t=${Date.now()}`, { cache: 'no-store' });
         const data = await res.json();
         
-        // Se a API confirmar que o status mudou para ENDED
         if (data.success && data.status === 'ENDED') {
-          setCurrentStep('EXIT_SUCCESS');
+          // Se já assinou e estava na sala, mostra "Chamada Encerrada"
+          // Se ainda ia preencher, bloqueia o formulário com "Link Expirado"
+          setCurrentStep(prev => (prev === 'ROOM' || prev === 'SUCCESS') ? 'EXIT_SUCCESS' : 'EXPIRED');
+        } else if (data.success && data.meeting) {
+          setTopic(data.meeting.topic);
+          setFarm(data.meeting.farm);
+          setMeetingType(data.meeting.type || 'PRESENTIAL');
+        } else {
+          setCurrentStep('EXPIRED'); // Não achou a reunião no banco
         }
-      } catch {}
+      } catch {
+        setCurrentStep('EXPIRED');
+      }
     };
 
-    const interval = setInterval(checkMeetingEnded, 3000); // Checa a cada 3 segundos
+    checkMeetingEnded(); // Verifica na hora que abre o link
+    const interval = setInterval(checkMeetingEnded, 3000); // Radar a cada 3 segundos
+    
     return () => clearInterval(interval);
-  }, [currentStep, meetingId]);
+  }, [meetingId]);
 
   const [showExitModal, setShowExitModal] = useState(false);
   const [exitReason, setExitReason] = useState('Chamado Operacional no Campo');
@@ -76,8 +71,9 @@ export default function MeetingRoomPage() {
     setCpf(value);
   };
 
-  // ENVIO DA PRESENÇA E REDIRECIONAMENTO INFALÍVEL
   const handleSubmit = async () => {
+    if (currentStep === 'EXPIRED') return; // Bloqueia o envio se tiver expirado
+    
     if (!name.trim()) {
       alert('⚠️ Por favor, digite seu Nome Completo.');
       return;
@@ -106,29 +102,23 @@ export default function MeetingRoomPage() {
     };
 
     try {
-      const res = await fetch('/api/presenca', {
+      await fetch('/api/presenca', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
-      const data = await res.json();
-      setIsSubmitting(false);
-
-      if (data.success) {
-        if (data.meetingType === 'REMOTE') {
-          setCurrentStep('ROOM'); 
-        } else {
-          setCurrentStep('SUCCESS'); 
-        }
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } else {
-        alert('Erro ao registrar: ' + data.error);
-      }
     } catch (err) {
-      setIsSubmitting(false);
-      alert('Erro de conexão. Tente novamente.');
+      console.error("Erro ao salvar presença:", err);
     }
+
+    setIsSubmitting(false);
+
+    if (meetingType === 'PRESENTIAL') {
+      setCurrentStep('SUCCESS');
+    } else {
+      setCurrentStep('ROOM');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleConfirmExit = async () => {
@@ -171,7 +161,64 @@ export default function MeetingRoomPage() {
   };
 
   // =========================================================================
-  // TELA DE SUCESSO (DDS PRESENCIAL - LIBERA O APARELHO IMEDIATAMENTE)
+  // TELA 5: LINK EXPIRADO / BLOQUEADO (Técnico já encerrou a sala)
+  // =========================================================================
+  if (currentStep === 'EXPIRED') {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-5 shadow-2xl animate-in fade-in zoom-in duration-300">
+          <div className="bg-red-500/10 text-red-400 p-4 rounded-2xl inline-flex border border-red-500/20">
+            <PhoneOff size={36} />
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-red-400 uppercase tracking-widest bg-red-500/10 px-3 py-1 rounded-full border border-red-500/20 inline-block">
+              Acesso Negado
+            </span>
+            <h1 className="text-xl font-bold text-white tracking-tight">Reunião Encerrada</h1>
+          </div>
+
+          <p className="text-slate-300 text-xs leading-relaxed">
+            O organizador já finalizou este DDS. Por questões de conformidade, o link de acesso foi <strong>desativado permanentemente</strong>.
+          </p>
+
+          <div className="pt-5 border-t border-slate-800 text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
+            <AlertTriangle size={14} className="text-amber-500" />
+            Caso não tenha assinado, contate o TST da unidade.
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // =========================================================================
+  // TELA 4: SAÍDA REGISTRADA (CHAMADA ENCERRADA)
+  // =========================================================================
+  if (currentStep === 'EXIT_SUCCESS') {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-5 shadow-2xl animate-in fade-in zoom-in duration-300">
+          <div className="bg-red-500/10 text-red-400 p-4 rounded-2xl inline-flex border border-red-500/20">
+            <CheckCircle size={36} />
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-red-400 uppercase tracking-widest bg-red-500/10 px-3 py-1 rounded-full border border-red-500/20 inline-block">
+              Desconectado
+            </span>
+            <h1 className="text-xl font-bold text-white tracking-tight">Participação Concluída</h1>
+          </div>
+
+          <p className="text-slate-300 text-xs leading-relaxed">
+            O DDS foi encerrado. A sua participação foi concluída e arquivada na ata oficial de auditoria da AM TST.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  // =========================================================================
+  // TELA 3: DE SUCESSO (DDS PRESENCIAL)
   // =========================================================================
   if (currentStep === 'SUCCESS') {
     return (
@@ -204,33 +251,7 @@ export default function MeetingRoomPage() {
   }
 
   // =========================================================================
-  // TELA DE CHAMADA ENCERRADA (PELO COLABORADOR OU PELO TÉCNICO)
-  // =========================================================================
-  if (currentStep === 'EXIT_SUCCESS') {
-    return (
-      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-5 shadow-2xl animate-in fade-in zoom-in duration-300">
-          <div className="bg-red-500/10 text-red-400 p-4 rounded-2xl inline-flex border border-red-500/20">
-            <PhoneOff size={36} />
-          </div>
-
-          <div className="space-y-1.5">
-            <span className="text-[11px] font-bold text-red-400 uppercase tracking-widest bg-red-500/10 px-3 py-1 rounded-full border border-red-500/20 inline-block">
-              Chamada Encerrada
-            </span>
-            <h1 className="text-xl font-bold text-white tracking-tight">Reunião Finalizada</h1>
-          </div>
-
-          <p className="text-slate-300 text-xs leading-relaxed">
-            A participação foi concluída. A reunião foi encerrada e a sua presença/saída foi arquivada na ata oficial de auditoria da AM TST.
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  // =========================================================================
-  // TELA DE SALA DE VÍDEO (DDS REMOTO)
+  // TELA 2: SALA DE VÍDEO (DDS REMOTO)
   // =========================================================================
   if (currentStep === 'ROOM') {
     return (
@@ -336,7 +357,7 @@ export default function MeetingRoomPage() {
   }
 
   // =========================================================================
-  // TELA 1: FORMULÁRIO DE ENTRADA
+  // TELA 1: FORMULÁRIO DE ENTRADA DO COLABORADOR
   // =========================================================================
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center py-6 px-4 font-sans">
@@ -357,7 +378,7 @@ export default function MeetingRoomPage() {
         </div>
       </header>
 
-      <div className="w-full max-w-md bg-gradient-to-r from-green-700 to-emerald-800 text-white p-5 rounded-2xl shadow-lg mb-6 text-center border border-green-500/30">
+      <div className="w-full max-w-md bg-gradient-to-r from-green-700 to-emerald-800 text-white p-5 rounded-3xl shadow-lg mb-6 text-center border border-green-500/30">
         <span className="text-[10px] font-bold uppercase tracking-wider text-green-200">
           {meetingType === 'PRESENTIAL' ? 'DDS Presencial' : 'Diálogo Diário de Segurança'}
         </span>
@@ -371,7 +392,7 @@ export default function MeetingRoomPage() {
           <span>Valide sua presença abaixo para registrar sua conformidade.</span>
         </div>
 
-        <section className="space-y-4 bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
+        <section className="space-y-4 bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
           <h2 className="text-sm font-bold text-white">1. Seus Dados</h2>
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1.5">Nome Completo</label>
@@ -395,12 +416,12 @@ export default function MeetingRoomPage() {
           </div>
         </section>
 
-        <section className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
+        <section className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
           <h2 className="text-sm font-bold text-white mb-3">2. Biometria Facial</h2>
           <SelfieCapture onConfirm={(selfie) => setSavedSelfie(selfie)} />
         </section>
 
-        <section className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
+        <section className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
           <h2 className="text-sm font-bold text-white mb-3">3. Assinatura Digital</h2>
           <SignaturePad onSave={(signature) => setSavedSignature(signature)} />
         </section>

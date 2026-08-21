@@ -11,10 +11,30 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+    const meetingId = searchParams.get('meetingId');
     const organizerId = searchParams.get('organizerId');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
+    // 1. ROTA DO COLABORADOR: Verifica o status EXATO da reunião do link
+    if (meetingId) {
+      const targetMeeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: { id: true, status: true, topic: true, farm: true, type: true }
+      });
+      
+      if (!targetMeeting) {
+        return NextResponse.json({ success: false, status: 'ENDED' });
+      }
+
+      return NextResponse.json({ 
+        success: true, 
+        status: targetMeeting.status, 
+        meeting: targetMeeting 
+      });
+    }
+
+    // 2. ROTA DO ADMIN: Filtros de Histórico
     const dateFilter: any = {};
     if (startDate) dateFilter.gte = new Date(`${startDate}T00:00:00.000Z`);
     if (endDate) dateFilter.lte = new Date(`${endDate}T23:59:59.999Z`);
@@ -135,22 +155,19 @@ export async function PUT(req: Request) {
   }
 }
 
-// 5. DELETE: EXCLUSÃO DE MÚLTIPLOS DDS
 export async function DELETE(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
     const { meetingIds } = body;
 
     if (!meetingIds || !Array.isArray(meetingIds) || meetingIds.length === 0) {
-      return NextResponse.json({ success: false, error: 'Nenhum DDS selecionado para exclusão.' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Nenhum DDS selecionado.' }, { status: 400 });
     }
 
-    // Apaga todas as presenças vinculadas (Exclusão em Cascata)
     await prisma.attendance.deleteMany({
       where: { meetingId: { in: meetingIds } }
     });
 
-    // Apaga as reuniões
     await prisma.meeting.deleteMany({
       where: { id: { in: meetingIds } }
     });
