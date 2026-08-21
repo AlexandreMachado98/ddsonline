@@ -4,8 +4,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Play, Users, FileText, CheckCircle2, 
   Smartphone, Download, Copy, Check, LogOut, 
-  History, PlusCircle, Calendar, AlertTriangle, X, Radio, Filter, FileSpreadsheet,
-  Camera, Image as ImageIcon, Trash2, Target, Loader2
+  History, PlusCircle, Calendar, AlertTriangle, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet,
+  Camera, Image as ImageIcon, Trash2, Target, ExternalLink
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
@@ -25,7 +25,7 @@ export default function AdminPanel() {
   const [farm, setFarm] = useState('');
   const [objective, setObjective] = useState('');
 
-  // Fotos da Equipe no Modo Presencial (Base64)
+  // Fotos da Equipe no Modo Presencial
   const [teamPhotos, setTeamPhotos] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -67,13 +67,18 @@ export default function AdminPanel() {
       
       if (!res.ok) return;
 
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        return;
+      }
       
       if (data.success) {
         if (data.meeting && data.meeting.status === 'LIVE') {
           setActiveMeeting(data.meeting);
 
-          // Fotos salvas
           if (data.meeting.teamPhotos) {
             try {
               const parsed = JSON.parse(data.meeting.teamPhotos);
@@ -83,7 +88,6 @@ export default function AdminPanel() {
             } catch {}
           }
 
-          // Notificação de saída (Toast)
           if (data.meeting.attendees) {
             data.meeting.attendees.forEach((person: any) => {
               if (person.name.includes('(Saída:') && !exitNotification) {
@@ -269,7 +273,7 @@ export default function AdminPanel() {
   };
 
   const handleEndMeeting = async () => {
-    if (confirm('Encerrar este DDS? A ata oficial com as presenças e fotos da equipe será arquivada.')) {
+    if (confirm('Encerrar este DDS? A ata oficial do DDS ON será arquivada.')) {
       if (activeMeeting && activeMeeting.attendees && activeMeeting.attendees.length > 0) {
         handleDownloadActivePdf();
       }
@@ -298,21 +302,21 @@ export default function AdminPanel() {
     const isPresential = activeMeeting.type === 'PRESENTIAL';
 
     return (
-      <main className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans relative text-white">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <main className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans relative text-white flex flex-col justify-between">
+        <div className="max-w-7xl w-full mx-auto space-y-6">
           
-          <header className="flex items-center justify-between bg-slate-900 p-5 rounded-3xl border border-slate-800 shadow-lg">
+          <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-lg">
             <div className="flex items-center gap-2">
               <span className="text-2xl font-black tracking-tight">
                 <span className="text-white">DDS </span>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">ON</span>
               </span>
-              <span className="text-xs bg-slate-800 text-slate-300 font-bold px-2.5 py-1 rounded-lg border border-slate-700 ml-2">
+              <span className="text-[11px] bg-slate-800 text-slate-300 font-bold px-2.5 py-1 rounded-lg border border-slate-700 ml-2">
                 {isPresential ? '👥 Modo Presencial' : '🎙️ Modo Remoto'}
               </span>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 self-end sm:self-auto">
               <span className="text-xs text-slate-400 hidden sm:inline">
                 Organizador: <strong className="text-white">{currentUser?.name}</strong>
               </span>
@@ -339,7 +343,7 @@ export default function AdminPanel() {
               <h2 className="text-2xl font-black">{activeMeeting.topic}</h2>
               <p className="text-green-100 text-sm mt-0.5">📍 {activeMeeting.farm}</p>
               {activeMeeting.objective && (
-                <p className="text-green-200/90 text-xs mt-1 italic">🎯 Objetivo: {activeMeeting.objective}</p>
+                <p className="text-green-200/90 text-xs mt-1.5 italic">🎯 Objetivo: {activeMeeting.objective}</p>
               )}
             </div>
             
@@ -356,7 +360,7 @@ export default function AdminPanel() {
                 onClick={handleDownloadActivePdf}
                 className="px-4 py-3 bg-green-800 hover:bg-green-700 border border-green-400/30 text-white rounded-xl font-bold transition-all flex items-center gap-2 shadow-sm text-sm"
               >
-                <Download size={18} /> Baixar Ata Oficial
+                <Download size={18} /> Baixar Ata
               </button>
 
               <button 
@@ -370,13 +374,14 @@ export default function AdminPanel() {
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
+            {/* Coluna Esquerda: Presencial ou Vídeo */}
             <div className="lg:col-span-7 space-y-4">
               {isPresential ? (
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-xl">
                   <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <Smartphone size={18} className="text-green-400" /> Coleta de Presença no Aparelho
+                        <Smartphone size={18} className="text-green-400" /> Coleta de Presença
                       </h3>
                       <p className="text-xs text-slate-400 mt-0.5">Passe o aparelho para os trabalhadores assinarem em sequência.</p>
                     </div>
@@ -392,7 +397,7 @@ export default function AdminPanel() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                          <Camera size={16} className="text-green-400" /> Registro Fotográfico da Equipe ({teamPhotos.length})
+                          <Camera size={16} className="text-green-400" /> Registro Fotográfico ({teamPhotos.length})
                         </h4>
                         <p className="text-xs text-slate-400">Fotos anexadas na ata oficial em PDF.</p>
                       </div>
@@ -419,7 +424,7 @@ export default function AdminPanel() {
                         className="border-2 border-dashed border-slate-800 hover:border-green-500/50 bg-slate-950/50 rounded-2xl p-8 text-center space-y-2 cursor-pointer transition-colors"
                       >
                         <ImageIcon size={32} className="mx-auto text-slate-600" />
-                        <p className="text-xs font-semibold text-slate-400">Nenhuma foto da equipe anexada ainda.</p>
+                        <p className="text-xs font-semibold text-slate-400">Nenhuma foto da equipe anexada.</p>
                         <p className="text-[11px] text-slate-500">Clique para tirar foto com a câmera ou escolher da galeria.</p>
                       </div>
                     ) : (
@@ -453,6 +458,7 @@ export default function AdminPanel() {
               )}
             </div>
 
+            {/* Coluna Direita: Lista de Presença */}
             <div className="lg:col-span-5 space-y-6">
               <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 flex items-center justify-around text-center">
                 <div>
@@ -468,7 +474,7 @@ export default function AdminPanel() {
 
               <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800">
                 <h3 className="font-bold text-white mb-4 flex items-center gap-2 text-sm">
-                  <FileText size={18} className="text-green-400" /> Lista de Presença em Tempo Real
+                  <FileText size={18} className="text-green-400" /> Lista de Presença do DDS
                 </h3>
                 
                 {(!activeMeeting.attendees || activeMeeting.attendees.length === 0) ? (
@@ -496,13 +502,13 @@ export default function AdminPanel() {
                               <p className="font-bold text-white text-sm">
                                 {person.name.replace(/\(Saída:.*\)/, '')}
                               </p>
-                              <p className="text-[11px]">
-                                {isExited ? (
-                                  <span className="text-red-300 font-semibold">⚠️ Saída: {person.exitReason || 'Justificada'}</span>
-                                ) : (
-                                  <span className="text-slate-400">CPF: {person.cpf}</span>
-                                )}
-                              </p>
+                              {isExited ? (
+                                <p className="text-[11px] font-semibold text-red-300">
+                                  ⚠️ Saída: {person.exitReason || 'Justificada'}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-slate-400">CPF: {person.cpf}</p>
+                              )}
                             </div>
                           </div>
                           
@@ -520,21 +526,23 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        {/* Notificação Toast de Saída */}
-        {exitNotification && (
-          <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white border border-red-500/40 p-4 rounded-2xl shadow-2xl flex items-center gap-3 max-w-sm animate-in slide-in-from-bottom-5 duration-300">
-            <div className="bg-red-500/20 text-red-400 p-2 rounded-xl">
-              <AlertTriangle size={20} />
-            </div>
-            <div className="flex-1">
-              <p className="text-xs font-bold text-red-400">Aviso de Saída do DDS</p>
-              <p className="text-xs text-slate-300 mt-0.5">{exitNotification}</p>
-            </div>
-            <button onClick={() => setExitNotification(null)} className="text-slate-400 hover:text-white p-1">
-              <X size={16} />
-            </button>
+        {/* Rodapé Oficial (Fixo no final da tela) */}
+        <footer className="mt-8 pt-5 border-t border-slate-800 text-center space-y-1.5 w-full max-w-7xl mx-auto">
+          <p className="text-[11px] text-slate-500 font-normal">
+            © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
+          </p>
+          <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500">
+            <span>Desenvolvido e Auditado por</span>
+            <a
+              href="https://amtst.vercel.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-green-400 hover:text-green-300 font-bold inline-flex items-center gap-1 transition-colors underline underline-offset-2"
+            >
+              AM TST <ExternalLink size={10} />
+            </a>
           </div>
-        )}
+        </footer>
       </main>
     );
   }
@@ -543,17 +551,17 @@ export default function AdminPanel() {
   // DASHBOARD PRINCIPAL
   // =========================================================================
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans flex flex-col justify-between">
+      <div className="max-w-5xl w-full mx-auto space-y-6">
         
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/90 p-6 rounded-3xl border border-slate-800 shadow-xl backdrop-blur-sm">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-lg">
           <div>
             <span className="text-2xl font-black tracking-tight">
               <span className="text-white">DDS </span>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">ON</span>
             </span>
             <p className="text-slate-400 text-xs mt-0.5">
-              Portal do Organizador • Gestão Diária de Segurança Presencial e Digital
+              Portal do Organizador • Gestão de Segurança
             </p>
           </div>
 
@@ -595,7 +603,8 @@ export default function AdminPanel() {
           </div>
         )}
 
-        <div className="flex bg-slate-900 border border-slate-800 p-1.5 rounded-2xl max-w-md">
+        {/* Abas Centralizadas */}
+        <div className="flex bg-slate-900 border border-slate-800 p-1.5 rounded-2xl max-w-md mx-auto">
           <button
             onClick={() => setActiveTab('NEW_DDS')}
             className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
@@ -615,11 +624,12 @@ export default function AdminPanel() {
           </button>
         </div>
 
+        {/* ABA 1: NOVO DDS */}
         {activeTab === 'NEW_DDS' && (
           <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl max-w-2xl mx-auto space-y-6">
             <div>
               <h2 className="text-xl font-black text-white">Criar Novo Diálogo de Segurança</h2>
-              <p className="text-slate-400 text-xs">Selecione se o DDS será realizado no campo presencialmente ou por transmissão</p>
+              <p className="text-slate-400 text-xs mt-1">Selecione a modalidade e configure a ata oficial</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-950 rounded-2xl border border-slate-800">
@@ -632,7 +642,7 @@ export default function AdminPanel() {
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <Users size={16} /> DDS Presencial (No Campo)
+                <Users size={16} /> DDS Presencial
               </button>
 
               <button
@@ -644,45 +654,45 @@ export default function AdminPanel() {
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <Radio size={16} /> DDS Remoto (Transmissão)
+                <Radio size={16} /> DDS Remoto
               </button>
             </div>
 
             <form onSubmit={handleStartNewMeeting} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Tema do Treinamento / Diálogo *</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Tema do Treinamento / Diálogo *</label>
                 <input 
                   type="text" 
                   required
                   value={topic} 
                   onChange={(e) => setTopic(e.target.value)}
-                  placeholder="Ex: NR-31 / Procedimentos de Segurança com Defensivos"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none"
+                  placeholder="Digite o tema principal"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Local / Fazenda / Galpão / Setor *</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Local / Fazenda / Galpão *</label>
                 <input 
                   type="text" 
                   required
                   value={farm} 
                   onChange={(e) => setFarm(e.target.value)}
-                  placeholder="Ex: Fazenda Santa Maria - Setor Agrícola 02"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none"
+                  placeholder="Digite o local da realização"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1">
-                  <Target size={13} className="text-green-400" /> Objetivo do Treinamento (Aparecerá na Ata Oficial)
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1">
+                  <Target size={13} className="text-green-400" /> Objetivo do Treinamento (Aparecerá na Ata)
                 </label>
                 <textarea 
                   rows={3}
                   value={objective} 
                   onChange={(e) => setObjective(e.target.value)}
-                  placeholder="Descreva resumidamente o objetivo deste DDS..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none resize-none leading-relaxed"
+                  placeholder="Descreva o objetivo deste DDS..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none resize-none leading-relaxed transition-all"
                 />
               </div>
 
@@ -693,7 +703,7 @@ export default function AdminPanel() {
               >
                 {isCreatingMeeting ? (
                   <>
-                    <Loader2 size={18} className="animate-spin" /> Criando DDS...
+                    <Loader2 size={18} className="animate-spin" /> Gerando Sala DDS ON...
                   </>
                 ) : (
                   <>
@@ -705,11 +715,12 @@ export default function AdminPanel() {
           </div>
         )}
 
+        {/* ABA 2: HISTÓRICO */}
         {activeTab === 'HISTORY' && (
           <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
             <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                   <Filter size={14} className="text-green-400" /> Filtrar Histórico por Período
                 </span>
 
@@ -725,22 +736,22 @@ export default function AdminPanel() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Inicial</label>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Data Inicial</label>
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full bg-slate-900 px-3 py-2 rounded-xl border border-slate-800 text-xs text-white outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full bg-slate-900 px-3 py-2.5 rounded-xl border border-slate-800 text-xs text-white outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Final</label>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Data Final</label>
                   <input
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full bg-slate-900 px-3 py-2 rounded-xl border border-slate-800 text-xs text-white outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full bg-slate-900 px-3 py-2.5 rounded-xl border border-slate-800 text-xs text-white outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
 
@@ -768,15 +779,15 @@ export default function AdminPanel() {
                     key={meeting.id} 
                     className="p-5 rounded-2xl border border-slate-800 bg-slate-950/70 hover:bg-slate-950 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
                   >
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-2.5 py-0.5 rounded-md">
                           {meeting.farm || 'Unidade'}
                         </span>
-                        <span className="text-[11px] font-semibold text-slate-300 bg-slate-800 px-2 py-0.5 rounded-md">
+                        <span className="text-[11px] font-semibold text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded-md">
                           {meeting.type === 'PRESENTIAL' ? '👥 Presencial' : '🎙️ Remoto'}
                         </span>
-                        <span className="text-xs text-slate-400 flex items-center gap-1">
+                        <span className="text-xs text-slate-400 flex items-center gap-1 border-l border-slate-700 pl-2">
                           <Calendar size={13} />
                           {new Date(meeting.createdAt).toLocaleDateString('pt-BR')} às {new Date(meeting.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
@@ -811,10 +822,28 @@ export default function AdminPanel() {
                 ))
               )}
             </div>
+
           </div>
         )}
 
       </div>
+
+      <footer className="mt-8 pt-5 border-t border-slate-800 text-center space-y-1.5 w-full max-w-5xl mx-auto">
+        <p className="text-[11px] text-slate-400 font-normal">
+          © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
+        </p>
+        <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500">
+          <span>Desenvolvido e Auditado por</span>
+          <a
+            href="https://amtst.vercel.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-green-400 hover:text-green-300 font-bold inline-flex items-center gap-1 transition-colors underline underline-offset-2"
+          >
+            AM TST <ExternalLink size={10} />
+          </a>
+        </div>
+      </footer>
     </main>
   );
 }

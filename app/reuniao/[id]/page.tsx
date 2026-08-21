@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { CheckCircle, Users, LogOut, AlertTriangle, X, Loader2, Send, PhoneOff, ShieldCheck } from 'lucide-react';
+import { CheckCircle, Users, LogOut, AlertTriangle, X, Loader2, Send, PhoneOff, ShieldCheck, ExternalLink } from 'lucide-react';
 import SignaturePad from '@/components/SignaturePad';
 import SelfieCapture from '@/components/SelfieCapture';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
@@ -11,8 +11,8 @@ export default function MeetingRoomPage() {
   const params = useParams();
   const meetingId = params?.id as string;
 
-  // Etapas simplificadas: Apenas FORM -> ROOM -> EXIT_SUCCESS
-  const [currentStep, setCurrentStep] = useState<'FORM' | 'ROOM' | 'EXIT_SUCCESS'>('FORM');
+  // Etapas: FORM -> SUCCESS (Presencial) -> ROOM (Remoto) -> EXIT_SUCCESS
+  const [currentStep, setCurrentStep] = useState<'FORM' | 'ROOM' | 'SUCCESS' | 'EXIT_SUCCESS'>('FORM');
 
   const [name, setName] = useState('');
   const [cpf, setCpf] = useState('');
@@ -22,6 +22,7 @@ export default function MeetingRoomPage() {
   
   const [topic, setTopic] = useState('DDS ON');
   const [farm, setFarm] = useState('');
+  const [meetingType, setMeetingType] = useState<'PRESENTIAL' | 'REMOTE'>('PRESENTIAL');
 
   // Busca detalhes da reunião
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function MeetingRoomPage() {
         if (data.success && data.meeting) {
           setTopic(data.meeting.topic);
           setFarm(data.meeting.farm);
+          setMeetingType(data.meeting.type || 'PRESENTIAL');
         }
       } catch {}
     };
@@ -52,14 +54,14 @@ export default function MeetingRoomPage() {
     setCpf(value);
   };
 
-  // ENVIO DA PRESENÇA E ENTRADA DIRETA NA SALA DE VÍDEO
+  // ENVIO DA PRESENÇA
   const handleSubmit = async () => {
     if (!name.trim()) {
       alert('⚠️ Por favor, digite seu Nome Completo.');
       return;
     }
     if (cpf.length < 14) {
-      alert('⚠️ Por favor, digite um CPF válido com 11 dígitos.');
+      alert('⚠️ Por favor, digite um CPF válido.');
       return;
     }
     if (!savedSelfie) {
@@ -93,8 +95,12 @@ export default function MeetingRoomPage() {
 
     setIsSubmitting(false);
 
-    // ENTRA DIRETO NA SALA DE TRANSMISSÃO SEM NENHUMA TRAVA!
-    setCurrentStep('ROOM');
+    // FLUXO INTELIGENTE: Presencial vai para a tela de Sucesso. Remoto vai para o Vídeo.
+    if (meetingType === 'PRESENTIAL') {
+      setCurrentStep('SUCCESS');
+    } else {
+      setCurrentStep('ROOM');
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -138,12 +144,45 @@ export default function MeetingRoomPage() {
   };
 
   // =========================================================================
-  // TELA 3: SAÍDA REGISTRADA (CHAMADA ENCERRADA)
+  // TELA DE SUCESSO (DDS PRESENCIAL - LIBERA O APARELHO IMEDIATAMENTE)
+  // =========================================================================
+  if (currentStep === 'SUCCESS') {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-5 shadow-2xl animate-in fade-in zoom-in duration-300">
+          <div className="bg-green-500/10 text-green-400 p-4 rounded-2xl inline-flex border border-green-500/20">
+            <CheckCircle size={44} />
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-green-400 uppercase tracking-widest bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20 inline-block">
+              Presença Confirmada
+            </span>
+            <h1 className="text-xl font-bold text-white tracking-tight">Assinatura Realizada!</h1>
+          </div>
+
+          <p className="text-slate-300 text-xs leading-relaxed">
+            Obrigado, <strong>{name}</strong>. Sua presença no treinamento presencial foi registrada na ata oficial.
+          </p>
+
+          <button
+            onClick={handlePassThePhone}
+            className="w-full mt-4 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 text-white font-bold text-sm rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+          >
+            <Users size={16} /> Passar Celular para Outro Colega
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  // =========================================================================
+  // TELA DE SAÍDA REGISTRADA (CHAMADA ENCERRADA)
   // =========================================================================
   if (currentStep === 'EXIT_SUCCESS') {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-5 shadow-2xl">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-5 shadow-2xl animate-in fade-in zoom-in duration-300">
           <div className="bg-red-500/10 text-red-400 p-4 rounded-2xl inline-flex border border-red-500/20">
             <PhoneOff size={36} />
           </div>
@@ -158,24 +197,19 @@ export default function MeetingRoomPage() {
           <p className="text-slate-300 text-xs leading-relaxed">
             Obrigado, <strong>{name}</strong>. Sua saída foi comunicada ao técnico e arquivada na ata oficial de auditoria.
           </p>
-
-          <div className="pt-5 border-t border-slate-800 text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
-            <CheckCircle size={14} className="text-emerald-500" />
-            Você já pode fechar esta página com segurança.
-          </div>
         </div>
       </main>
     );
   }
 
   // =========================================================================
-  // TELA 2: SALA DO DDS AO VIVO (LIBERADA DIRETO)
+  // TELA DE SALA DE VÍDEO (DDS REMOTO)
   // =========================================================================
   if (currentStep === 'ROOM') {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center p-3 md:p-6 font-sans relative">
         <div className="w-full max-w-5xl flex flex-col space-y-4 flex-1">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="bg-green-500/20 p-2 rounded-xl text-green-400">
                 <CheckCircle size={22} />
@@ -193,18 +227,10 @@ export default function MeetingRoomPage() {
               >
                 <LogOut size={14} /> Preciso Sair
               </button>
-
-              <button
-                onClick={handlePassThePhone}
-                className="flex-1 sm:flex-none px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm"
-              >
-                <Users size={14} /> Passar Celular
-              </button>
             </div>
           </div>
 
           <div className="flex-1 min-h-[500px]">
-            {/* VÍDEO DO COLABORADOR AQUI - SEM ESPERAS */}
             <DdsConferenceRoom
               roomName={meetingId}
               userName={name}
@@ -283,10 +309,11 @@ export default function MeetingRoomPage() {
   }
 
   // =========================================================================
-  // TELA 1: FORMULÁRIO DE ENTRADA (COLABORADOR PREENCHE DADOS AQUI)
+  // TELA 1: FORMULÁRIO DE ENTRADA (PRIMEIRA TELA DO COLABORADOR)
   // =========================================================================
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center py-6 px-4 font-sans">
+      
       <header className="w-full max-w-md flex items-center justify-between bg-slate-900 border border-slate-800 px-4 py-3 rounded-2xl shadow-sm mb-6">
         <div className="flex items-center gap-2">
           <span className="text-base font-black tracking-tight">
@@ -304,48 +331,50 @@ export default function MeetingRoomPage() {
         </div>
       </header>
 
-      <div className="w-full max-w-md bg-gradient-to-r from-green-700 to-emerald-800 text-white p-5 rounded-2xl shadow-lg mb-6 text-center border border-green-500/30">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-green-200">Diálogo Diário de Segurança</span>
+      <div className="w-full max-w-md bg-gradient-to-r from-green-700 to-emerald-800 text-white p-5 rounded-3xl shadow-lg mb-6 text-center border border-green-500/30">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-green-200">
+          {meetingType === 'PRESENTIAL' ? 'DDS Presencial' : 'Diálogo Diário de Segurança'}
+        </span>
         <h1 className="text-xl font-bold mt-1 text-white">{topic}</h1>
         {farm && <p className="text-xs text-green-100 mt-0.5">📍 {farm}</p>}
       </div>
 
-      <div className="w-full max-w-md space-y-6 pb-20">
-        <div className="bg-slate-900 border border-slate-800 text-slate-300 text-xs p-3.5 rounded-xl text-center flex items-center justify-center gap-2">
+      <div className="w-full max-w-md space-y-6 pb-8">
+        <div className="bg-slate-900 border border-slate-800 text-slate-300 text-xs p-3.5 rounded-2xl text-center flex items-center justify-center gap-2">
           <ShieldCheck size={16} className="text-green-400 shrink-0" />
-          <span>Valide sua presença abaixo para entrar na transmissão ao vivo.</span>
+          <span>Valide sua presença abaixo para registrar sua conformidade.</span>
         </div>
 
-        <section className="space-y-4 bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
+        <section className="space-y-4 bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
           <h2 className="text-sm font-bold text-white">1. Seus Dados</h2>
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Nome Completo</label>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Nome Completo</label>
             <input 
               type="text" 
               value={name} 
               onChange={(e) => setName(e.target.value)}
               placeholder="Digite seu nome completo"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">CPF</label>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">CPF</label>
             <input 
               type="tel" 
               value={cpf} 
               onChange={handleCpfChange}
               placeholder="000.000.000-00"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
             />
           </div>
         </section>
 
-        <section className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
+        <section className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
           <h2 className="text-sm font-bold text-white mb-3">2. Biometria Facial</h2>
           <SelfieCapture onConfirm={(selfie) => setSavedSelfie(selfie)} />
         </section>
 
-        <section className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
+        <section className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
           <h2 className="text-sm font-bold text-white mb-3">3. Assinatura Digital</h2>
           <SignaturePad onSave={(signature) => setSavedSignature(signature)} />
         </section>
@@ -353,19 +382,36 @@ export default function MeetingRoomPage() {
         <button 
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 active:scale-[0.98] text-white font-bold text-base rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-600/25"
+          className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 active:scale-[0.98] text-white font-bold text-sm rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-600/25"
         >
           {isSubmitting ? (
             <>
-              <Loader2 size={20} className="animate-spin" /> Registrando...
+              <Loader2 size={20} className="animate-spin" /> Registrando Presença...
             </>
           ) : (
             <>
-              <Send size={20} /> Entrar Direto no DDS ON
+              <Send size={18} /> {meetingType === 'PRESENTIAL' ? 'Registrar Presença Oficial' : 'Confirmar Presença e Entrar no Vídeo'}
             </>
           )}
         </button>
       </div>
+
+      <footer className="mt-4 pt-6 border-t border-slate-800/80 text-center space-y-1.5 w-full max-w-md">
+        <p className="text-[11px] text-slate-400 font-normal">
+          © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
+        </p>
+        <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500">
+          <span>Desenvolvido e Auditado por</span>
+          <a
+            href="https://amtst.vercel.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-green-400 hover:text-green-300 font-bold inline-flex items-center gap-1 transition-colors underline underline-offset-2"
+          >
+            AM TST <ExternalLink size={10} />
+          </a>
+        </div>
+      </footer>
     </main>
   );
 }
