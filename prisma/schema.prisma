@@ -50,18 +50,16 @@ model User {
 }
 
 model Meeting {
-  id              String       @id @default(uuid())
-  topic           String
-  farm            String
-  status          String       @default("LIVE")
-  createdAt       DateTime     @default(now())
-  inviteExpiresAt DateTime?
-  inviteToken     String?
-  organizerId     String?
-  organizer       User?        @relation(fields: [organizerId], references: [id])
-  companyId       String?
-  company         Company?     @relation(fields: [companyId], references: [id])
-  attendees       Attendance[]
+  id          String       @id @default(uuid())
+  topic       String
+  farm        String
+  status      String       @default("LIVE")
+  createdAt   DateTime     @default(now())
+  organizerId String?
+  organizer   User?        @relation(fields: [organizerId], references: [id])
+  companyId   String?
+  company     Company?     @relation(fields: [companyId], references: [id])
+  attendees   Attendance[]
 }
 
 model Attendance {
@@ -70,6 +68,7 @@ model Attendance {
   cpf           String
   selfie        String
   signature     String
+  status        String    @default("PENDING") // PENDING (aguardando entrada), ADMITTED (na sala), REJECTED
   exitReason    String?
   exitSignature String?
   leftAt        DateTime?
