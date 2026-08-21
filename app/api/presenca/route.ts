@@ -36,17 +36,19 @@ export async function POST(req: Request) {
       });
     }
 
+    // Cria a presença com status PENDING (Aguardando no lobby para o técnico permitir a entrada)
     const attendance = await (prisma as any).attendance.create({
       data: {
         name: String(name).trim(),
         cpf: String(cpf).trim(),
         selfie: savedSelfie,
         signature: savedSignature,
+        status: 'PENDING',
         meetingId: meeting.id
       }
     });
 
-    return NextResponse.json({ success: true, data: attendance, meetingId: meeting.id });
+    return NextResponse.json({ success: true, data: attendance, attendanceId: attendance.id });
   } catch (error: any) {
     console.error("Erro no POST /api/presenca:", error);
     return NextResponse.json({ success: false, error: error?.message || 'Erro ao salvar presença' }, { status: 500 });

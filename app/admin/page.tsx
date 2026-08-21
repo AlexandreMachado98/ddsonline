@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Play, Users, Link as LinkIcon, FileText, CheckCircle2, 
-  Smartphone, Download, Copy, Check, LogOut, 
-  History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet
+  Play, Users, FileText, CheckCircle2, 
+  Download, Copy, Check, LogOut, 
+  History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet, UserCheck, UserX, Bell
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
@@ -28,17 +28,17 @@ export default function AdminPanel() {
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
   const [exitNotification, setExitNotification] = useState<string | null>(null);
-  const [remainingMinutes, setRemainingMinutes] = useState<number>(10);
-  const [isLinkExpired, setIsLinkExpired] = useState<boolean>(false);
 
-  // 1. Carrega dados da sessão do organizador
+  // Lista de Colaboradores aguardando permissão para entrar
+  const [pendingAdmission, setPendingAdmission] = useState<any[]>([]);
+
   useEffect(() => {
+    const auth = localStorage.getItem('dds_admin_auth');
+    if (!auth) {
+      window.location.replace('/');
+      return;
+    }
     try {
-      const auth = localStorage.getItem('dds_admin_auth');
-      if (!auth) {
-        window.location.replace('/');
-        return;
-      }
       const user = JSON.parse(auth);
       setCurrentUser(user);
     } catch {
@@ -47,7 +47,6 @@ export default function AdminPanel() {
     }
   }, []);
 
-  // 2. Busca e monitoramento em tempo real com anti-cache
   const fetchAllData = useCallback(async () => {
     try {
       const orgId = currentUser?.id || '';
@@ -62,42 +61,31 @@ export default function AdminPanel() {
       
       if (!res.ok) return;
 
-      const responseText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(responseText);
-      } catch {
-        return;
-      }
+      const data = await res.json();
       
       if (data.success) {
         if (data.meeting && data.meeting.status === 'LIVE') {
           setActiveMeeting(data.meeting);
-        } else {
-          setActiveMeeting(null);
-        }
 
-        setMeetingHistory(data.history || []);
+          const allAttendees = data.meeting.attendees || [];
+          
+          // Separa quem está aguardando no Lobby para o técnico aprovar
+          const waiting = allAttendees.filter((a: any) => a.status === 'PENDING');
+          setPendingAdmission(waiting);
 
-        if (data.meeting && data.meeting.inviteExpiresAt) {
-          const diffMs = new Date(data.meeting.inviteExpiresAt).getTime() - Date.now();
-          if (diffMs > 0) {
-            setRemainingMinutes(Math.ceil(diffMs / (60 * 1000)));
-            setIsLinkExpired(false);
-          } else {
-            setRemainingMinutes(0);
-            setIsLinkExpired(true);
-          }
-        }
-
-        if (data.meeting && data.meeting.attendees) {
-          data.meeting.attendees.forEach((person: any) => {
+          // Avisos de saída
+          allAttendees.forEach((person: any) => {
             if (person.name.includes('(Saída:') && !exitNotification) {
               setExitNotification(`⚠️ ${person.name.replace(/\(Saída:.*\)/, '')} precisou se ausentar.`);
               setTimeout(() => setExitNotification(null), 8000);
             }
           });
+        } else {
+          setActiveMeeting(null);
+          setPendingAdmission([]);
         }
+
+        setMeetingHistory(data.history || []);
       }
     } catch (error) {
       console.error(error);
@@ -109,10 +97,24 @@ export default function AdminPanel() {
   useEffect(() => {
     if (currentUser) {
       fetchAllData();
-      const interval = setInterval(fetchAllData, 2500);
+      const interval = setInterval(fetchAllData, 2000);
       return () => clearInterval(interval);
     }
   }, [currentUser, fetchAllData]);
+
+  // Ação: Permitir ou Recusar entrada do Colaborador
+  const handleAdmitUser = async (attendanceId: string, action: 'ADMIT' | 'REJECT') => {
+    try {
+      await fetch('/api/presenca/admit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attendanceId, action })
+      });
+      fetchAllData();
+    } catch {
+      alert('Erro ao processar solicitação de entrada.');
+    }
+  };
 
   const handleStartNewMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,13 +136,7 @@ export default function AdminPanel() {
         })
       });
       
-      const responseText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(responseText);
-      } catch {
-        throw new Error('Falha ao ler resposta da API.');
-      }
+      const data = await res.json();
       
       if (res.ok && data.success && data.meeting) {
         setActiveMeeting(data.meeting);
@@ -153,25 +149,6 @@ export default function AdminPanel() {
       alert('Aviso: ' + (err?.message || 'Falha de comunicação.'));
     } finally {
       setIsCreatingMeeting(false);
-    }
-  };
-
-  const handleRenewLink = async () => {
-    if (!activeMeeting) return;
-    try {
-      const res = await fetch('/api/reuniao', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meetingId: activeMeeting.id })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setActiveMeeting(data.meeting);
-        handleCopyInviteLink();
-        alert('✅ Link renovado por mais 10 minutos!');
-      }
-    } catch {
-      alert('Erro ao renovar o link.');
     }
   };
 
@@ -246,10 +223,10 @@ export default function AdminPanel() {
     window.location.replace('/');
   };
 
-  // =========================================================================
-  // SALA DO DDS AO VIVO (COM MOSAICO DE PARTICIPANTES CONECTADO)
-  // =========================================================================
+  // SALA DO DDS AO VIVO COM CONTROLE DE ADMISSÃO (GOOGLE MEET MODEL)
   if (isLiveMode && activeMeeting) {
+    const admittedAttendees = (activeMeeting.attendees || []).filter((a: any) => a.status === 'ADMITTED' || !a.status);
+
     return (
       <main className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans relative text-white">
         <div className="max-w-7xl mx-auto space-y-6">
@@ -275,6 +252,45 @@ export default function AdminPanel() {
             </div>
           </header>
 
+          {/* Banner de Solicitações de Entrada (Lobby) */}
+          {pendingAdmission.length > 0 && (
+            <div className="bg-gradient-to-r from-amber-600 via-amber-700 to-slate-900 border border-amber-500/40 p-4 rounded-3xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-300">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-500/20 text-white rounded-2xl">
+                  <Bell size={24} className="animate-bounce" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">
+                    {pendingAdmission.length === 1 ? '1 Colaborador aguarda no Lobby' : `${pendingAdmission.length} Colaboradores aguardam no Lobby`}
+                  </h4>
+                  <p className="text-xs text-amber-200">Permita a entrada para liberar o áudio e vídeo dos participantes.</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {pendingAdmission.map((pending) => (
+                  <div key={pending.id} className="flex items-center gap-2 bg-slate-950/80 p-2 rounded-xl border border-amber-500/30">
+                    <span className="text-xs font-bold text-white px-2 truncate max-w-[120px]">{pending.name}</span>
+                    <button
+                      onClick={() => handleAdmitUser(pending.id, 'ADMIT')}
+                      className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
+                    >
+                      <UserCheck size={14} /> Permitir
+                    </button>
+                    <button
+                      onClick={() => handleAdmitUser(pending.id, 'REJECT')}
+                      className="p-1.5 bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white rounded-lg text-xs transition-colors"
+                      title="Recusar entrada"
+                    >
+                      <UserX size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Banner da Reunião */}
           <div className="bg-gradient-to-r from-green-700 via-emerald-700 to-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-green-500/30">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -282,35 +298,20 @@ export default function AdminPanel() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-green-400"></span>
                 </span>
-                <span className="font-semibold text-green-200 uppercase tracking-wider text-xs">DDS ON • Treinamento Ao Vivo</span>
-                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
-                  isLinkExpired ? 'bg-red-500 text-white' : 'bg-green-950/80 text-green-300 border border-green-500/30'
-                }`}>
-                  <Clock size={12} />
-                  {isLinkExpired ? 'Link Expirado' : `Link válido por ~${remainingMinutes} min`}
-                </span>
+                <span className="font-semibold text-green-200 uppercase tracking-wider text-xs">DDS ON • Transmissão Ao Vivo</span>
               </div>
               <h2 className="text-2xl font-black">{activeMeeting.topic}</h2>
               <p className="text-green-100 text-sm mt-0.5">📍 {activeMeeting.farm}</p>
             </div>
             
             <div className="flex flex-wrap gap-2">
-              {isLinkExpired ? (
-                <button 
-                  onClick={handleRenewLink}
-                  className="px-4 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-bold transition-all flex items-center gap-2 shadow-md text-sm animate-bounce"
-                >
-                  <RefreshCw size={18} /> Renovar Link (Mais 10 min)
-                </button>
-              ) : (
-                <button 
-                  onClick={handleCopyInviteLink}
-                  className="px-4 py-3 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold transition-all flex items-center gap-2 shadow-md text-sm"
-                >
-                  {copiedLink ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
-                  {copiedLink ? 'Link Copiado!' : 'Copiar Link do DDS'}
-                </button>
-              )}
+              <button 
+                onClick={handleCopyInviteLink}
+                className="px-4 py-3 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold transition-all flex items-center gap-2 shadow-md text-sm"
+              >
+                {copiedLink ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
+                {copiedLink ? 'Link Copiado!' : 'Copiar Link do DDS'}
+              </button>
 
               <button 
                 onClick={handleDownloadActivePdf}
@@ -329,21 +330,19 @@ export default function AdminPanel() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Mosaico de Vídeo + Colaboradores Conectados */}
             <div className="lg:col-span-7 space-y-4">
               <DdsConferenceRoom
                 roomName={activeMeeting.id}
                 userName={`${currentUser?.name || 'Técnico'} (DDS ON)`}
                 isAdmin={true}
-                attendees={activeMeeting.attendees || []}
+                attendees={admittedAttendees}
               />
             </div>
 
-            {/* Métricas e Lista em Tempo Real */}
             <div className="lg:col-span-5 space-y-6">
               <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 flex items-center justify-around text-center">
                 <div>
-                  <span className="text-3xl font-black text-white">{activeMeeting.attendees?.length || 0}</span>
+                  <span className="text-3xl font-black text-white">{admittedAttendees.length}</span>
                   <span className="text-slate-400 text-xs block mt-1">Presenças Auditadas</span>
                 </div>
                 <div className="h-10 w-[1px] bg-slate-800"></div>
@@ -358,14 +357,14 @@ export default function AdminPanel() {
                   <FileText size={18} className="text-green-400" /> Lista de Presença em Tempo Real
                 </h3>
                 
-                {!activeMeeting.attendees || activeMeeting.attendees.length === 0 ? (
+                {admittedAttendees.length === 0 ? (
                   <div className="text-center py-12 text-slate-500">
-                    <p>Nenhum colaborador assinou ainda.</p>
+                    <p>Nenhum colaborador admitido ainda.</p>
                     <p className="text-xs text-slate-600 mt-1">Envie o link copiado para a equipe.</p>
                   </div>
                 ) : (
                   <ul className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
-                    {activeMeeting.attendees.map((person: any) => {
+                    {admittedAttendees.map((person: any) => {
                       const isExited = Boolean(person.exitReason || person.name.includes('(Saída:'));
                       return (
                         <li key={person.id} className={`flex items-center justify-between p-3.5 rounded-2xl border ${
@@ -406,14 +405,11 @@ export default function AdminPanel() {
     );
   }
 
-  // =========================================================================
   // DASHBOARD PRINCIPAL
-  // =========================================================================
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans">
       <div className="max-w-5xl mx-auto space-y-6">
         
-        {/* Cabeçalho Principal */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/90 p-6 rounded-3xl border border-slate-800 shadow-xl backdrop-blur-sm">
           <div>
             <span className="text-2xl font-black tracking-tight">
@@ -440,7 +436,6 @@ export default function AdminPanel() {
           </div>
         </header>
 
-        {/* Alerta de DDS Ativo (Blindado contra flash) */}
         {isInitialLoadDone && activeMeeting && (
           <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-5 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-green-400/30 animate-in fade-in duration-300">
             <div className="flex items-center gap-3.5">
@@ -462,7 +457,6 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* Abas */}
         <div className="flex bg-slate-900 border border-slate-800 p-1.5 rounded-2xl max-w-md">
           <button
             onClick={() => setActiveTab('NEW_DDS')}
@@ -483,12 +477,11 @@ export default function AdminPanel() {
           </button>
         </div>
 
-        {/* ABA 1: NOVO DDS */}
         {activeTab === 'NEW_DDS' && (
           <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl max-w-2xl mx-auto space-y-6">
             <div>
               <h2 className="text-xl font-black text-white">Iniciar Novo DDS</h2>
-              <p className="text-slate-400 text-xs">Gera a sala ao vivo e o link temporário de 10 minutos para a equipe</p>
+              <p className="text-slate-400 text-xs">Gera a sala ao vivo e o link permanente com controle de entrada</p>
             </div>
 
             <form onSubmit={handleStartNewMeeting} className="space-y-4">
@@ -525,7 +518,7 @@ export default function AdminPanel() {
                   </>
                 ) : (
                   <>
-                    <Play size={18} /> Iniciar DDS e Gerar Link de 10 Minutos
+                    <Play size={18} /> Iniciar DDS e Abrir Sala com Lobby
                   </>
                 )}
               </button>
@@ -533,10 +526,8 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* ABA 2: HISTÓRICO */}
         {activeTab === 'HISTORY' && (
           <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
-            
             <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
