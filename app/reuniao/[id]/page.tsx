@@ -1,8 +1,8 @@
  'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { CheckCircle, Users, LogOut, AlertTriangle, X, Loader2, Send, PhoneOff, Clock, ShieldCheck, UserX } from 'lucide-react';
+import { CheckCircle, Users, LogOut, AlertTriangle, X, Loader2, Send, PhoneOff, Clock, ShieldCheck, UserX, ArrowRight } from 'lucide-react';
 import SignaturePad from '@/components/SignaturePad';
 import SelfieCapture from '@/components/SelfieCapture';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
@@ -19,6 +19,7 @@ export default function MeetingRoomPage() {
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [savedSelfie, setSavedSelfie] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [topic, setTopic] = useState('DDS ON');
   const [farm, setFarm] = useState('');
 
@@ -37,40 +38,46 @@ export default function MeetingRoomPage() {
     fetchMeetingDetails();
   }, [meetingId]);
 
-  // Monitoramento Anti-Cache da Sala de Espera (Desbloqueio Imediato)
+  // Função central de checagem do Lobby
+  const verifyAdmissionStatus = useCallback(async () => {
+    try {
+      const storedId = attendanceId || (typeof window !== 'undefined' ? localStorage.getItem(`dds_att_${meetingId}`) : null);
+      const url = `/api/presenca/status?attendanceId=${storedId || ''}&cpf=${encodeURIComponent(cpf)}&meetingId=${meetingId}&_t=${Date.now()}`;
+      
+      const res = await fetch(url, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
+      });
+      
+      const data = await res.json();
+
+      if (data.success) {
+        if (data.status === 'ADMITTED') {
+          setCurrentStep('ROOM'); // DESBLOQUEIO INSTANTÂNEO!
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (data.status === 'REJECTED') {
+          setCurrentStep('REJECTED');
+        }
+      }
+    } catch {}
+  }, [attendanceId, cpf, meetingId]);
+
+  // Polling automático da Sala de Espera a cada 1.5 segundos
   useEffect(() => {
     if (currentStep !== 'LOBBY') return;
 
-    let isSubscribed = true;
+    verifyAdmissionStatus();
+    const interval = setInterval(verifyAdmissionStatus, 1500);
 
-    const checkAdmission = async () => {
-      try {
-        const url = `/api/presenca/status?attendanceId=${attendanceId || ''}&cpf=${cpf}&meetingId=${meetingId}&_t=${Date.now()}`;
-        const res = await fetch(url, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
-        });
-        
-        const data = await res.json();
+    return () => clearInterval(interval);
+  }, [currentStep, verifyAdmissionStatus]);
 
-        if (isSubscribed && data.success) {
-          if (data.status === 'ADMITTED') {
-            setCurrentStep('ROOM'); // DESBLOQUEIA E ENTRA NA REUNIÃO NA HORA!
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          } else if (data.status === 'REJECTED') {
-            setCurrentStep('REJECTED');
-          }
-        }
-      } catch {}
-    };
-
-    checkAdmission();
-    const interval = setInterval(checkAdmission, 1500); // Consulta a cada 1.5s
-    return () => {
-      isSubscribed = false;
-      clearInterval(interval);
-    };
-  }, [currentStep, attendanceId, cpf, meetingId]);
+  // Botão manual de verificação (Caso o colaborador queira forçar a entrada)
+  const handleManualCheck = async () => {
+    setIsCheckingStatus(true);
+    await verifyAdmissionStatus();
+    setTimeout(() => setIsCheckingStatus(false), 500);
+  };
 
   const [showExitModal, setShowExitModal] = useState(false);
   const [exitReason, setExitReason] = useState('Chamado Operacional no Campo');
@@ -123,11 +130,12 @@ export default function MeetingRoomPage() {
       const data = await res.json();
       if (data.success && data.attendanceId) {
         setAttendanceId(data.attendanceId);
+        localStorage.setItem(`dds_att_${meetingId}`, data.attendanceId);
       }
     } catch {}
 
     setIsSubmitting(false);
-    setCurrentStep('LOBBY'); // ENTRA NO LOBBY
+    setCurrentStep('LOBBY'); // ENTRA NA SALA DE ESPERA
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -165,12 +173,17 @@ export default function MeetingRoomPage() {
     setSavedSelfie(null);
     setExitSignature(null);
     setAttendanceId(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(`dds_att_${meetingId}`);
+    }
     setShowExitModal(false);
     setCurrentStep('FORM');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // TELA 2: SALA DE ESPERA (LOBBY)
+  // =========================================================================
+  // TELA 2: SALA DE ESPERA (LOBBY) COM VERIFICAÇÃO AUTOMÁTICA E MANUAL
+  // =========================================================================
   if (currentStep === 'LOBBY') {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
@@ -189,7 +202,7 @@ export default function MeetingRoomPage() {
               Presença Registrada
             </span>
             <h1 className="text-2xl font-black text-white">Sala de Espera</h1>
-            <p className="text-xs text-slate-300 font-medium">Aguardando o organizador permitir sua entrada...</p>
+            <p className="text-xs text-slate-300 font-medium">Aguardando o organizador liberar sua entrada...</p>
           </div>
 
           <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs text-slate-400 space-y-2 text-left">
@@ -203,9 +216,28 @@ export default function MeetingRoomPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-2 text-xs text-slate-400 pt-2">
-            <Loader2 size={16} className="animate-spin text-green-500" />
-            <span>Você entrará na reunião automaticamente assim que for autorizado.</span>
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+              <Loader2 size={15} className="animate-spin text-green-500" />
+              <span>Conectando automaticamente assim que for autorizado...</span>
+            </div>
+
+            {/* Botão de Verificação Manual (Garante que nunca trave) */}
+            <button
+              onClick={handleManualCheck}
+              disabled={isCheckingStatus}
+              className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+            >
+              {isCheckingStatus ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Verificando Autorização...
+                </>
+              ) : (
+                <>
+                  Já foi autorizado pelo técnico? Entrar Agora <ArrowRight size={14} />
+                </>
+              )}
+            </button>
           </div>
 
         </div>
@@ -269,7 +301,7 @@ export default function MeetingRoomPage() {
     );
   }
 
-  // TELA 5: SALA DO DDS AO VIVO (ENTRADA LIBERADA)
+  // TELA 5: SALA DO DDS AO VIVO (LIBERADO PELO ORGANIZADOR)
   if (currentStep === 'ROOM') {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center p-3 md:p-6 font-sans relative">

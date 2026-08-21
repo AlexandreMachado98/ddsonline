@@ -121,24 +121,35 @@ export default function AdminPanel() {
     }
   }, [currentUser, fetchAllData]);
 
-  // Ação: Permitir ou Recusar entrada do Colaborador
+  // AÇÃO: Permitir ou Recusar entrada com liberação instantânea e remoção imediata da fila
   const handleAdmitUser = async (attendanceId: string, action: 'ADMIT' | 'REJECT') => {
     try {
-      await fetch('/api/presenca/admit', {
+      // Remove visualmente da fila na hora para resposta imediata
+      setPendingAdmission(prev => prev.filter(p => p.id !== attendanceId));
+
+      const res = await fetch('/api/presenca/admit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ attendanceId, action })
       });
-      fetchAllData();
+      
+      const data = await res.json();
+      if (data.success) {
+        fetchAllData();
+      }
     } catch {
       alert('Erro ao processar permissão de entrada.');
+      fetchAllData();
     }
   };
 
-  // Ação: Permitir TODOS de uma vez
+  // AÇÃO: Permitir TODOS de uma vez
   const handleAdmitAll = async () => {
     try {
-      for (const pending of pendingAdmission) {
+      const toAdmit = [...pendingAdmission];
+      setPendingAdmission([]); // Limpa a fila na hora
+
+      for (const pending of toAdmit) {
         await fetch('/api/presenca/admit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -148,6 +159,7 @@ export default function AdminPanel() {
       fetchAllData();
     } catch {
       alert('Erro ao permitir todos.');
+      fetchAllData();
     }
   };
 
@@ -321,7 +333,7 @@ export default function AdminPanel() {
       setTeamPhotos([]);
       setPendingAdmission([]);
       fetchAllData();
-      alert('✅ DDS Encerrado! Ata arquivada com sucesso.');
+      alert('✅ DDS Encerrado! Ata e anexo fotográfico arquivados com sucesso.');
     }
   };
 
@@ -667,7 +679,7 @@ export default function AdminPanel() {
           </div>
         </header>
 
-        {/* Alerta de DDS Ativo */}
+        {/* Alerta de DDS Ativo (Blindado contra flash) */}
         {isInitialLoadDone && activeMeeting && (
           <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-5 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-green-400/30 animate-in fade-in duration-300">
             <div className="flex items-center gap-3.5">
@@ -871,7 +883,7 @@ export default function AdminPanel() {
                         <span className="text-xs font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-2.5 py-0.5 rounded-md">
                           {meeting.farm || 'Unidade'}
                         </span>
-                        <span className="text-[11px] font-semibold text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded-md">
+                        <span className="text-[11px] font-semibold text-slate-300 bg-slate-800 px-2 py-0.5 rounded-md">
                           {meeting.type === 'PRESENTIAL' ? '👥 Presencial' : '🎙️ Remoto'}
                         </span>
                         <span className="text-xs text-slate-400 flex items-center gap-1">

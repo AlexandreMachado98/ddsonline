@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { attendanceId, action } = body; // 'ADMIT' ou 'REJECT'
+    const { attendanceId, action } = body;
 
     if (!attendanceId) {
       return NextResponse.json({ success: false, error: 'ID de presença ausente' }, { status: 400 });
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     const newStatus = action === 'ADMIT' ? 'ADMITTED' : 'REJECTED';
 
     const updated = await (prisma as any).attendance.update({
-      where: { id: attendanceId },
+      where: { id: String(attendanceId).trim() },
       data: {
         status: newStatus
       }
