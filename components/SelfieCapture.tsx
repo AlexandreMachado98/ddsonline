@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, RefreshCw, Check, Smartphone, AlertCircle } from 'lucide-react';
+import { Camera, RefreshCw, Check, Smartphone, CameraOff } from 'lucide-react';
 
 interface SelfieCaptureProps {
   onConfirm: (imageSrc: string | null) => void;
@@ -15,11 +15,9 @@ export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [hasCameraError, setHasCameraError] = useState(false);
 
-  // Resolução flexível para evitar OverconstrainedError em qualquer celular
+  // Configuração simples para garantir que abra em qualquer celular
   const videoConstraints = {
-    facingMode: 'user',
-    width: { ideal: 640 },
-    height: { ideal: 640 }
+    facingMode: 'user'
   };
 
   // 1. Captura pela Webcam ao vivo
@@ -33,7 +31,7 @@ export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
     }
   }, [webcamRef, onConfirm]);
 
-  // 2. Captura pela Câmera Nativa do Celular (Infalível em 100% dos aparelhos e no WhatsApp)
+  // 2. Captura pela Câmera Nativa do Celular / Galeria
   const handleNativeCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -42,7 +40,7 @@ export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
     reader.onloadend = () => {
       const rawBase64 = reader.result as string;
 
-      // Comprime a foto no navegador para carregar rápido no 4G/Starlink
+      // Comprime a foto no navegador para carregar rápido
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
@@ -79,6 +77,7 @@ export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
 
   const retake = () => {
     setCapturedImage(null);
+    setHasCameraError(false);
     onConfirm(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -86,12 +85,13 @@ export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
   };
 
   return (
-    <div className="flex flex-col items-center w-full space-y-3">
+    <div className="flex flex-col items-center w-full space-y-4">
       
       {/* Quadro de Exibição da Foto / Câmera */}
-      <div className="relative w-full max-w-[260px] overflow-hidden bg-black rounded-3xl shadow-lg aspect-square flex items-center justify-center border border-slate-700">
+      <div className="relative w-full max-w-[260px] overflow-hidden bg-slate-950 rounded-3xl shadow-lg aspect-square flex items-center justify-center border border-slate-700">
+        
         {!capturedImage ? (
-          !hasCameraError ? (
+          <>
             <Webcam
               audio={false}
               ref={webcamRef}
@@ -101,13 +101,16 @@ export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
               onUserMediaError={() => setHasCameraError(true)}
               className="w-full h-full object-cover"
             />
-          ) : (
-            <div className="p-4 text-center text-slate-400 space-y-2">
-              <Smartphone size={32} className="mx-auto text-green-400" />
-              <p className="text-xs font-semibold text-white">Usar Câmera do Aparelho</p>
-              <p className="text-[10px] text-slate-400">Clique no botão abaixo para abrir a câmera nativa do seu celular.</p>
-            </div>
-          )
+
+            {/* Aviso visual caso a câmera ao vivo não seja autorizada pelo navegador */}
+            {hasCameraError && (
+              <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center p-4 text-center z-10 space-y-2">
+                <CameraOff size={32} className="text-slate-600" />
+                <p className="text-xs font-bold text-slate-300">Câmera indisponível</p>
+                <p className="text-[10px] text-slate-500">O navegador bloqueou a câmera ao vivo. Use o botão do celular abaixo.</p>
+              </div>
+            )}
+          </>
         ) : (
           <img
             src={capturedImage}
@@ -117,7 +120,7 @@ export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
         )}
       </div>
 
-      {/* Input invisível que aciona a Câmera Frontal do Celular */}
+      {/* Input invisível que aciona a Câmera Frontal Nativa do Celular */}
       <input
         type="file"
         accept="image/*"
@@ -128,40 +131,49 @@ export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
       />
 
       {/* Botões de Ação */}
-      <div className="w-full max-w-[260px] space-y-2">
+      <div className="w-full max-w-[260px] flex flex-col gap-2.5">
         {!capturedImage ? (
           <>
-            {!hasCameraError ? (
-              <button
-                type="button"
-                onClick={captureFromWebcam}
-                className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-md"
-              >
-                <Camera size={16} /> Tirar Foto
-              </button>
-            ) : null}
+            {/* 1. Botão Câmera Ao Vivo (Fica bloqueado se der erro, mas continua na tela) */}
+            <button
+              type="button"
+              onClick={captureFromWebcam}
+              disabled={hasCameraError}
+              className={`w-full py-3.5 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-md ${
+                hasCameraError 
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
+                  : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white active:scale-95'
+              }`}
+            >
+              <Camera size={16} /> Capturar (Ao Vivo)
+            </button>
 
-            {/* Botão de Câmera Nativa (Garante que funcione em qualquer celular) */}
+            <div className="flex items-center gap-2 w-full">
+              <div className="h-[1px] bg-slate-800 flex-1"></div>
+              <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">OU</span>
+              <div className="h-[1px] bg-slate-800 flex-1"></div>
+            </div>
+
+            {/* 2. Botão Câmera Nativa do Celular (SEMPRE VISÍVEL) */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
+              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-green-400 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-700 shadow-sm"
             >
-              <Smartphone size={14} className="text-green-400" />
-              {hasCameraError ? 'Abrir Câmera do Celular' : 'Usar Câmera do Celular'}
+              <Smartphone size={16} /> Abrir Câmera do Aparelho
             </button>
           </>
         ) : (
-          <div className="w-full space-y-2">
-            <div className="text-[11px] text-emerald-400 font-bold flex items-center justify-center gap-1">
-              <Check size={14} /> Biometria Facial Registrada
+          <div className="w-full space-y-3">
+            <div className="text-xs text-green-400 font-bold flex items-center justify-center gap-1 bg-green-500/10 py-2 rounded-xl border border-green-500/20">
+              <Check size={16} /> Biometria Facial Registrada
             </div>
             <button
               type="button"
               onClick={retake}
-              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
+              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
             >
-              <RefreshCw size={13} /> Tirar Outra Foto
+              <RefreshCw size={14} /> Tirar Outra Foto
             </button>
           </div>
         )}
