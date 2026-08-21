@@ -1,13 +1,12 @@
  import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
-// FORÇA A VERCEL A NUNCA CACHEAR ESTA ROTA (TEMPO REAL OBRIGATÓRIO)
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const prisma = new PrismaClient();
 
-// 1. GET: Busca reunião ativa e histórico em tempo real
+// 1. GET: Busca reunião ativa e histórico com fotos
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -35,7 +34,6 @@ export async function GET(req: Request) {
       meetingWhere.createdAt = dateFilter;
     }
 
-    // Busca a reunião AO VIVO com todas as presenças atualizadas
     const activeMeeting = await (prisma as any).meeting.findFirst({
       where: {
         status: 'LIVE',
@@ -73,11 +71,11 @@ export async function GET(req: Request) {
   }
 }
 
-// 2. POST: Abre nova reunião
+// 2. POST: Cria novo DDS (Presencial ou Remoto)
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { topic, farm, organizerId } = body;
+    const { topic, farm, type, objective, organizerId, teamPhotos } = body;
 
     if (!topic || !farm) {
       return NextResponse.json({ success: false, error: 'Preencha o Tema e o Local da fazenda' }, { status: 400 });
@@ -93,16 +91,14 @@ export async function POST(req: Request) {
       });
     } catch (e) {}
 
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    const inviteToken = Math.random().toString(36).substring(2, 8).toUpperCase();
-
     const newMeeting = await (prisma as any).meeting.create({
       data: {
         topic: String(topic).trim(),
         farm: String(farm).trim(),
+        type: type || 'PRESENTIAL',
+        objective: objective ? String(objective).trim() : null,
+        teamPhotos: teamPhotos ? JSON.stringify(teamPhotos) : null,
         status: 'LIVE',
-        inviteExpiresAt: expiresAt,
-        inviteToken: inviteToken,
         organizerId: organizerId || null
       },
       include: {
@@ -116,18 +112,16 @@ export async function POST(req: Request) {
   }
 }
 
-// 3. PATCH: Renova link de 10 min
+// 3. PATCH: Atualiza fotos da equipe ou dados durante a reunião presencial
 export async function PATCH(req: Request) {
   try {
-    const { meetingId } = await req.json();
-    const newExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    const newToken = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const body = await req.json();
+    const { meetingId, teamPhotos } = body;
 
     const updated = await (prisma as any).meeting.update({
       where: { id: meetingId },
       data: {
-        inviteExpiresAt: newExpiresAt,
-        inviteToken: newToken
+        teamPhotos: teamPhotos ? JSON.stringify(teamPhotos) : null
       },
       include: {
         attendees: true

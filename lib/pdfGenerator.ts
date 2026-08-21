@@ -16,6 +16,9 @@ interface Attendee {
 interface MeetingData {
   topic: string;
   farm: string;
+  type?: string;
+  objective?: string;
+  teamPhotos?: string; // JSON string ou Array
   createdAt?: string;
   attendees: Attendee[];
 }
@@ -29,11 +32,13 @@ interface ConsolidatedReportData {
   meetings: MeetingData[];
 }
 
-// 1. ATA INDIVIDUAL DE DDS COM ENTRADA E SAÍDA AUDITADA (DDS ON)
+// 1. ATA OFICIAL DE DDS (PRESENCIAL OU REMOTO) COM OBJETIVO E ANEXO FOTOGRÁFICO
 export function generateDdsPdf(meeting: MeetingData) {
   const doc = new jsPDF();
 
-  // Topo Verde Segurança + Grafite
+  const isPresential = meeting.type === 'PRESENTIAL';
+
+  // 1. Topo Oficial AM TST
   doc.setFillColor(15, 23, 42); // Grafite escuro
   doc.rect(0, 0, 210, 28, 'F');
 
@@ -48,41 +53,71 @@ export function generateDdsPdf(meeting: MeetingData) {
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(134, 239, 172);
-  doc.text('ATA OFICIAL DE DIÁLOGO DIÁRIO DE SEGURANÇA E AUDITORIA', 14, 20);
+  doc.text(
+    isPresential 
+      ? 'ATA OFICIAL DE DIÁLOGO DE SEGURANÇA PRESENCIAL • AUDITORIA SST' 
+      : 'ATA OFICIAL DE DIÁLOGO DE SEGURANÇA DIGITAL E AUDITORIA', 
+    14, 
+    20
+  );
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
-  doc.text('REGISTRO DE CONFORMIDADE NR', 200, 16, { align: 'right' });
+  doc.text(isPresential ? 'MODALIDADE: PRESENCIAL' : 'MODALIDADE: REMOTO', 200, 16, { align: 'right' });
 
-  // Metadados
+  // 2. Metadados do Treinamento
   doc.setTextColor(31, 41, 55);
   doc.setFontSize(9);
   
-  doc.setFont('helvetica', 'bold');
-  doc.text('Tema do Treinamento:', 14, 38);
-  doc.setFont('helvetica', 'normal');
-  doc.text(meeting.topic || 'Não informado', 52, 38);
+  let currentY = 36;
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Unidade / Fazenda:', 14, 44);
+  doc.text('Tema do Treinamento:', 14, currentY);
   doc.setFont('helvetica', 'normal');
-  doc.text(meeting.farm || 'Não informado', 46, 44);
+  doc.text(meeting.topic || 'Não informado', 52, currentY);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Data e Horário:', 14, 50);
+  doc.text('Unidade / Fazenda:', 14, currentY + 6);
   doc.setFont('helvetica', 'normal');
-  doc.text(new Date(meeting.createdAt || Date.now()).toLocaleString('pt-BR'), 40, 50);
+  doc.text(meeting.farm || 'Não informado', 46, currentY + 6);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Total de Participantes:', 14, 56);
+  doc.text('Data e Horário:', 14, currentY + 12);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${meeting.attendees.length} colaborador(es) auditado(s)`, 52, 56);
+  doc.text(new Date(meeting.createdAt || Date.now()).toLocaleString('pt-BR'), 40, currentY + 12);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Total de Participantes:', 14, currentY + 18);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${meeting.attendees.length} colaborador(es) auditado(s)`, 52, currentY + 18);
+
+  currentY += 24;
+
+  // Bloco: Objetivo do Treinamento (Se houver)
+  if (meeting.objective) {
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(14, currentY - 2, 182, 14, 2, 2, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, currentY - 2, 182, 14, 2, 2, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(22, 163, 74);
+    doc.text('Objetivo do Treinamento:', 17, currentY + 3);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+    const splitObj = doc.splitTextToSize(meeting.objective, 176);
+    doc.text(splitObj, 17, currentY + 8);
+
+    currentY += 18;
+  }
 
   doc.setDrawColor(22, 163, 74);
   doc.setLineWidth(0.3);
-  doc.line(14, 60, 196, 60);
+  doc.line(14, currentY, 196, currentY);
 
+  // 3. Tabela de Presenças com Fotos e Assinaturas
   const tableRows = meeting.attendees.map(a => {
     const isEarlyExit = Boolean(a.exitReason || a.exitSignature);
     const exitTime = a.leftAt ? new Date(a.leftAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
@@ -102,7 +137,7 @@ export function generateDdsPdf(meeting: MeetingData) {
   });
 
   autoTable(doc, {
-    startY: 64,
+    startY: currentY + 4,
     head: [['Colaborador', 'CPF', 'Entrada', 'Biometria Facial', 'Assinatura Entrada', 'Status / Saída', 'Assinatura Saída']],
     body: tableRows,
     theme: 'grid',
@@ -133,21 +168,18 @@ export function generateDdsPdf(meeting: MeetingData) {
         const attendee = meeting.attendees[data.row.index];
         if (!attendee) return;
 
-        // Selfie na coluna 3
         if (data.column.index === 3 && attendee.selfie) {
           try {
             doc.addImage(attendee.selfie, 'JPEG', data.cell.x + 4, data.cell.y + 2, 14, 14);
           } catch (e) {}
         }
 
-        // Assinatura Entrada na coluna 4
         if (data.column.index === 4 && attendee.signature) {
           try {
             doc.addImage(attendee.signature, 'PNG', data.cell.x + 3, data.cell.y + 3, 24, 12);
           } catch (e) {}
         }
 
-        // Assinatura Saída na coluna 6 (se houver)
         if (data.column.index === 6 && attendee.exitSignature) {
           try {
             doc.addImage(attendee.exitSignature, 'PNG', data.cell.x + 3, data.cell.y + 3, 24, 12);
@@ -157,6 +189,67 @@ export function generateDdsPdf(meeting: MeetingData) {
     }
   });
 
+  // 4. ANEXO FOTOGRÁFICO DA EQUIPE PRESENCIAL (Se houver fotos anexadas)
+  let photosArray: string[] = [];
+  if (meeting.teamPhotos) {
+    try {
+      photosArray = typeof meeting.teamPhotos === 'string' ? JSON.parse(meeting.teamPhotos) : meeting.teamPhotos;
+    } catch {}
+  }
+
+  if (Array.isArray(photosArray) && photosArray.length > 0) {
+    doc.addPage();
+
+    // Topo do Anexo Fotográfico
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, 210, 24, 'F');
+    doc.setFillColor(22, 163, 74);
+    doc.rect(0, 22, 210, 2, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ANEXO FOTOGRÁFICO • EVIDÊNCIA DA EQUIPE PRESENCIAL', 14, 15);
+
+    doc.setTextColor(51, 65, 85);
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Registro visual do DDS presencial realizado em ${meeting.farm}.`, 14, 32);
+
+    let photoX = 14;
+    let photoY = 38;
+    const photoWidth = 88;
+    const photoHeight = 58;
+
+    photosArray.forEach((photoBase64, index) => {
+      try {
+        doc.setFillColor(241, 245, 249);
+        doc.roundedRect(photoX - 1, photoY - 1, photoWidth + 2, photoHeight + 2, 2, 2, 'F');
+        doc.addImage(photoBase64, 'JPEG', photoX, photoY, photoWidth, photoHeight);
+
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Foto da Equipe #${index + 1}`, photoX + 2, photoY + photoHeight + 5);
+
+        // Alterna entre coluna da esquerda e direita
+        if (index % 2 === 0) {
+          photoX = 108;
+        } else {
+          photoX = 14;
+          photoY += photoHeight + 14;
+
+          // Se passar da página, adiciona nova página de fotos
+          if (photoY > 230 && index < photosArray.length - 1) {
+            doc.addPage();
+            photoY = 20;
+            photoX = 14;
+          }
+        }
+      } catch (err) {}
+    });
+  }
+
+  // Rodapé em todas as páginas
   const pageCount = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -170,7 +263,7 @@ export function generateDdsPdf(meeting: MeetingData) {
   }
 
   const cleanTopic = (meeting.topic || 'DDS').replace(/[^a-zA-Z0-9]/g, '_');
-  doc.save(`DDS_ON_Ata_${cleanTopic}_${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`DDS_ON_${isPresential ? 'Presencial' : 'Remoto'}_${cleanTopic}_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 // 2. RELATÓRIO CONSOLIDADO DO PERÍODO
@@ -235,13 +328,14 @@ export function generateConsolidatedDdsPdf(report: ConsolidatedReportData) {
     new Date(m.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     m.topic,
     m.farm,
-    `${m.attendees?.length || 0} colaboradores`,
+    m.type === 'PRESENTIAL' ? 'PRESENCIAL' : 'REMOTO',
+    `${m.attendees?.length || 0} pessoas`,
     'CONCLUÍDO'
   ]);
 
   autoTable(doc, {
     startY: 61,
-    head: [['Data', 'Hora', 'Tema do Treinamento', 'Local / Fazenda', 'Presentes', 'Status']],
+    head: [['Data', 'Hora', 'Tema do Treinamento', 'Local / Fazenda', 'Modalidade', 'Presentes', 'Status']],
     body: tableData,
     theme: 'striped',
     headStyles: {
@@ -255,12 +349,13 @@ export function generateConsolidatedDdsPdf(report: ConsolidatedReportData) {
       cellPadding: 2.5
     },
     columnStyles: {
-      0: { cellWidth: 22, halign: 'center' },
-      1: { cellWidth: 16, halign: 'center' },
-      2: { cellWidth: 70 },
-      3: { cellWidth: 40 },
-      4: { cellWidth: 24, halign: 'center' },
-      5: { cellWidth: 20, halign: 'center' }
+      0: { cellWidth: 20, halign: 'center' },
+      1: { cellWidth: 15, halign: 'center' },
+      2: { cellWidth: 62 },
+      3: { cellWidth: 35 },
+      4: { cellWidth: 22, halign: 'center' },
+      5: { cellWidth: 18, halign: 'center' },
+      6: { cellWidth: 18, halign: 'center' }
     }
   });
 
