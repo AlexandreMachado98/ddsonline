@@ -4,8 +4,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Play, Users, FileText, CheckCircle2, 
   Smartphone, Download, Copy, Check, LogOut, 
-  History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet,
-  Camera, Image as ImageIcon, Trash2, Target
+  History, PlusCircle, Calendar, AlertTriangle, X, Radio, Filter, FileSpreadsheet,
+  Camera, Image as ImageIcon, Trash2, Target, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
@@ -73,6 +73,7 @@ export default function AdminPanel() {
         if (data.meeting && data.meeting.status === 'LIVE') {
           setActiveMeeting(data.meeting);
 
+          // Fotos salvas
           if (data.meeting.teamPhotos) {
             try {
               const parsed = JSON.parse(data.meeting.teamPhotos);
@@ -82,6 +83,7 @@ export default function AdminPanel() {
             } catch {}
           }
 
+          // Notificação de saída (Toast)
           if (data.meeting.attendees) {
             data.meeting.attendees.forEach((person: any) => {
               if (person.name.includes('(Saída:') && !exitNotification) {
@@ -280,7 +282,7 @@ export default function AdminPanel() {
       setActiveMeeting(null);
       setTeamPhotos([]);
       fetchAllData();
-      alert('✅ DDS Encerrado! Ata e anexo fotográfico arquivados com sucesso.');
+      alert('✅ DDS Encerrado! Ata arquivada com sucesso.');
     }
   };
 
@@ -323,7 +325,6 @@ export default function AdminPanel() {
             </div>
           </header>
 
-          {/* Banner de Reunião Ativa */}
           <div className="bg-gradient-to-r from-green-700 via-emerald-700 to-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-green-500/30">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -369,7 +370,6 @@ export default function AdminPanel() {
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            {/* Coluna Esquerda: Módulo Presencial ou Mosaico de Vídeo */}
             <div className="lg:col-span-7 space-y-4">
               {isPresential ? (
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-xl">
@@ -453,12 +453,11 @@ export default function AdminPanel() {
               )}
             </div>
 
-            {/* Coluna Direita: Lista de Presença em Tempo Real */}
             <div className="lg:col-span-5 space-y-6">
               <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 flex items-center justify-around text-center">
                 <div>
                   <span className="text-3xl font-black text-white">{activeMeeting.attendees?.length || 0}</span>
-                  <span className="text-slate-400 text-xs block mt-1">Presenças Coletadas</span>
+                  <span className="text-slate-400 text-xs block mt-1">Presenças Auditadas</span>
                 </div>
                 <div className="h-10 w-[1px] bg-slate-800"></div>
                 <div>
@@ -469,7 +468,7 @@ export default function AdminPanel() {
 
               <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800">
                 <h3 className="font-bold text-white mb-4 flex items-center gap-2 text-sm">
-                  <FileText size={18} className="text-green-400" /> Lista de Presença do DDS
+                  <FileText size={18} className="text-green-400" /> Lista de Presença em Tempo Real
                 </h3>
                 
                 {(!activeMeeting.attendees || activeMeeting.attendees.length === 0) ? (
@@ -520,6 +519,22 @@ export default function AdminPanel() {
 
           </div>
         </div>
+
+        {/* Notificação Toast de Saída */}
+        {exitNotification && (
+          <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white border border-red-500/40 p-4 rounded-2xl shadow-2xl flex items-center gap-3 max-w-sm animate-in slide-in-from-bottom-5 duration-300">
+            <div className="bg-red-500/20 text-red-400 p-2 rounded-xl">
+              <AlertTriangle size={20} />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-bold text-red-400">Aviso de Saída do DDS</p>
+              <p className="text-xs text-slate-300 mt-0.5">{exitNotification}</p>
+            </div>
+            <button onClick={() => setExitNotification(null)} className="text-slate-400 hover:text-white p-1">
+              <X size={16} />
+            </button>
+          </div>
+        )}
       </main>
     );
   }
@@ -557,7 +572,6 @@ export default function AdminPanel() {
           </div>
         </header>
 
-        {/* Alerta de DDS Ativo */}
         {isInitialLoadDone && activeMeeting && (
           <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-5 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-green-400/30 animate-in fade-in duration-300">
             <div className="flex items-center gap-3.5">
@@ -601,7 +615,6 @@ export default function AdminPanel() {
           </button>
         </div>
 
-        {/* ABA 1: NOVO DDS COM ESCOLHA DE MODALIDADE */}
         {activeTab === 'NEW_DDS' && (
           <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl max-w-2xl mx-auto space-y-6">
             <div>
@@ -692,7 +705,6 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* ABA 2: HISTÓRICO */}
         {activeTab === 'HISTORY' && (
           <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
             <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
@@ -799,7 +811,6 @@ export default function AdminPanel() {
                 ))
               )}
             </div>
-
           </div>
         )}
 

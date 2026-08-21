@@ -11,7 +11,7 @@ export default function MeetingRoomPage() {
   const params = useParams();
   const meetingId = params?.id as string;
 
-  // Etapas: 'FORM' (Preenchimento) -> 'ROOM' (Sala do DDS) -> 'EXIT_SUCCESS' (Saída)
+  // Etapas simplificadas: Apenas FORM -> ROOM -> EXIT_SUCCESS
   const [currentStep, setCurrentStep] = useState<'FORM' | 'ROOM' | 'EXIT_SUCCESS'>('FORM');
 
   const [name, setName] = useState('');
@@ -19,10 +19,11 @@ export default function MeetingRoomPage() {
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [savedSelfie, setSavedSelfie] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const [topic, setTopic] = useState('DDS ON');
   const [farm, setFarm] = useState('');
 
-  // Busca dados da reunião
+  // Busca detalhes da reunião
   useEffect(() => {
     const fetchMeetingDetails = async () => {
       try {
@@ -51,7 +52,7 @@ export default function MeetingRoomPage() {
     setCpf(value);
   };
 
-  // ENVIO DA PRESENÇA E ENTRADA DIRETA NA SALA
+  // ENVIO DA PRESENÇA E ENTRADA DIRETA NA SALA DE VÍDEO
   const handleSubmit = async () => {
     if (!name.trim()) {
       alert('⚠️ Por favor, digite seu Nome Completo.');
@@ -136,7 +137,9 @@ export default function MeetingRoomPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // TELA 3: SAÍDA REGISTRADA
+  // =========================================================================
+  // TELA 3: SAÍDA REGISTRADA (CHAMADA ENCERRADA)
+  // =========================================================================
   if (currentStep === 'EXIT_SUCCESS') {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
@@ -165,7 +168,9 @@ export default function MeetingRoomPage() {
     );
   }
 
+  // =========================================================================
   // TELA 2: SALA DO DDS AO VIVO (LIBERADA DIRETO)
+  // =========================================================================
   if (currentStep === 'ROOM') {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center p-3 md:p-6 font-sans relative">
@@ -199,6 +204,7 @@ export default function MeetingRoomPage() {
           </div>
 
           <div className="flex-1 min-h-[500px]">
+            {/* VÍDEO DO COLABORADOR AQUI - SEM ESPERAS */}
             <DdsConferenceRoom
               roomName={meetingId}
               userName={name}
@@ -276,7 +282,9 @@ export default function MeetingRoomPage() {
     );
   }
 
-  // TELA 1: FORMULÁRIO DE ENTRADA
+  // =========================================================================
+  // TELA 1: FORMULÁRIO DE ENTRADA (COLABORADOR PREENCHE DADOS AQUI)
+  // =========================================================================
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center py-6 px-4 font-sans">
       <header className="w-full max-w-md flex items-center justify-between bg-slate-900 border border-slate-800 px-4 py-3 rounded-2xl shadow-sm mb-6">
@@ -349,11 +357,11 @@ export default function MeetingRoomPage() {
         >
           {isSubmitting ? (
             <>
-              <Loader2 size={20} className="animate-spin" /> Confirmando Presença...
+              <Loader2 size={20} className="animate-spin" /> Registrando...
             </>
           ) : (
             <>
-              <Send size={20} /> Confirmar Presença e Entrar no DDS ON
+              <Send size={20} /> Entrar Direto no DDS ON
             </>
           )}
         </button>
