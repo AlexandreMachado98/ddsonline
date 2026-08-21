@@ -24,7 +24,7 @@ export default function MeetingRoomPage() {
   const [farm, setFarm] = useState('');
   const [meetingType, setMeetingType] = useState<'PRESENTIAL' | 'REMOTE'>('PRESENTIAL');
 
-  // Busca detalhes da reunião
+  // Busca detalhes apenas para exibir no cabeçalho
   useEffect(() => {
     const fetchMeetingDetails = async () => {
       try {
@@ -54,7 +54,7 @@ export default function MeetingRoomPage() {
     setCpf(value);
   };
 
-  // ENVIO DA PRESENÇA
+  // ENVIO DA PRESENÇA E REDIRECIONAMENTO INFALÍVEL
   const handleSubmit = async () => {
     if (!name.trim()) {
       alert('⚠️ Por favor, digite seu Nome Completo.');
@@ -84,24 +84,31 @@ export default function MeetingRoomPage() {
     };
 
     try {
-      await fetch('/api/presenca', {
+      const res = await fetch('/api/presenca', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      
+      const data = await res.json();
+      setIsSubmitting(false);
+
+      if (data.success) {
+        // LÓGICA BLINDADA: O SERVIDOR DECIDE A TELA
+        if (data.meetingType === 'REMOTE') {
+          setCurrentStep('ROOM'); // Abre a sala de vídeo
+        } else {
+          setCurrentStep('SUCCESS'); // Abre a tela verde de sucesso (Presencial)
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        alert('Erro ao registrar: ' + data.error);
+      }
     } catch (err) {
       console.error("Erro ao salvar presença:", err);
+      setIsSubmitting(false);
+      alert('Erro de conexão. Tente novamente.');
     }
-
-    setIsSubmitting(false);
-
-    // FLUXO INTELIGENTE: Presencial vai para a tela de Sucesso. Remoto vai para o Vídeo.
-    if (meetingType === 'PRESENTIAL') {
-      setCurrentStep('SUCCESS');
-    } else {
-      setCurrentStep('ROOM');
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleConfirmExit = async () => {
@@ -309,11 +316,10 @@ export default function MeetingRoomPage() {
   }
 
   // =========================================================================
-  // TELA 1: FORMULÁRIO DE ENTRADA (PRIMEIRA TELA DO COLABORADOR)
+  // TELA 1: FORMULÁRIO DE ENTRADA (PRIMEIRA TELA)
   // =========================================================================
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center py-6 px-4 font-sans">
-      
       <header className="w-full max-w-md flex items-center justify-between bg-slate-900 border border-slate-800 px-4 py-3 rounded-2xl shadow-sm mb-6">
         <div className="flex items-center gap-2">
           <span className="text-base font-black tracking-tight">
