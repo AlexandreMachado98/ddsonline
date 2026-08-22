@@ -52,7 +52,7 @@ export async function GET(req: Request) {
     const activeMeeting = await prisma.meeting.findFirst({
       where: {
         status: 'LIVE',
-        ...(organizerId && organizerId !== 'undefined' ? { organizerId } : {})
+        ...(organizerId && organizerId !== 'undefined' && organizerId !== 'null' ? { organizerId } : {})
       },
       include: {
         attendees: { orderBy: { createdAt: 'desc' } }
@@ -91,16 +91,46 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Preencha o Tema e o Local da fazenda' }, { status: 400 });
     }
 
+    // =========================================================================
+    // BLINDAGEM DO ORGANIZER_ID CONTRA ERROS DE FOREIGN KEY
+    // =========================================================================
+    let validOrganizerId: string | null = null;
+    let resolvedCompanyId: string | null = null;
+
+    if (organizerId && typeof organizerId === 'string' && organizerId.trim() !== '') {
+      const user = await prisma.user.findUnique({
+        where: { id: organizerId.trim() },
+        include: { companyRel: true }
+      });
+
+      if (user) {
+        // KILL-SWITCH: Se a empresa do técnico estiver suspensa, impede de criar o DDS
+        if (user.role !== 'SUPER_ADMIN' && user.companyRel) {
+          if (user.companyRel.status === 'SUSPENDED' || user.companyRel.status === 'BLOCKED') {
+            return NextResponse.json(
+              { success: false, error: '⛔ Sua empresa encontra-se com o acesso suspenso no DDS MASTER.' },
+              { status: 403 }
+            );
+          }
+        }
+
+        validOrganizerId = user.id;
+        resolvedCompanyId = user.companyId || null;
+      }
+    }
+
+    // Encerra reuniões anteriores que ainda estejam LIVE
     try {
       await prisma.meeting.updateMany({
         where: {
           status: 'LIVE',
-          ...(organizerId ? { organizerId } : {})
+          ...(validOrganizerId ? { organizerId: validOrganizerId } : {})
         },
         data: { status: 'ENDED' }
       });
     } catch (e) {}
 
+    // Cria a nova reunião de forma segura
     const newMeeting = await prisma.meeting.create({
       data: {
         topic: String(topic).trim(),
@@ -109,13 +139,15 @@ export async function POST(req: Request) {
         objective: objective ? String(objective).trim() : null,
         teamPhotos: teamPhotos ? JSON.stringify(teamPhotos) : null,
         status: 'LIVE',
-        organizerId: organizerId || null
+        organizerId: validOrganizerId,      // Validado ou null (nunca quebra!)
+        companyId: resolvedCompanyId        // Vincula à empresa para o DDS MASTER
       },
       include: { attendees: true }
     });
 
     return NextResponse.json({ success: true, meeting: newMeeting });
   } catch (error: any) {
+    console.error("Erro ao criar reunião:", error);
     return NextResponse.json({ success: false, error: error?.message || 'Falha ao salvar' }, { status: 500 });
   }
 }
