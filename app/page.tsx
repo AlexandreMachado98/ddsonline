@@ -177,7 +177,7 @@ export default function HomePage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Empresa / Fazenda Principal</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Empresa</label>
                 <div className="relative flex items-center">
                   <Building className="absolute left-3.5 text-slate-500" size={17} />
                   <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Ex: Fazenda Ouro Verde" className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all" />
@@ -189,7 +189,7 @@ export default function HomePage() {
                   <KeyRound size={13} /> Palavra-Chave da Empresa (Opcional)
                 </label>
                 <p className="text-[10px] text-slate-400 mb-2">Digite o código da sua empresa para aprovação imediata.</p>
-                <input type="text" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} placeholder="Ex: AGRO2026" className="w-full bg-slate-950/80 border border-green-500/30 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all uppercase font-mono" />
+                <input type="text" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} placeholder="Código da Empresa" className="w-full bg-slate-950/80 border border-green-500/30 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all uppercase font-mono" />
               </div>
             </>
           )}
