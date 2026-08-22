@@ -34,30 +34,60 @@ export async function GET(req: Request) {
       });
     }
 
-    // 2. ROTA DO ADMIN: Filtros de Histórico
+    // 2. ROTA DO ADMIN: Filtros de Histórico e Reunião Ativa
     const dateFilter: any = {};
     if (startDate) dateFilter.gte = new Date(`${startDate}T00:00:00.000Z`);
     if (endDate) dateFilter.lte = new Date(`${endDate}T23:59:59.999Z`);
 
-    const meetingWhere: any = { status: 'ENDED' };
+    // Valida se o organizerId existe no banco
+    let validUserId: string | null = null;
+    let userCompanyId: string | null = null;
 
-    if (organizerId && organizerId !== 'undefined' && organizerId !== 'null') {
-      meetingWhere.organizerId = organizerId;
+    if (organizerId && organizerId !== 'undefined' && organizerId !== 'null' && organizerId.trim() !== '') {
+      const user = await prisma.user.findUnique({
+        where: { id: organizerId.trim() }
+      });
+      if (user) {
+        validUserId = user.id;
+        userCompanyId = user.companyId || null;
+      }
     }
 
-    if (startDate || endDate) {
-      meetingWhere.createdAt = dateFilter;
+    // Monta o filtro inteligente (se não achar pelo ID, não trava a busca)
+    const activeMeetingFilter: any = { status: 'LIVE' };
+    if (validUserId) {
+      if (userCompanyId) {
+        activeMeetingFilter.OR = [
+          { organizerId: validUserId },
+          { companyId: userCompanyId }
+        ];
+      } else {
+        activeMeetingFilter.organizerId = validUserId;
+      }
     }
 
     const activeMeeting = await prisma.meeting.findFirst({
-      where: {
-        status: 'LIVE',
-        ...(organizerId && organizerId !== 'undefined' && organizerId !== 'null' ? { organizerId } : {})
-      },
+      where: activeMeetingFilter,
       include: {
         attendees: { orderBy: { createdAt: 'desc' } }
-      }
+      },
+      orderBy: { createdAt: 'desc' }
     });
+
+    const meetingWhere: any = { status: 'ENDED' };
+    if (validUserId) {
+      if (userCompanyId) {
+        meetingWhere.OR = [
+          { organizerId: validUserId },
+          { companyId: userCompanyId }
+        ];
+      } else {
+        meetingWhere.organizerId = validUserId;
+      }
+    }
+    if (startDate || endDate) {
+      meetingWhere.createdAt = dateFilter;
+    }
 
     const history = await prisma.meeting.findMany({
       where: meetingWhere,
@@ -91,9 +121,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Preencha o Tema e o Local da fazenda' }, { status: 400 });
     }
 
-    // =========================================================================
-    // BLINDAGEM DO ORGANIZER_ID CONTRA ERROS DE FOREIGN KEY
-    // =========================================================================
+    // Validação Segura do Organizador
     let validOrganizerId: string | null = null;
     let resolvedCompanyId: string | null = null;
 
@@ -104,7 +132,6 @@ export async function POST(req: Request) {
       });
 
       if (user) {
-        // KILL-SWITCH: Se a empresa do técnico estiver suspensa, impede de criar o DDS
         if (user.role !== 'SUPER_ADMIN' && user.companyRel) {
           if (user.companyRel.status === 'SUSPENDED' || user.companyRel.status === 'BLOCKED') {
             return NextResponse.json(
@@ -113,13 +140,23 @@ export async function POST(req: Request) {
             );
           }
         }
-
         validOrganizerId = user.id;
         resolvedCompanyId = user.companyId || null;
       }
     }
 
-    // Encerra reuniões anteriores que ainda estejam LIVE
+    // Se o ID enviado não for encontrado, vincula ao primeiro usuário ativo disponível
+    if (!validOrganizerId) {
+      const defaultUser = await prisma.user.findFirst({
+        where: { status: 'ACTIVE' }
+      });
+      if (defaultUser) {
+        validOrganizerId = defaultUser.id;
+        resolvedCompanyId = defaultUser.companyId || null;
+      }
+    }
+
+    // Encerra qualquer reunião anterior que tenha ficado LIVE
     try {
       await prisma.meeting.updateMany({
         where: {
@@ -130,7 +167,7 @@ export async function POST(req: Request) {
       });
     } catch (e) {}
 
-    // Cria a nova reunião de forma segura
+    // Cria a nova reunião
     const newMeeting = await prisma.meeting.create({
       data: {
         topic: String(topic).trim(),
@@ -139,8 +176,8 @@ export async function POST(req: Request) {
         objective: objective ? String(objective).trim() : null,
         teamPhotos: teamPhotos ? JSON.stringify(teamPhotos) : null,
         status: 'LIVE',
-        organizerId: validOrganizerId,      // Validado ou null (nunca quebra!)
-        companyId: resolvedCompanyId        // Vincula à empresa para o DDS MASTER
+        organizerId: validOrganizerId,
+        companyId: resolvedCompanyId
       },
       include: { attendees: true }
     });
