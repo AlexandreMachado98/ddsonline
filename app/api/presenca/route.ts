@@ -1,12 +1,10 @@
- import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
-const prisma = globalForPrisma.prisma || new PrismaClient();
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
   try {
@@ -16,18 +14,18 @@ export async function POST(req: Request) {
     // --- 1. AÇÃO DE SAÍDA ANTECIPADA ---
     if (action === 'register_exit') {
       const cleanCpf = String(cpf || '').replace(/\D/g, '');
-      const attendances = await prisma.attendance.findMany({
+      const attendances = await (prisma as any).attendance.findMany({
         where: { meetingId: meetingId },
         orderBy: { createdAt: 'desc' }
       });
 
-      const target = attendances.find((a) => 
+      const target = attendances.find((a: any) => 
         a.cpf.replace(/\D/g, '') === cleanCpf ||
         a.name.toLowerCase().trim() === String(name || '').toLowerCase().trim()
       );
 
       if (target) {
-        const updated = await prisma.attendance.update({
+        const updated = await (prisma as any).attendance.update({
           where: { id: target.id },
           data: {
             exitReason: String(exitReason || 'Não informado').trim(),
@@ -41,34 +39,54 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Presença não localizada' }, { status: 404 });
     }
 
-    // --- 2. REGISTRO DE PRESENÇA DIRETO ---
+    // --- 2. REGISTRO DE PRESENÇA DIRETO (ENTRADA IMEDIATA SEM LOBBY) ---
     let meeting = null;
 
     if (meetingId && meetingId !== 'dds-principal') {
-      meeting = await prisma.meeting.findUnique({
-        where: { id: meetingId }
+      meeting = await (prisma as any).meeting.findUnique({
+        where: { id: meetingId },
+        include: {
+          company: true,
+          organizer: { include: { companyRel: true } }
+        }
       });
     }
 
     if (!meeting) {
-      meeting = await prisma.meeting.findFirst({
+      meeting = await (prisma as any).meeting.findFirst({
         where: { status: 'LIVE' },
+        include: {
+          company: true,
+          organizer: { include: { companyRel: true } }
+        },
         orderBy: { createdAt: 'desc' }
       });
     }
 
+    // KILL-SWITCH NO ADMIT: Validação de empresa suspensa
+    if (meeting) {
+      const companyStatus = meeting.company?.status || meeting.organizer?.companyRel?.status;
+      if (companyStatus === 'SUSPENDED' || companyStatus === 'BLOCKED') {
+        return NextResponse.json(
+          { success: false, error: '⛔ Este DDS pertence a uma empresa com acesso suspenso no momento.' },
+          { status: 403 }
+        );
+      }
+    }
+
     if (!meeting) {
-      meeting = await prisma.meeting.create({
+      meeting = await (prisma as any).meeting.create({
         data: {
           topic: 'DDS Diário',
           farm: 'Fazenda Geral',
+          type: 'PRESENTIAL',
           status: 'LIVE'
         }
       });
     }
 
     // Cria a presença com status ADMITTED
-    const attendance = await prisma.attendance.create({
+    const attendance = await (prisma as any).attendance.create({
       data: {
         name: String(name).trim(),
         cpf: String(cpf).trim(),
@@ -79,21 +97,15 @@ export async function POST(req: Request) {
       }
     });
 
-    // Leitura segura do campo "type" para evitar erros de tipagem no VS Code
-    const safeMeeting = meeting as { type?: string };
-    const resolvedType = safeMeeting.type || 'PRESENTIAL';
-
     return NextResponse.json({ 
       success: true, 
       data: attendance, 
       attendanceId: attendance.id,
-      status: 'ADMITTED',
-      meetingType: resolvedType
+      status: 'ADMITTED' 
     });
 
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Erro no servidor';
-    console.error("Erro na API Central de Presença:", message);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+  } catch (error: any) {
+    console.error("Erro na API Central de Presença:", error);
+    return NextResponse.json({ success: false, error: error?.message || 'Erro no servidor' }, { status: 500 });
   }
 }

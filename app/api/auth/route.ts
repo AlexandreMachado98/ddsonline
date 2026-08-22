@@ -33,19 +33,25 @@ export async function POST(req: Request) {
 
       let companyId = null;
       let companyNameStr = String(company || 'Unidade Rural').trim();
-      let finalStatus = 'PENDING_APPROVAL'; // Por padrão, vai para a fila
+      let finalStatus = 'PENDING_APPROVAL';
 
-      // Se o técnico digitou uma palavra-chave, procura a empresa no banco
       if (secretKey && secretKey.trim() !== '') {
         const foundCompany = await prisma.company.findFirst({
           where: { secretKey: String(secretKey).trim().toUpperCase() }
         });
 
         if (foundCompany) {
+          // KILL-SWITCH NO CADASTRO: Se a empresa estiver suspensa, impede o cadastro
+          if (foundCompany.status === 'SUSPENDED' || foundCompany.status === 'BLOCKED') {
+            return NextResponse.json(
+              { success: false, error: '⛔ Esta empresa encontra-se com o acesso suspenso pela administração.' },
+              { status: 403 }
+            );
+          }
+
           companyId = foundCompany.id;
-          companyNameStr = foundCompany.name; // Puxa o nome real da empresa do banco
+          companyNameStr = foundCompany.name;
           
-          // Se a empresa permite aprovação automática, já libera o técnico!
           if (foundCompany.autoApproveWithKey) {
             finalStatus = 'ACTIVE';
           }
@@ -81,11 +87,14 @@ export async function POST(req: Request) {
     }
 
     // =========================================================================
-    // 2. LOGIN DO TÉCNICO
+    // 2. LOGIN DO TÉCNICO (COM KILL-SWITCH ATIVADO)
     // =========================================================================
     if (action === 'login') {
       let user = await prisma.user.findUnique({
-        where: { email: cleanEmail }
+        where: { email: cleanEmail },
+        include: {
+          companyRel: true // Inclui os dados em tempo real da Empresa vinculada
+        }
       });
 
       if (!user && cleanEmail === 'admin@dds.com.br' && cleanPassword === '123456') {
@@ -98,6 +107,9 @@ export async function POST(req: Request) {
             status: 'ACTIVE',
             position: 'Técnico Master',
             company: 'AM TST'
+          },
+          include: {
+            companyRel: true
           }
         });
       }
@@ -109,10 +121,12 @@ export async function POST(req: Request) {
       if (cleanEmail === 'admin@dds.com.br' && user.status !== 'ACTIVE') {
         user = await prisma.user.update({
           where: { id: user.id },
-          data: { status: 'ACTIVE' }
+          data: { status: 'ACTIVE' },
+          include: { companyRel: true }
         });
       }
 
+      // 1. Bloqueio por status do próprio usuário
       if (user.status === 'PENDING_APPROVAL') {
         return NextResponse.json(
           { success: false, error: '⛔ Seu cadastro está na fila de aprovação do DDS MASTER. Aguarde a liberação.' },
@@ -122,9 +136,19 @@ export async function POST(req: Request) {
 
       if (user.status === 'BLOCKED' || user.status === 'SUSPENDED') {
         return NextResponse.json(
-          { success: false, error: '⛔ Acesso Bloqueado ou Suspenso. Entre em contato com a AM TST.' },
+          { success: false, error: '⛔ Acesso de usuário Bloqueado ou Suspenso. Entre em contato com a AM TST.' },
           { status: 403 }
         );
+      }
+
+      // 2. KILL-SWITCH DA EMPRESA: Se a empresa estiver suspensa no DDS Master, barra o login imediatamente
+      if (user.role !== 'SUPER_ADMIN' && user.companyRel) {
+        if (user.companyRel.status === 'SUSPENDED' || user.companyRel.status === 'BLOCKED') {
+          return NextResponse.json(
+            { success: false, error: `⛔ O acesso da empresa "${user.companyRel.name}" foi SUSPENSO pelo DDS MASTER. Entre em contato com a administração.` },
+            { status: 403 }
+          );
+        }
       }
 
       return NextResponse.json({
@@ -134,7 +158,7 @@ export async function POST(req: Request) {
           name: user.name,
           email: user.email,
           role: user.role,
-          company: user.company || 'Unidade',
+          company: user.companyRel?.name || user.company || 'Unidade',
           status: user.status
         }
       });
