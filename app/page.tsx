@@ -1,7 +1,7 @@
  'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Lock, Mail, ArrowRight, User, Building, Briefcase, ExternalLink, Eye, EyeOff, CheckCircle2, Clock, Loader2, KeyRound, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, ArrowRight, User, Building, Briefcase, ExternalLink, Eye, EyeOff, CheckCircle2, Clock, Loader2, KeyRound } from 'lucide-react';
 
 export default function HomePage() {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -12,7 +12,7 @@ export default function HomePage() {
   const [name, setName] = useState('');
   const [role, setRole] = useState('Técnico em Segurança do Trabalho');
   const [company, setCompany] = useState('');
-  const [secretKey, setSecretKey] = useState(''); // Novo estado para a Palavra-Chave
+  const [secretKey, setSecretKey] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -50,20 +50,6 @@ export default function HomePage() {
       return;
     }
 
-    if (!isRegisterMode && cleanEmail === 'admin@dds.com.br' && cleanPassword === '123456') {
-      const adminUser = {
-        id: 'admin-master-01',
-        name: 'Alexandre Machado',
-        email: 'admin@dds.com.br',
-        role: 'SUPER_ADMIN',
-        company: 'AM TST',
-        status: 'ACTIVE'
-      };
-      localStorage.setItem('dds_admin_auth', JSON.stringify(adminUser));
-      window.location.replace('/admin');
-      return;
-    }
-
     try {
       const res = await fetch('/api/auth', {
         method: 'POST',
@@ -75,7 +61,7 @@ export default function HomePage() {
           name,
           role,
           company,
-          secretKey // Envia a palavra chave para o back-end
+          secretKey
         })
       });
 
@@ -83,15 +69,14 @@ export default function HomePage() {
 
       if (res.ok && data.success) {
         if (isRegisterMode) {
-          // Se a conta for aprovada instantaneamente por causa da Palavra-Chave, entra direto!
           if (!data.pendingApproval && data.user) {
             localStorage.setItem('dds_admin_auth', JSON.stringify(data.user));
             window.location.replace('/admin');
           } else {
-            // Se não tinha chave ou ela não aprova automático, vai pro Lobby
             setIsRegisteredSuccess(true);
           }
         } else {
+          // Salva o usuário com o UUID real retornado do Supabase
           localStorage.setItem('dds_admin_auth', JSON.stringify(data.user));
           window.location.replace('/admin');
         }
