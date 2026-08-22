@@ -1,7 +1,7 @@
  'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Lock, Mail, ArrowRight, User, Building, Briefcase, ExternalLink, Eye, EyeOff, CheckCircle2, Clock, Loader2 } from 'lucide-react';
+import { Lock, Mail, ArrowRight, User, Building, Briefcase, ExternalLink, Eye, EyeOff, CheckCircle2, Clock, Loader2, KeyRound, ShieldCheck } from 'lucide-react';
 
 export default function HomePage() {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -10,8 +10,9 @@ export default function HomePage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState('');
+  const [role, setRole] = useState('Técnico em Segurança do Trabalho');
   const [company, setCompany] = useState('');
+  const [secretKey, setSecretKey] = useState(''); // Novo estado para a Palavra-Chave
   const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -72,8 +73,9 @@ export default function HomePage() {
           email: cleanEmail,
           password: cleanPassword,
           name,
-          role: role || 'Técnico em Segurança do Trabalho',
-          company: company || 'Não informada'
+          role,
+          company,
+          secretKey // Envia a palavra chave para o back-end
         })
       });
 
@@ -81,7 +83,14 @@ export default function HomePage() {
 
       if (res.ok && data.success) {
         if (isRegisterMode) {
-          setIsRegisteredSuccess(true);
+          // Se a conta for aprovada instantaneamente por causa da Palavra-Chave, entra direto!
+          if (!data.pendingApproval && data.user) {
+            localStorage.setItem('dds_admin_auth', JSON.stringify(data.user));
+            window.location.replace('/admin');
+          } else {
+            // Se não tinha chave ou ela não aprova automático, vai pro Lobby
+            setIsRegisteredSuccess(true);
+          }
         } else {
           localStorage.setItem('dds_admin_auth', JSON.stringify(data.user));
           window.location.replace('/admin');
@@ -90,12 +99,13 @@ export default function HomePage() {
         setError(data.error || 'Falha ao processar solicitação.');
       }
     } catch (err: any) {
-      setError('Erro de conexão com o servidor. Verifique a rede.');
+      setError('Erro de conexão com o servidor: ' + (err?.message || 'Verifique a rede'));
     } finally {
       setLoading(false);
     }
   };
 
+  // TELA DE CADASTRO PENDENTE
   if (isRegisteredSuccess) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
@@ -103,35 +113,28 @@ export default function HomePage() {
           <div className="p-4 bg-green-500/10 text-green-400 rounded-2xl inline-flex border border-green-500/20">
             <CheckCircle2 size={42} />
           </div>
-
           <div className="space-y-1.5">
-            <span className="text-[11px] font-bold text-green-400 uppercase tracking-widest bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20 inline-block">
-              Solicitação Enviada
+            <span className="text-[11px] font-bold text-amber-400 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 inline-block">
+              Aguardando Aprovação
             </span>
-            <h1 className="text-2xl font-black text-white">Cadastro Recebido!</h1>
+            <h1 className="text-2xl font-black text-white">Cadastro Enviado!</h1>
           </div>
-
           <p className="text-slate-300 text-xs leading-relaxed">
-            Obrigado, <strong>{name}</strong>. Seus dados foram registrados e enviados para a moderação da <strong>AM TST</strong>.
+            Obrigado, <strong>{name}</strong>. Como nenhuma Palavra-Chave foi informada, seus dados estão na fila de liberação da <strong>AM TST</strong>.
           </p>
-
           <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 text-xs text-slate-400 text-left space-y-1.5">
             <p className="font-semibold text-slate-200 flex items-center gap-1.5">
-              <Clock size={14} className="text-green-400" /> Próximo passo:
+              <Clock size={14} className="text-amber-400" /> Próximo passo:
             </p>
             <p className="text-[11px] leading-relaxed">
-              O administrador geral da plataforma precisa aprovar sua conta. Assim que for liberado, basta voltar nesta tela e fazer login com seu e-mail e senha.
+              Assim que o DDS MASTER aprovar a sua conta, basta voltar nesta tela e fazer login com seu e-mail e senha.
             </p>
           </div>
-
           <button
             onClick={() => {
               setIsRegisteredSuccess(false);
               setIsRegisterMode(false);
-              setName('');
-              setEmail('');
-              setPassword('');
-              setError('');
+              setName(''); setEmail(''); setPassword(''); setError(''); setSecretKey('');
             }}
             className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-all border border-slate-700"
           >
@@ -144,7 +147,6 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
-      
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-green-600/15 blur-[140px] rounded-full pointer-events-none"></div>
 
       <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10 space-y-6 backdrop-blur-md">
@@ -154,14 +156,12 @@ export default function HomePage() {
             <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
             Plataforma Digital de SST
           </div>
-
           <h1 className="text-3xl font-black tracking-tight text-white">
             DDS <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">ON</span>
           </h1>
-
           <p className="text-xs text-slate-300 font-medium max-w-xs mx-auto leading-relaxed">
             {isRegisterMode 
-              ? 'Solicite seu acesso para gerenciar e transmitir DDS na sua unidade.' 
+              ? 'Insira a Palavra-Chave da sua empresa para acesso instantâneo.' 
               : 'A nova forma de realizar, auditar e transmitir o Diálogo Diário de Segurança.'}
           </p>
         </div>
@@ -179,14 +179,7 @@ export default function HomePage() {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
                 <div className="relative flex items-center">
                   <User className="absolute left-3.5 text-slate-500" size={17} />
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Digite seu nome completo"
-                    className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
-                  />
+                  <input type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Digite seu nome completo" className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all" />
                 </div>
               </div>
 
@@ -194,13 +187,7 @@ export default function HomePage() {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Cargo / Função</label>
                 <div className="relative flex items-center">
                   <Briefcase className="absolute left-3.5 text-slate-500" size={17} />
-                  <input
-                    type="text"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    placeholder="Digite seu cargo ou função"
-                    className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
-                  />
+                  <input type="text" value={role} onChange={(e) => setRole(e.target.value)} placeholder="Ex: Técnico de Segurança" className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all" />
                 </div>
               </div>
 
@@ -208,14 +195,16 @@ export default function HomePage() {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Empresa / Fazenda Principal</label>
                 <div className="relative flex items-center">
                   <Building className="absolute left-3.5 text-slate-500" size={17} />
-                  <input
-                    type="text"
-                    value={company}
-                    onChange={(e) => setCompany(e.target.value)}
-                    placeholder="Digite o nome da empresa"
-                    className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
-                  />
+                  <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Ex: Fazenda Ouro Verde" className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all" />
                 </div>
+              </div>
+
+              <div className="bg-green-500/10 p-3 rounded-2xl border border-green-500/20">
+                <label className="block text-xs font-bold text-green-400 mb-1 flex items-center gap-1.5">
+                  <KeyRound size={13} /> Palavra-Chave da Empresa (Opcional)
+                </label>
+                <p className="text-[10px] text-slate-400 mb-2">Digite o código da sua empresa para aprovação imediata.</p>
+                <input type="text" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} placeholder="Ex: AGRO2026" className="w-full bg-slate-950/80 border border-green-500/30 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all uppercase font-mono" />
               </div>
             </>
           )}
@@ -224,14 +213,7 @@ export default function HomePage() {
             <label className="block text-xs font-semibold text-slate-300 mb-1">E-mail Corporativo</label>
             <div className="relative flex items-center">
               <Mail className="absolute left-3.5 text-slate-500" size={17} />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Digite seu e-mail corporativo"
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
-              />
+              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Digite seu e-mail" className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all" />
             </div>
           </div>
 
@@ -239,52 +221,21 @@ export default function HomePage() {
             <label className="block text-xs font-semibold text-slate-300 mb-1">Senha de Acesso</label>
             <div className="relative flex items-center">
               <Lock className="absolute left-3.5 text-slate-500" size={17} />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Digite sua senha"
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-10 pr-11 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 text-slate-500 hover:text-slate-300 transition-colors p-1"
-                title={showPassword ? "Ocultar senha" : "Ver senha"}
-              >
+              <input type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Digite sua senha" className="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-10 pr-11 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all" />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 text-slate-500 hover:text-slate-300 transition-colors p-1" title={showPassword ? "Ocultar senha" : "Ver senha"}>
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 active:scale-[0.98] text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-600/25 mt-2"
-          >
-            {loading ? (
-              <>
-                <Loader2 size={16} className="animate-spin" /> Conectando...
-              </>
-            ) : (
-              <>
-                {isRegisterMode ? 'Enviar Solicitação de Cadastro' : 'Acessar o Painel'} <ArrowRight size={16} />
-              </>
-            )}
+          <button type="submit" disabled={loading} className="w-full py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 active:scale-[0.98] text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-600/25 mt-2">
+            {loading ? <><Loader2 size={16} className="animate-spin" /> Processando...</> : <>{isRegisterMode ? 'Cadastrar Minha Conta' : 'Acessar o Painel'} <ArrowRight size={16} /></>}
           </button>
         </form>
 
         <div className="pt-1 text-center">
-          <button
-            type="button"
-            onClick={() => {
-              setIsRegisterMode(!isRegisterMode);
-              setError('');
-            }}
-            className="text-xs text-green-400 hover:text-green-300 font-semibold transition-colors"
-          >
-            {isRegisterMode ? 'Já possui conta aprovada? Fazer login' : 'Primeiro acesso? Cadastre-se como organizador'}
+          <button type="button" onClick={() => { setIsRegisterMode(!isRegisterMode); setError(''); }} className="text-xs text-green-400 hover:text-green-300 font-semibold transition-colors">
+            {isRegisterMode ? 'Já possui conta? Fazer login' : 'Primeiro acesso? Cadastre-se como organizador'}
           </button>
         </div>
 
@@ -294,12 +245,7 @@ export default function HomePage() {
           </p>
           <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500">
             <span>Desenvolvido e Auditado por</span>
-            <a
-              href="https://amtst.vercel.app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-green-400 hover:text-green-300 font-bold inline-flex items-center gap-1 transition-colors underline underline-offset-2"
-            >
+            <a href="https://amtst.vercel.app" target="_blank" rel="noopener noreferrer" className="text-green-400 hover:text-green-300 font-bold inline-flex items-center gap-1 transition-colors underline underline-offset-2">
               AM TST <ExternalLink size={10} />
             </a>
           </div>

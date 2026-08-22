@@ -4,21 +4,23 @@ import { PrismaClient } from '@prisma/client';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const prisma = new PrismaClient();
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+const prisma = globalForPrisma.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { action, email, password, name, role, company } = body;
+    const { action, email, password, name, role, company, secretKey } = body;
 
     const cleanEmail = String(email || '').toLowerCase().trim();
     const cleanPassword = String(password || '').trim();
 
     // =========================================================================
-    // 1. AÇÃO: CADASTRO DE NOVO TÉCNICO (Salva como PENDENTE para o dds-master)
+    // 1. CADASTRO DE TÉCNICO COM VINCULAÇÃO INTELIGENTE DE EMPRESA
     // =========================================================================
     if (action === 'register') {
-      const existing = await (prisma as any).user.findUnique({
+      const existing = await prisma.user.findUnique({
         where: { email: cleanEmail }
       });
 
@@ -29,36 +31,65 @@ export async function POST(req: Request) {
         );
       }
 
-      const newUser = await (prisma as any).user.create({
+      let companyId = null;
+      let companyNameStr = String(company || 'Unidade Rural').trim();
+      let finalStatus = 'PENDING_APPROVAL'; // Por padrão, vai para a fila
+
+      // Se o técnico digitou uma palavra-chave, procura a empresa no banco
+      if (secretKey && secretKey.trim() !== '') {
+        const foundCompany = await prisma.company.findFirst({
+          where: { secretKey: String(secretKey).trim().toUpperCase() }
+        });
+
+        if (foundCompany) {
+          companyId = foundCompany.id;
+          companyNameStr = foundCompany.name; // Puxa o nome real da empresa do banco
+          
+          // Se a empresa permite aprovação automática, já libera o técnico!
+          if (foundCompany.autoApproveWithKey) {
+            finalStatus = 'ACTIVE';
+          }
+        } else {
+          return NextResponse.json(
+            { success: false, error: 'Palavra-Chave da Empresa inválida. Verifique com seu gestor.' },
+            { status: 400 }
+          );
+        }
+      }
+
+      const newUser = await prisma.user.create({
         data: {
           name: String(name || '').trim(),
           email: cleanEmail,
           password: cleanPassword,
           role: 'ORGANIZER',
-          status: 'PENDING_APPROVAL', // Aparece na fila do dds-master para aprovação
+          status: finalStatus as any,
           position: String(role || 'Técnico em Segurança do Trabalho').trim(),
-          company: String(company || 'Unidade Rural').trim()
+          company: companyNameStr,
+          companyId: companyId
         }
       });
 
       return NextResponse.json({
         success: true,
-        message: 'Cadastro recebido! Aguarde a aprovação da moderação.',
+        pendingApproval: finalStatus === 'PENDING_APPROVAL',
+        message: finalStatus === 'ACTIVE' 
+          ? 'Cadastro aprovado e vinculado à empresa com sucesso!' 
+          : 'Cadastro recebido! Aguarde a aprovação.',
         user: newUser
       });
     }
 
     // =========================================================================
-    // 2. AÇÃO: LOGIN (Verifica se foi APROVADO no dds-master)
+    // 2. LOGIN DO TÉCNICO
     // =========================================================================
     if (action === 'login') {
-      let user = await (prisma as any).user.findUnique({
+      let user = await prisma.user.findUnique({
         where: { email: cleanEmail }
       });
 
-      // Conta de Administrador Padrão
       if (!user && cleanEmail === 'admin@dds.com.br' && cleanPassword === '123456') {
-        user = await (prisma as any).user.create({
+        user = await prisma.user.create({
           data: {
             name: 'Alexandre Machado',
             email: 'admin@dds.com.br',
@@ -72,43 +103,30 @@ export async function POST(req: Request) {
       }
 
       if (!user || user.password !== cleanPassword) {
-        return NextResponse.json(
-          { success: false, error: 'E-mail ou senha incorretos.' },
-          { status: 401 }
-        );
+        return NextResponse.json({ success: false, error: 'E-mail ou senha incorretos.' }, { status: 401 });
       }
 
-      // Se for o admin principal, garante status ACTIVE
       if (cleanEmail === 'admin@dds.com.br' && user.status !== 'ACTIVE') {
-        user = await (prisma as any).user.update({
+        user = await prisma.user.update({
           where: { id: user.id },
           data: { status: 'ACTIVE' }
         });
       }
 
-      // Trava 1: Se o usuário ainda não foi aprovado pelo dds-master
       if (user.status === 'PENDING_APPROVAL') {
         return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Seu cadastro ainda está em análise pela equipe da AM TST no DDS MASTER. Aguarde a liberação do seu acesso.' 
-          },
+          { success: false, error: '⛔ Seu cadastro está na fila de aprovação do DDS MASTER. Aguarde a liberação.' },
           { status: 403 }
         );
       }
 
-      // Trava 2: Se o usuário estiver bloqueado ou suspenso
       if (user.status === 'BLOCKED' || user.status === 'SUSPENDED') {
         return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Seu acesso foi suspenso. Entre em contato com o suporte da AM TST.' 
-          },
+          { success: false, error: '⛔ Acesso Bloqueado ou Suspenso. Entre em contato com a AM TST.' },
           { status: 403 }
         );
       }
 
-      // Login aprovado com sucesso!
       return NextResponse.json({
         success: true,
         user: {
@@ -116,18 +134,15 @@ export async function POST(req: Request) {
           name: user.name,
           email: user.email,
           role: user.role,
-          company: user.company || 'Unidade Rural',
-          status: user.status || 'ACTIVE'
+          company: user.company || 'Unidade',
+          status: user.status
         }
       });
     }
 
     return NextResponse.json({ success: false, error: 'Ação inválida.' }, { status: 400 });
-  } catch (error: any) {
-    console.error("Erro no Auth:", error);
-    return NextResponse.json(
-      { success: false, error: error?.message || 'Erro interno no servidor' },
-      { status: 500 }
-    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erro interno';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
