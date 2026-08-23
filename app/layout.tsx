@@ -1,21 +1,26 @@
-import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
-
 export const viewport: Viewport = {
-  themeColor: "#2563eb",
+  themeColor: "#020617",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false,
 };
 
 export const metadata: Metadata = {
-  title: "DDS Online",
-  description: "Sistema de Diálogo Diário de Segurança",
+  title: "DDS ON - Gestão Diária de Segurança",
+  description: "Plataforma Digital de SST e Lista de Presença",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" }
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -26,12 +31,11 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <head>
-        <link rel="manifest" href="/manifest.json" />
-        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
       </head>
-      <body className={inter.className}>{children}</body>
+      <body className="font-sans antialiased bg-slate-950 text-slate-100 min-h-screen">
+        {children}
+      </body>
     </html>
   );
 }
