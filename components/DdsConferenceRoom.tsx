@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Mic, MicOff, Video as VideoIcon, VideoOff, 
   Monitor, MonitorOff, Users, Hand, Crown, 
-  AlertCircle, Check, Sparkles, Wifi, WifiOff
+  Check, Sparkles, Wifi, WifiOff
 } from 'lucide-react';
 
 interface RemoteParticipant {
@@ -80,7 +80,7 @@ function ParticipantVideoCard({
         )}
       </div>
 
-      {/* TOPO: BADGE DE MÃO LEVANTADA */}
+      {/* TOPO: BADGE DE MÃO LEVANTADA OU PRESENÇA */}
       <div className="relative z-10 flex items-center justify-between">
         {participant.isHandRaised ? (
           <span className="bg-amber-500 text-slate-950 font-black px-2.5 py-1 rounded-xl text-[10px] flex items-center gap-1 shadow-md animate-bounce">
@@ -175,20 +175,20 @@ export default function DdsConferenceRoom({
   const participantConns = useRef<Map<string, any>>(new Map());
   const activeCalls = useRef<Map<string, any>>(new Map());
 
-  // Elementos de Vídeo Locais
+  // Elementos de Vídeo
   const localMainVideoRef = useRef<HTMLVideoElement>(null);
   const localPipVideoRef = useRef<HTMLVideoElement>(null);
+  const localParticipantMosaicRef = useRef<HTMLVideoElement>(null);
   const screenShareVideoRef = useRef<HTMLVideoElement>(null);
   const organizerVideoRef = useRef<HTMLVideoElement>(null);
 
   // Participantes Remotos
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
 
-  // Limpa o nome da sala para IDs seguros do WebRTC
   const cleanRoomId = roomName.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
   const hostPeerId = `dds-${cleanRoomId}-host`;
 
-  // 1. CARREGAR MOTOR WEBRTC (PEERJS) VIA CDN COM ZERO CONFIGURAÇÃO
+  // 1. CARREGAR MOTOR WEBRTC (PEERJS) VIA CDN
   const loadPeerJs = useCallback((): Promise<any> => {
     return new Promise((resolve, reject) => {
       if ((window as any).Peer) {
@@ -219,14 +219,22 @@ export default function DdsConferenceRoom({
 
       localStreamRef.current = stream;
 
+      // Organizador: Conecta ao vídeo do palco
       if (isAdmin && localMainVideoRef.current && !isScreenSharing) {
         localMainVideoRef.current.srcObject = stream;
         localMainVideoRef.current.play().catch(() => {});
       }
-      if (localPipVideoRef.current) {
+      if (isAdmin && localPipVideoRef.current) {
         localPipVideoRef.current.srcObject = stream;
         localPipVideoRef.current.play().catch(() => {});
       }
+
+      // Participante: Conecta a sua câmera direto no seu card no Mosaico
+      if (!isAdmin && localParticipantMosaicRef.current) {
+        localParticipantMosaicRef.current.srcObject = stream;
+        localParticipantMosaicRef.current.play().catch(() => {});
+      }
+
       return stream;
     } catch (err) {
       console.error("Erro ao acessar câmera:", err);
@@ -235,7 +243,15 @@ export default function DdsConferenceRoom({
     }
   }, [isAdmin, isScreenSharing]);
 
-  // 3. INICIALIZAR CONEXÃO WEBRTC PEER-TO-PEER
+  // 3. SINCRONIZAÇÃO DO VÍDEO DO PARTICIPANTE NO MOSAICO
+  useEffect(() => {
+    if (!isAdmin && localParticipantMosaicRef.current && localStreamRef.current) {
+      localParticipantMosaicRef.current.srcObject = localStreamRef.current;
+      localParticipantMosaicRef.current.play().catch(() => {});
+    }
+  }, [isAdmin, isVideoOff]);
+
+  // 4. CONEXÃO WEBRTC PEER-TO-PEER
   useEffect(() => {
     let isMounted = true;
 
@@ -246,9 +262,7 @@ export default function DdsConferenceRoom({
       if (!PeerClass || !isMounted) return;
 
       if (isAdmin) {
-        // =====================================================================
         // MODO ORGANIZADOR (HOST DA SALA)
-        // =====================================================================
         const peer = new PeerClass(hostPeerId, {
           debug: 1,
           config: {
@@ -265,7 +279,6 @@ export default function DdsConferenceRoom({
           if (isMounted) setIsConnected(true);
         });
 
-        // Recebe chamadas de vídeo dos participantes
         peer.on('call', (call: any) => {
           const currentOutStream = isScreenSharing && screenStreamRef.current 
             ? screenStreamRef.current 
@@ -296,7 +309,6 @@ export default function DdsConferenceRoom({
           });
         });
 
-        // Recebe dados dos participantes (Mão Levantada, Nome)
         peer.on('connection', (conn: any) => {
           participantConns.current.set(conn.peer, conn);
 
@@ -335,9 +347,7 @@ export default function DdsConferenceRoom({
         });
 
       } else {
-        // =====================================================================
         // MODO PARTICIPANTE (COLABORADOR)
-        // =====================================================================
         const randomId = `dds-${cleanRoomId}-user-${Math.random().toString(36).substring(2, 7)}`;
         const peer = new PeerClass(randomId, {
           debug: 1,
@@ -355,7 +365,6 @@ export default function DdsConferenceRoom({
           if (!isMounted) return;
           setIsConnected(true);
 
-          // 1. Abre canal de dados com o Organizador
           const conn = peer.connect(hostPeerId);
           hostDataConn.current = conn;
 
@@ -381,7 +390,6 @@ export default function DdsConferenceRoom({
             }
           });
 
-          // 2. Faz a chamada de vídeo para o Organizador
           if (stream) {
             const call = peer.call(hostPeerId, stream);
             call.on('stream', (organizerStream: MediaStream) => {
@@ -411,7 +419,7 @@ export default function DdsConferenceRoom({
     };
   }, [cleanRoomId, hostPeerId, isAdmin, userName, initLocalMedia, loadPeerJs]);
 
-  // 4. ATUALIZA VÍDEO DO ORGANIZADOR QUANDO RECEBIDO NO PARTICIPANTE
+  // 5. ATUALIZA VÍDEO DO ORGANIZADOR QUANDO RECEBIDO NO PARTICIPANTE
   useEffect(() => {
     if (!isAdmin && remoteOrganizerStream && organizerVideoRef.current) {
       organizerVideoRef.current.srcObject = remoteOrganizerStream;
@@ -419,7 +427,7 @@ export default function DdsConferenceRoom({
     }
   }, [isAdmin, remoteOrganizerStream]);
 
-  // 5. TRANSMISSÃO DE TELA (REPLACE TRACK EM TEMPO REAL)
+  // 6. TRANSMISSÃO DE TELA (ORGANIZADOR)
   const toggleScreenShare = async () => {
     if (!isAdmin) return;
 
@@ -439,7 +447,6 @@ export default function DdsConferenceRoom({
 
       const screenTrack = screenStream.getVideoTracks()[0];
 
-      // Atualiza o stream de todos os participantes conectados
       activeCalls.current.forEach((call) => {
         const sender = call.peerConnection?.getSenders()?.find((s: any) => s.track?.kind === 'video');
         if (sender) {
@@ -463,7 +470,6 @@ export default function DdsConferenceRoom({
     }
     setIsScreenSharing(false);
 
-    // Restaura a câmera do organizador para todos os participantes
     if (localStreamRef.current) {
       const camTrack = localStreamRef.current.getVideoTracks()[0];
       if (camTrack) {
@@ -475,7 +481,7 @@ export default function DdsConferenceRoom({
     }
   };
 
-  // 6. LEVANTAR A MÃO (SINAL TRANSMITIDO AO VIVO PARA O ORGANIZADOR)
+  // 7. LEVANTAR A MÃO (PARTICIPANTE)
   const toggleRaiseHand = () => {
     const nextState = !isMyHandRaised;
     setIsMyHandRaised(nextState);
@@ -489,7 +495,7 @@ export default function DdsConferenceRoom({
     }
   };
 
-  // 7. MODERAÇÃO DO ORGANIZADOR
+  // 8. MODERAÇÃO DO ORGANIZADOR
   const handleModerateMute = (peerId: string) => {
     const conn = participantConns.current.get(peerId);
     if (conn && conn.open) {
@@ -514,7 +520,7 @@ export default function DdsConferenceRoom({
     setRemoteParticipants(prev => prev.map(p => p.peerId === peerId ? { ...p, isHandRaised: false } : p));
   };
 
-  // 8. CONTROLES DE ÁUDIO E VÍDEO LOCAL
+  // 9. CONTROLES DE ÁUDIO E VÍDEO LOCAL
   const toggleAudio = () => {
     if (localStreamRef.current) {
       const track = localStreamRef.current.getAudioTracks()[0];
@@ -535,7 +541,7 @@ export default function DdsConferenceRoom({
     }
   };
 
-  // 9. ORDENAÇÃO DO MOSAICO: QUEM LEVANTOU A MÃO FICA EM 1º LUGAR
+  // 10. ORDENAÇÃO DO MOSAICO: QUEM LEVANTOU A MÃO FICA EM 1º LUGAR
   const sortedParticipants = [...remoteParticipants].sort((a, b) => {
     if (a.isHandRaised && !b.isHandRaised) return -1;
     if (!a.isHandRaised && b.isHandRaised) return 1;
@@ -548,7 +554,7 @@ export default function DdsConferenceRoom({
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 md:p-6 space-y-6 shadow-2xl relative overflow-hidden">
       
-      {/* TOAST DE ALERTA DE MÃO LEVANTADA (PARA O ORGANIZADOR) */}
+      {/* TOAST DE MÃO LEVANTADA (PARA O ORGANIZADOR) */}
       {handRaiseToast && (
         <div className="fixed top-6 right-6 z-[9999] bg-amber-500 text-slate-950 px-5 py-3 rounded-2xl shadow-2xl font-black text-sm flex items-center gap-2 border-2 border-amber-300 animate-in slide-in-from-top-4 duration-300">
           <Hand size={20} className="animate-bounce" />
@@ -590,7 +596,7 @@ export default function DdsConferenceRoom({
       </div>
 
       {/* ========================================================================= */}
-      {/* 1. PALCO PRINCIPAL (TRANSMISSÃO DO ORGANIZADOR) */}
+      {/* 1. PALCO PRINCIPAL (TRANSMISSÃO DO ORGANIZADOR - 100% LIMPO SEM OBSTRUÇÃO) */}
       {/* ========================================================================= */}
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
@@ -622,7 +628,7 @@ export default function DdsConferenceRoom({
                   <Monitor size={14} className="text-green-400 animate-pulse" />
                   <span className="text-xs font-bold text-white">Transmitindo Tela para os Colaboradores</span>
                 </div>
-                {/* Miniatura do Organizador */}
+                {/* Miniatura do Organizador no Canto */}
                 <div className="absolute bottom-4 right-4 w-44 sm:w-60 aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border-2 border-green-500 z-20">
                   <video
                     ref={localPipVideoRef}
@@ -667,7 +673,7 @@ export default function DdsConferenceRoom({
               </div>
             )
           ) : (
-            /* VISÃO DO PARTICIPANTE (RECEBE O VÍDEO DO ORGANIZADOR EM TEMPO REAL) */
+            /* VISÃO DO PARTICIPANTE: 100% LIMPA (SEM NENHUMA JANELA TAMPANDO A APRESENTAÇÃO) */
             <div className="relative w-full h-full flex items-center justify-center bg-black">
               {remoteOrganizerStream ? (
                 <video
@@ -682,25 +688,11 @@ export default function DdsConferenceRoom({
                     <Crown size={28} />
                   </div>
                   <div>
-                    <h4 className="text-base font-bold text-white">Conectando ao Instrutor...</h4>
-                    <p className="text-xs text-slate-400">Aguarde o início da transmissão do DDS.</p>
+                    <h4 className="text-base font-bold text-white">Conectando à Transmissão do Instrutor...</h4>
+                    <p className="text-xs text-slate-400">Aguarde o início do vídeo e da apresentação.</p>
                   </div>
                 </div>
               )}
-
-              {/* Miniatura da Câmera do Próprio Participante no Canto */}
-              <div className="absolute bottom-4 right-4 w-36 sm:w-48 aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border-2 border-slate-700 z-20">
-                <video
-                  ref={localPipVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={`w-full h-full object-cover scale-x-[-1] ${isVideoOff ? 'hidden' : 'block'}`}
-                />
-                <div className="absolute bottom-1.5 left-2 bg-black/80 px-2 py-0.5 rounded-md text-[10px] font-bold text-white truncate max-w-[90%]">
-                  {userName} (Você)
-                </div>
-              </div>
             </div>
           )}
 
@@ -708,16 +700,16 @@ export default function DdsConferenceRoom({
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. MOSAICO DOS PARTICIPANTES (GRADE AMPLA COM WEBRTC) */}
+      {/* 2. MOSAICO DOS PARTICIPANTES (COM O PRÓPRIO VÍDEO DO COLABORADOR EM 1º LUGAR) */}
       {/* ========================================================================= */}
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between border-t border-slate-800/80 pt-4 px-1">
           <div>
             <h4 className="text-base font-bold text-white flex items-center gap-2">
-              <Users size={18} className="text-green-400" /> Mosaico dos Participantes ({sortedParticipants.length})
+              <Users size={18} className="text-green-400" /> Mosaico dos Participantes ({sortedParticipants.length + (!isAdmin ? 1 : 0)})
             </h4>
             <p className="text-xs text-slate-400">
-              Colaboradores conectados • Quem levanta a mão fica em 1º lugar no topo
+              Colaboradores presentes • Quem levanta a mão fica em destaque
             </p>
           </div>
 
@@ -728,26 +720,88 @@ export default function DdsConferenceRoom({
           )}
         </div>
 
-        {sortedParticipants.length === 0 ? (
-          <div className="bg-slate-950/60 border border-slate-800 rounded-3xl p-10 text-center space-y-2">
-            <Users size={36} className="mx-auto text-slate-600 mb-2" />
-            <p className="text-sm font-bold text-slate-300">Nenhum participante conectado na transmissão ainda.</p>
-            <p className="text-xs text-slate-500">Assim que os colaboradores entrarem pelo link, o vídeo deles aparecerá aqui.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {sortedParticipants.map((p) => (
-              <ParticipantVideoCard
-                key={p.peerId}
-                participant={p}
-                isAdmin={isAdmin}
-                onModerateMute={handleModerateMute}
-                onModerateVideo={handleModerateVideo}
-                onLowerHand={handleLowerHand}
-              />
-            ))}
-          </div>
-        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          
+          {/* ===================================================================== */}
+          {/* CARD DO PRÓPRIO PARTICIPANTE (SEMPRE EM 1º LUGAR NA VISÃO DELE) */}
+          {/* ===================================================================== */}
+          {!isAdmin && (
+            <div 
+              className={`relative h-48 sm:h-52 bg-slate-950 rounded-3xl overflow-hidden border-2 flex flex-col justify-between p-3 transition-all duration-300 shadow-xl ${
+                isMyHandRaised 
+                  ? 'border-amber-400 ring-4 ring-amber-400/20 bg-gradient-to-b from-amber-950/30 to-slate-950 scale-[1.02] z-20' 
+                  : 'border-green-500/60 ring-2 ring-green-500/10'
+              }`}
+            >
+              {/* VÍDEO LOCAL DO PRÓPRIO PARTICIPANTE */}
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-950">
+                <video
+                  ref={localParticipantMosaicRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={`w-full h-full object-cover scale-x-[-1] ${isVideoOff ? 'hidden' : 'block'}`}
+                />
+                {isVideoOff && (
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <div className="w-14 h-14 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-black text-lg">
+                      {userName.slice(0, 2).toUpperCase()}
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-medium">Sua Câmera está Desligada</span>
+                  </div>
+                )}
+              </div>
+
+              {/* TOPO: STATUS E MÃO LEVANTADA */}
+              <div className="relative z-10 flex items-center justify-between">
+                {isMyHandRaised ? (
+                  <span className="bg-amber-500 text-slate-950 font-black px-2.5 py-1 rounded-xl text-[10px] flex items-center gap-1 shadow-md animate-bounce">
+                    <Hand size={12} /> Sua Mão está Levantada
+                  </span>
+                ) : (
+                  <span className="bg-green-500 text-slate-950 font-bold px-2 py-0.5 rounded-lg text-[10px] flex items-center gap-1">
+                    <Check size={10} /> Você (Conectado)
+                  </span>
+                )}
+
+                {isAudioMuted && (
+                  <span className="bg-red-500/20 text-red-400 p-1.5 rounded-lg border border-red-500/30">
+                    <MicOff size={13} />
+                  </span>
+                )}
+              </div>
+
+              {/* RODAPÉ COM SEU NOME */}
+              <div className="relative z-10">
+                <div className="bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800 shadow-sm flex items-center justify-between">
+                  <p className="text-xs font-bold text-white truncate">{userName} (Você)</p>
+                  <span className="text-[9px] text-green-400 font-bold uppercase tracking-wider">Seu Vídeo</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DEMAIS PARTICIPANTES REMOTOS NO MOSAICO */}
+          {sortedParticipants.map((p) => (
+            <ParticipantVideoCard
+              key={p.peerId}
+              participant={p}
+              isAdmin={isAdmin}
+              onModerateMute={handleModerateMute}
+              onModerateVideo={handleModerateVideo}
+              onLowerHand={handleLowerHand}
+            />
+          ))}
+
+          {/* Mensagem se não houver outros participantes */}
+          {isAdmin && sortedParticipants.length === 0 && (
+            <div className="col-span-full bg-slate-950/60 border border-slate-800 rounded-3xl p-10 text-center space-y-2">
+              <Users size={36} className="mx-auto text-slate-600 mb-2" />
+              <p className="text-sm font-bold text-slate-300">Aguardando colaboradores entrarem na chamada...</p>
+              <p className="text-xs text-slate-500">Assim que os participantes acessarem o link, suas câmeras aparecerão aqui no mosaico.</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ========================================================================= */}
