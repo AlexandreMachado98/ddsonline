@@ -2,16 +2,19 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { CheckCircle, Users, LogOut, AlertTriangle, X, Loader2, Send, PhoneOff, ShieldCheck, ExternalLink } from 'lucide-react';
+import { 
+  CheckCircle, Users, LogOut, AlertTriangle, X, 
+  Loader2, Send, PhoneOff, ShieldCheck, ExternalLink, MapPin
+} from 'lucide-react';
 import SignaturePad from '@/components/SignaturePad';
 import SelfieCapture from '@/components/SelfieCapture';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
 
 export default function MeetingRoomPage() {
   const params = useParams();
-  const meetingId = params?.id as string;
+  const meetingId = (params?.id as string) || '';
 
-  // Etapas: FORM -> SUCCESS (Presencial) -> ROOM (Remoto) -> EXIT_SUCCESS -> EXPIRED (Link Quebrado)
+  // Etapas: FORM -> SUCCESS (Presencial) -> ROOM (Remoto) -> EXIT_SUCCESS -> EXPIRED (Link Encerrado)
   const [currentStep, setCurrentStep] = useState<'FORM' | 'ROOM' | 'SUCCESS' | 'EXIT_SUCCESS' | 'EXPIRED'>('FORM');
 
   const [name, setName] = useState('');
@@ -25,34 +28,32 @@ export default function MeetingRoomPage() {
   const [meetingType, setMeetingType] = useState<'PRESENTIAL' | 'REMOTE'>('PRESENTIAL');
 
   // =========================================================================
-  // RADAR DE SESSÃO ÚNICA: Quebra o link na mesma hora se a reunião for encerrada!
+  // RADAR DE SESSÃO ÚNICA: Monitora se a reunião está ativa no banco
   // =========================================================================
   useEffect(() => {
     if (!meetingId) return;
 
-    const checkMeetingEnded = async () => {
+    const checkMeetingStatus = async () => {
       try {
         const res = await fetch(`/api/reuniao?meetingId=${meetingId}&_t=${Date.now()}`, { cache: 'no-store' });
         const data = await res.json();
         
         if (data.success && data.status === 'ENDED') {
-          // Se já assinou e estava na sala, mostra "Chamada Encerrada"
-          // Se ainda ia preencher, bloqueia o formulário com "Link Expirado"
           setCurrentStep(prev => (prev === 'ROOM' || prev === 'SUCCESS') ? 'EXIT_SUCCESS' : 'EXPIRED');
         } else if (data.success && data.meeting) {
           setTopic(data.meeting.topic);
           setFarm(data.meeting.farm);
           setMeetingType(data.meeting.type || 'PRESENTIAL');
         } else {
-          setCurrentStep('EXPIRED'); // Não achou a reunião no banco
+          setCurrentStep('EXPIRED');
         }
       } catch {
         setCurrentStep('EXPIRED');
       }
     };
 
-    checkMeetingEnded(); // Verifica na hora que abre o link
-    const interval = setInterval(checkMeetingEnded, 3000); // Radar a cada 3 segundos
+    checkMeetingStatus();
+    const interval = setInterval(checkMeetingStatus, 3000);
     
     return () => clearInterval(interval);
   }, [meetingId]);
@@ -72,14 +73,14 @@ export default function MeetingRoomPage() {
   };
 
   const handleSubmit = async () => {
-    if (currentStep === 'EXPIRED') return; // Bloqueia o envio se tiver expirado
+    if (currentStep === 'EXPIRED') return;
     
     if (!name.trim()) {
       alert('⚠️ Por favor, digite seu Nome Completo.');
       return;
     }
     if (cpf.length < 14) {
-      alert('⚠️ Por favor, digite um CPF válido.');
+      alert('⚠️ Por favor, digite um CPF válido com 11 dígitos.');
       return;
     }
     if (!savedSelfie) {
@@ -94,19 +95,26 @@ export default function MeetingRoomPage() {
     setIsSubmitting(true);
 
     const payload = {
-      name,
-      cpf,
+      name: name.trim(),
+      cpf: cpf.trim(),
       savedSelfie,
       savedSignature,
       meetingId
     };
 
     try {
-      await fetch('/api/presenca', {
+      const res = await fetch('/api/presenca', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        alert(data.error || 'Erro ao registrar presença.');
+        setIsSubmitting(false);
+        return;
+      }
     } catch (err) {
       console.error("Erro ao salvar presença:", err);
     }
@@ -135,8 +143,8 @@ export default function MeetingRoomPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'register_exit',
-          name,
-          cpf,
+          name: name.trim(),
+          cpf: cpf.trim(),
           meetingId,
           exitReason: finalReason,
           exitSignature
@@ -161,7 +169,7 @@ export default function MeetingRoomPage() {
   };
 
   // =========================================================================
-  // TELA 5: LINK EXPIRADO / BLOQUEADO (Técnico já encerrou a sala)
+  // TELA: LINK EXPIRADO / REUNIÃO ENCERRADA
   // =========================================================================
   if (currentStep === 'EXPIRED') {
     return (
@@ -173,18 +181,18 @@ export default function MeetingRoomPage() {
 
           <div className="space-y-1.5">
             <span className="text-[11px] font-bold text-red-400 uppercase tracking-widest bg-red-500/10 px-3 py-1 rounded-full border border-red-500/20 inline-block">
-              Acesso Negado
+              Acesso Encerrado
             </span>
-            <h1 className="text-xl font-bold text-white tracking-tight">Reunião Encerrada</h1>
+            <h1 className="text-xl font-bold text-white tracking-tight">Reunião Finalizada</h1>
           </div>
 
           <p className="text-slate-300 text-xs leading-relaxed">
-            O organizador já finalizou este DDS. Por questões de conformidade, o link de acesso foi <strong>desativado permanentemente</strong>.
+            O organizador já finalizou este DDS. O link de acesso foi <strong>desativado para novas assinaturas</strong> por conformidade de segurança.
           </p>
 
           <div className="pt-5 border-t border-slate-800 text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
             <AlertTriangle size={14} className="text-amber-500" />
-            Caso não tenha assinado, contate o TST da unidade.
+            Caso não tenha conseguido assinar, contate o TST da sua unidade.
           </div>
         </div>
       </main>
@@ -192,25 +200,25 @@ export default function MeetingRoomPage() {
   }
 
   // =========================================================================
-  // TELA 4: SAÍDA REGISTRADA (CHAMADA ENCERRADA)
+  // TELA: SAÍDA REGISTRADA
   // =========================================================================
   if (currentStep === 'EXIT_SUCCESS') {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
         <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-5 shadow-2xl animate-in fade-in zoom-in duration-300">
-          <div className="bg-red-500/10 text-red-400 p-4 rounded-2xl inline-flex border border-red-500/20">
+          <div className="bg-green-500/10 text-green-400 p-4 rounded-2xl inline-flex border border-green-500/20">
             <CheckCircle size={36} />
           </div>
 
           <div className="space-y-1.5">
-            <span className="text-[11px] font-bold text-red-400 uppercase tracking-widest bg-red-500/10 px-3 py-1 rounded-full border border-red-500/20 inline-block">
-              Desconectado
+            <span className="text-[11px] font-bold text-green-400 uppercase tracking-widest bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20 inline-block">
+              Desconectado com Sucesso
             </span>
-            <h1 className="text-xl font-bold text-white tracking-tight">Participação Concluída</h1>
+            <h1 className="text-xl font-bold text-white tracking-tight">Participação Registrada</h1>
           </div>
 
           <p className="text-slate-300 text-xs leading-relaxed">
-            O DDS foi encerrado. A sua participação foi concluída e arquivada na ata oficial de auditoria da AM TST.
+            Sua participação foi concluída e devidamente registrada na ata oficial de conformidade da <strong>AM TST</strong>.
           </p>
         </div>
       </main>
@@ -218,7 +226,7 @@ export default function MeetingRoomPage() {
   }
 
   // =========================================================================
-  // TELA 3: DE SUCESSO (DDS PRESENCIAL)
+  // TELA: SUCESSO NO DDS PRESENCIAL (PASSAR CELULAR)
   // =========================================================================
   if (currentStep === 'SUCCESS') {
     return (
@@ -232,18 +240,18 @@ export default function MeetingRoomPage() {
             <span className="text-[11px] font-bold text-green-400 uppercase tracking-widest bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20 inline-block">
               Presença Confirmada
             </span>
-            <h1 className="text-xl font-bold text-white tracking-tight">Assinatura Realizada!</h1>
+            <h1 className="text-xl font-bold text-white tracking-tight">Assinatura Concluída!</h1>
           </div>
 
           <p className="text-slate-300 text-xs leading-relaxed">
-            Obrigado, <strong>{name}</strong>. Sua presença no treinamento presencial foi registrada na ata oficial.
+            Obrigado, <strong>{name}</strong>. Sua presença com biometria facial foi adicionada à ata oficial do DDS.
           </p>
 
           <button
             onClick={handlePassThePhone}
             className="w-full mt-4 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 text-white font-bold text-sm rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
           >
-            <Users size={16} /> Passar Celular para Outro Colega
+            <Users size={16} /> Passar Celular para Próximo Colega
           </button>
         </div>
       </main>
@@ -251,43 +259,44 @@ export default function MeetingRoomPage() {
   }
 
   // =========================================================================
-  // TELA 2: SALA DE VÍDEO (DDS REMOTO)
+  // TELA: SALA DE VÍDEO (DDS REMOTO / AO VIVO)
   // =========================================================================
   if (currentStep === 'ROOM') {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center p-3 md:p-6 font-sans relative">
         <div className="w-full max-w-5xl flex flex-col space-y-4 flex-1">
+          
+          {/* Barra Superior do Participante */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="bg-green-500/20 p-2 rounded-xl text-green-400">
                 <CheckCircle size={22} />
               </div>
               <div>
-                <p className="text-[11px] text-slate-400">DDS ON • Presença Validada</p>
+                <p className="text-[11px] text-slate-400">DDS ON • Participante Conectado</p>
                 <h2 className="text-sm font-bold text-white">{name} ({topic})</h2>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button
-                onClick={() => setShowExitModal(true)}
-                className="flex-1 sm:flex-none px-3.5 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
-              >
-                <LogOut size={14} /> Preciso Sair
-              </button>
-            </div>
+            <button
+              onClick={() => setShowExitModal(true)}
+              className="px-3.5 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
+            >
+              <LogOut size={14} /> Registrar Saída
+            </button>
           </div>
 
+          {/* COMPONENTE DA SALA WEBRTC (COMO PARTICIPANTE) */}
           <div className="flex-1 min-h-[500px]">
             <DdsConferenceRoom
               roomName={meetingId}
-              userName={name}
+              userName={name.trim()}
               isAdmin={false}
             />
           </div>
         </div>
 
-        {/* Modal de Saída */}
+        {/* Modal de Saída Antecipada */}
         {showExitModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white text-slate-900 w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in duration-200">
@@ -357,7 +366,7 @@ export default function MeetingRoomPage() {
   }
 
   // =========================================================================
-  // TELA 1: FORMULÁRIO DE ENTRADA DO COLABORADOR
+  // TELA: FORMULÁRIO DE ENTRADA DO COLABORADOR
   // =========================================================================
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center py-6 px-4 font-sans">
@@ -368,7 +377,7 @@ export default function MeetingRoomPage() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">ON</span>
           </span>
           <span className="text-[11px] text-slate-400 font-medium border-l border-slate-700 pl-2">
-            Registro Oficial
+            Registro de Presença
           </span>
         </div>
 
@@ -380,16 +389,20 @@ export default function MeetingRoomPage() {
 
       <div className="w-full max-w-md bg-gradient-to-r from-green-700 to-emerald-800 text-white p-5 rounded-3xl shadow-lg mb-6 text-center border border-green-500/30">
         <span className="text-[10px] font-bold uppercase tracking-wider text-green-200">
-          {meetingType === 'PRESENTIAL' ? 'DDS Presencial' : 'Diálogo Diário de Segurança'}
+          {meetingType === 'PRESENTIAL' ? 'DDS Presencial no Campo' : 'Treinamento Remoto Ao Vivo'}
         </span>
         <h1 className="text-xl font-bold mt-1 text-white">{topic}</h1>
-        {farm && <p className="text-xs text-green-100 mt-0.5">📍 {farm}</p>}
+        {farm && (
+          <p className="text-xs text-green-100 mt-0.5 flex items-center justify-center gap-1">
+            <MapPin size={12} /> {farm}
+          </p>
+        )}
       </div>
 
       <div className="w-full max-w-md space-y-6 pb-20">
         <div className="bg-slate-900 border border-slate-800 text-slate-300 text-xs p-3.5 rounded-xl text-center flex items-center justify-center gap-2">
           <ShieldCheck size={16} className="text-green-400 shrink-0" />
-          <span>Valide sua presença abaixo para registrar sua conformidade.</span>
+          <span>Valide seus dados abaixo para acessar a transmissão.</span>
         </div>
 
         <section className="space-y-4 bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
