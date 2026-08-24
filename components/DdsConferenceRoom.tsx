@@ -3,8 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Mic, MicOff, Video as VideoIcon, VideoOff, 
-  Monitor, MonitorOff, Users, PhoneOff, Maximize, 
-  ShieldCheck, AlertCircle, Sparkles
+  Monitor, MonitorOff, Users, AlertCircle
 } from 'lucide-react';
 
 interface Attendee {
@@ -28,37 +27,52 @@ export default function DdsConferenceRoom({
   isAdmin = false, 
   attendees = [] 
 }: DdsConferenceRoomProps) {
-  // Estados de Mídia
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [hasMediaError, setHasMediaError] = useState(false);
 
-  // Streams de Vídeo
+  // Elementos de Vídeo
   const cameraVideoRef = useRef<HTMLVideoElement>(null);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
   const pipCameraVideoRef = useRef<HTMLVideoElement>(null);
 
+  // Streams de Mídia
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
 
-  // 1. Inicializar Câmera e Microfone do Técnico/Participante
+  // 1. INICIALIZAR CÂMERA E MICROFONE
   const initLocalMedia = useCallback(async () => {
     try {
       setHasMediaError(false);
+      
+      // Se já existir stream ativo, para as tracks anteriores
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(t => t.stop());
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        video: { 
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 }, 
+          facingMode: 'user' 
+        },
         audio: true
       });
 
       localStreamRef.current = stream;
 
+      // Conecta ao vídeo principal
       if (cameraVideoRef.current) {
         cameraVideoRef.current.srcObject = stream;
+        cameraVideoRef.current.play().catch(() => {});
       }
+      // Conecta ao vídeo em miniatura (PiP)
       if (pipCameraVideoRef.current) {
         pipCameraVideoRef.current.srcObject = stream;
+        pipCameraVideoRef.current.play().catch(() => {});
       }
+
     } catch (err) {
       console.error("Erro ao acessar câmera/microfone:", err);
       setHasMediaError(true);
@@ -69,17 +83,35 @@ export default function DdsConferenceRoom({
     initLocalMedia();
 
     return () => {
-      // Limpeza ao desmontar componente
       if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop());
+        localStreamRef.current.getTracks().forEach(t => t.stop());
       }
       if (screenStreamRef.current) {
-        screenStreamRef.current.getTracks().forEach(track => track.stop());
+        screenStreamRef.current.getTracks().forEach(t => t.stop());
       }
     };
   }, [initLocalMedia]);
 
-  // 2. Ligar / Desligar Microfone
+  // 2. SINCRONIZAÇÃO AUTOMÁTICA DOS VÍDEOS QUANDO MUDA O ESTADO
+  useEffect(() => {
+    if (isScreenSharing) {
+      if (screenVideoRef.current && screenStreamRef.current) {
+        screenVideoRef.current.srcObject = screenStreamRef.current;
+        screenVideoRef.current.play().catch(() => {});
+      }
+      if (pipCameraVideoRef.current && localStreamRef.current) {
+        pipCameraVideoRef.current.srcObject = localStreamRef.current;
+        pipCameraVideoRef.current.play().catch(() => {});
+      }
+    } else {
+      if (cameraVideoRef.current && localStreamRef.current) {
+        cameraVideoRef.current.srcObject = localStreamRef.current;
+        cameraVideoRef.current.play().catch(() => {});
+      }
+    }
+  }, [isScreenSharing]);
+
+  // 3. LIGAR / DESLIGAR MICROFONE
   const toggleAudio = () => {
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
@@ -90,18 +122,32 @@ export default function DdsConferenceRoom({
     }
   };
 
-  // 3. Ligar / Desligar Câmera
-  const toggleVideo = () => {
+  // 4. LIGAR / DESLIGAR CÂMERA (CORRIGIDO: A imagem volta instantaneamente)
+  const toggleVideo = async () => {
     if (localStreamRef.current) {
       const videoTrack = localStreamRef.current.getVideoTracks()[0];
       if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoOff(!videoTrack.enabled);
+        const nextState = !videoTrack.enabled;
+        videoTrack.enabled = nextState;
+        setIsVideoOff(!nextState);
+
+        // Garante que o elemento de vídeo continue reproduzindo
+        if (nextState) {
+          if (cameraVideoRef.current) cameraVideoRef.current.play().catch(() => {});
+          if (pipCameraVideoRef.current) pipCameraVideoRef.current.play().catch(() => {});
+        }
+      } else {
+        // Se a track foi perdida, reinicia a mídia suavemente
+        await initLocalMedia();
+        setIsVideoOff(false);
       }
+    } else {
+      await initLocalMedia();
+      setIsVideoOff(false);
     }
   };
 
-  // 4. Iniciar e Parar Compartilhamento de Tela (Com Câmera em PiP)
+  // 5. INICIAR / PARAR COMPARTILHAMENTO DE TELA (CORRIGIDO: Sem tela preta)
   const toggleScreenShare = async () => {
     if (isScreenSharing) {
       stopScreenShare();
@@ -110,53 +156,39 @@ export default function DdsConferenceRoom({
 
     try {
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { displaySurface: 'monitor' },
+        video: { 
+          displaySurface: 'monitor',
+          frameRate: { ideal: 30 }
+        },
         audio: false
       });
 
       screenStreamRef.current = screenStream;
-
-      if (screenVideoRef.current) {
-        screenVideoRef.current.srcObject = screenStream;
-      }
-
       setIsScreenSharing(true);
 
-      // Conecta a câmera na miniatura flutuante (Google Meet style)
-      if (pipCameraVideoRef.current && localStreamRef.current) {
-        pipCameraVideoRef.current.srcObject = localStreamRef.current;
-      }
-
-      // Evento disparado quando o usuário clica em "Parar Compartilhamento" na barra do navegador
+      // Evento disparado caso o usuário clique em "Parar Compartilhamento" na barra do Windows/Chrome
       screenStream.getVideoTracks()[0].onended = () => {
         stopScreenShare();
       };
 
     } catch (err) {
-      console.warn("Compartilhamento de tela cancelado ou não permitido:", err);
+      console.warn("Compartilhamento cancelado:", err);
       setIsScreenSharing(false);
     }
   };
 
   const stopScreenShare = () => {
     if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      screenStreamRef.current.getTracks().forEach(t => t.stop());
       screenStreamRef.current = null;
     }
     setIsScreenSharing(false);
-
-    // Restaura o stream da câmera no quadro principal
-    setTimeout(() => {
-      if (cameraVideoRef.current && localStreamRef.current) {
-        cameraVideoRef.current.srcObject = localStreamRef.current;
-      }
-    }, 100);
   };
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 md:p-6 space-y-4 shadow-2xl relative overflow-hidden">
       
-      {/* CABEÇALHO DA SALA AO VIVO */}
+      {/* CABEÇALHO DA SALA */}
       <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
         <div className="flex items-center gap-2">
           <span className="relative flex h-3 w-3">
@@ -164,7 +196,7 @@ export default function DdsConferenceRoom({
             <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
           </span>
           <h3 className="text-sm font-bold text-white tracking-wide">
-            Sala Ao Vivo: <span className="font-mono text-green-400 font-bold">{roomName.slice(0, 8)}</span>
+            Transmissão Ao Vivo: <span className="font-mono text-green-400 font-bold">{roomName.slice(0, 8)}</span>
           </h3>
         </div>
 
@@ -175,39 +207,39 @@ export default function DdsConferenceRoom({
         </div>
       </div>
 
-      {/* ÁREA CENTRAL DE VÍDEO (LAYOUT ESTILO GOOGLE MEET) */}
-      <div className="relative w-full aspect-video bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center shadow-inner group">
+      {/* ÁREA CENTRAL DE VÍDEO (GOOGLE MEET STYLE) */}
+      <div className="relative w-full aspect-video bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center shadow-inner">
         
         {/* ========================================================================= */}
-        {/* CENÁRIO A: TRANSMISSÃO DE TELA ATIVA COM CÂMERA FLUTUANTE EM MINIATURA */}
+        {/* MODO 1: TRANSMISSÃO DE TELA ATIVA */}
         {/* ========================================================================= */}
         {isScreenSharing ? (
           <div className="relative w-full h-full flex items-center justify-center bg-black">
-            {/* TELA PRINCIPAL TRANSMITIDA */}
+            {/* TELA PRINCIPAL COMPARTILHADA */}
             <video
               ref={screenVideoRef}
               autoPlay
               playsInline
+              muted
               className="w-full h-full object-contain"
             />
 
             {/* SELO DE TRANSMISSÃO */}
-            <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-green-500/30 flex items-center gap-2 z-10">
+            <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-green-500/30 flex items-center gap-2 z-10 shadow-lg">
               <Monitor size={14} className="text-green-400 animate-pulse" />
               <span className="text-xs font-bold text-white">Você está transmitindo sua tela</span>
             </div>
 
-            {/* MINIATURA FLUTUANTE DA CÂMERA (GOOGLE MEET PiP) */}
-            <div className="absolute bottom-4 right-4 w-40 sm:w-52 aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border-2 border-green-500/80 z-20 group/pip transition-transform hover:scale-105">
-              {!isVideoOff ? (
-                <video
-                  ref={pipCameraVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover scale-x-[-1]"
-                />
-              ) : (
+            {/* MINIATURA FLUTUANTE DA CÂMERA (PiP) */}
+            <div className="absolute bottom-4 right-4 w-40 sm:w-52 aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border-2 border-green-500 z-20 transition-all hover:scale-105">
+              <video
+                ref={pipCameraVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full object-cover scale-x-[-1] ${isVideoOff ? 'hidden' : 'block'}`}
+              />
+              {isVideoOff && (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-500">
                   <VideoOff size={20} />
                   <span className="text-[10px] mt-1 font-semibold">Câmera Pausada</span>
@@ -220,28 +252,30 @@ export default function DdsConferenceRoom({
           </div>
         ) : (
           /* ========================================================================= */
-          /* CENÁRIO B: CÂMERA NORMAL EM TELA CHEIA */
+          /* MODO 2: CÂMERA EM TELA CHEIA */
           /* ========================================================================= */
           <div className="relative w-full h-full flex items-center justify-center">
-            {!isVideoOff && !hasMediaError ? (
-              <video
-                ref={cameraVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover scale-x-[-1]"
-              />
-            ) : (
+            {/* Tag de Vídeo sempre montada (evita travamento ao religar) */}
+            <video
+              ref={cameraVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`w-full h-full object-cover scale-x-[-1] ${isVideoOff || hasMediaError ? 'hidden' : 'block'}`}
+            />
+
+            {/* Overlay quando a câmera estiver pausada ou bloqueada */}
+            {(isVideoOff || hasMediaError) && (
               <div className="flex flex-col items-center justify-center text-slate-500 space-y-2">
                 <div className="p-4 bg-slate-900 rounded-full border border-slate-800">
                   {hasMediaError ? <AlertCircle size={36} className="text-amber-400" /> : <VideoOff size={36} className="text-slate-600" />}
                 </div>
                 <p className="text-xs font-bold text-slate-300">
-                  {hasMediaError ? 'Acesso à câmera bloqueado no navegador' : 'Sua câmera está desligada'}
+                  {hasMediaError ? 'Permissão de câmera bloqueada' : 'Sua câmera está pausada'}
                 </p>
                 {hasMediaError && (
                   <button onClick={initLocalMedia} className="text-[11px] text-green-400 hover:underline">
-                    Tentar novamente
+                    Autorizar Câmera
                   </button>
                 )}
               </div>
@@ -257,11 +291,12 @@ export default function DdsConferenceRoom({
       </div>
 
       {/* ========================================================================= */}
-      {/* BARRA DE CONTROLES INFERIOR (ESTILO MEET) */}
+      {/* BARRA DE CONTROLES */}
       {/* ========================================================================= */}
       <div className="flex items-center justify-center gap-3 pt-2">
         {/* Botão Microfone */}
         <button
+          type="button"
           onClick={toggleAudio}
           className={`p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center transition-all shadow-md ${
             isAudioMuted 
@@ -275,6 +310,7 @@ export default function DdsConferenceRoom({
 
         {/* Botão Câmera */}
         <button
+          type="button"
           onClick={toggleVideo}
           className={`p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center transition-all shadow-md ${
             isVideoOff 
@@ -286,16 +322,17 @@ export default function DdsConferenceRoom({
           {isVideoOff ? <VideoOff size={18} /> : <VideoIcon size={18} />}
         </button>
 
-        {/* Botão Transmissão de Tela (Screen Share) */}
+        {/* Botão Transmissão de Tela (Apenas para o Organizador) */}
         {isAdmin && (
           <button
+            type="button"
             onClick={toggleScreenShare}
             className={`px-5 py-3.5 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all shadow-md ${
               isScreenSharing 
                 ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-orange-600/20 animate-pulse' 
                 : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-green-600/25'
             }`}
-            title={isScreenSharing ? 'Parar Compartilhamento de Tela' : 'Compartilhar Tela com a Equipe'}
+            title={isScreenSharing ? 'Parar Compartilhamento de Tela' : 'Apresentar Tela com a Equipe'}
           >
             {isScreenSharing ? <MonitorOff size={18} /> : <Monitor size={18} />}
             <span>{isScreenSharing ? 'Parar Tela' : 'Apresentar Tela'}</span>
