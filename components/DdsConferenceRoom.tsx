@@ -1,564 +1,308 @@
  'use client';
 
-import React, { useRef, useState, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  Video, VideoOff, Mic, MicOff, Monitor, Square, Circle, 
-  Download, FlipHorizontal, ShieldCheck, LayoutGrid, Maximize2, Users, User, Loader2
+  Mic, MicOff, Video as VideoIcon, VideoOff, 
+  Monitor, MonitorOff, Users, PhoneOff, Maximize, 
+  ShieldCheck, AlertCircle, Sparkles
 } from 'lucide-react';
-
-interface RemoteParticipant {
-  peerId: string;
-  userName: string;
-  stream: MediaStream;
-}
 
 interface Attendee {
   id: string;
   name: string;
   cpf: string;
-  selfie?: string;
+  status: string;
   createdAt: string;
-  exitReason?: string;
 }
 
-interface DdsConferenceProps {
+interface DdsConferenceRoomProps {
   roomName: string;
   userName: string;
   isAdmin?: boolean;
   attendees?: Attendee[];
 }
 
-function RemoteVideoTile({ participant }: { participant: RemoteParticipant }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (videoRef.current && participant.stream) {
-      videoRef.current.srcObject = participant.stream;
-      videoRef.current.play().catch(err => console.error("Erro ao tentar reproduzir vídeo remoto:", err));
-    }
-  }, [participant.stream]);
-
-  return (
-    <div className="relative bg-slate-900 rounded-2xl overflow-hidden border border-green-500/40 shadow-lg flex items-center justify-center min-h-[200px] aspect-video animate-in zoom-in duration-300">
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        className="w-full h-full object-cover"
-      />
-      <div className="absolute bottom-2 left-2 right-2 bg-slate-950/85 backdrop-blur-sm p-2 rounded-xl border border-slate-800 flex items-center justify-between z-10">
-        <div className="truncate mr-2">
-          <p className="text-xs font-bold text-white truncate">{participant.userName}</p>
-          <span className="text-[10px] text-green-400 font-semibold flex items-center gap-1 mt-0.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse"></span> Ao Vivo
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DdsConferenceRoomComponent({ 
+export default function DdsConferenceRoom({ 
   roomName, 
   userName, 
   isAdmin = false, 
   attendees = [] 
-}: DdsConferenceProps) {
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const peerInstanceRef = useRef<any>(null);
-
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
-
-  const [isCameraActive, setIsCameraActive] = useState(false);
-  const [isMicMuted, setIsMicMuted] = useState(false);
+}: DdsConferenceRoomProps) {
+  // Estados de Mídia
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [isMirrored, setIsMirrored] = useState(true);
-  const [isConnecting, setIsConnecting] = useState(true);
+  const [hasMediaError, setHasMediaError] = useState(false);
 
-  const [viewMode, setViewMode] = useState<'MOSAIC' | 'SPOTLIGHT'>('MOSAIC');
+  // Streams de Vídeo
+  const cameraVideoRef = useRef<HTMLVideoElement>(null);
+  const screenVideoRef = useRef<HTMLVideoElement>(null);
+  const pipCameraVideoRef = useRef<HTMLVideoElement>(null);
 
-  // Gravação
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
-  const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
 
-  const finalUserName = userName?.trim() || (isAdmin ? 'Técnico de Segurança' : 'Colaborador');
-  const cleanRoom = (roomName || 'dds-principal')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9-_]/g, '-')
-    .toLowerCase();
-
-  // Inicia a Câmera e o WebRTC P2P
-  useEffect(() => {
-    let isMounted = true;
-    let streamInstance: MediaStream | null = null;
-
-    const setupConference = async () => {
-      try {
-        setIsConnecting(true);
-
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            frameRate: { ideal: 24 }
-          },
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
-        });
-
-        if (!isMounted) {
-          stream.getTracks().forEach(t => t.stop());
-          return;
-        }
-
-        streamInstance = stream;
-        setLocalStream(stream);
-        setIsCameraActive(true);
-
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
-
-        // Ignora erro de tipo do pacote dinâmico
-        // @ts-ignore
-        const { default: Peer } = await import('peerjs');
-
-        const peerId = isAdmin 
-          ? `ddson-host-${cleanRoom}` 
-          : `ddson-user-${cleanRoom}-${Math.random().toString(36).substring(2, 7)}`;
-
-        const peer = new Peer(peerId, {
-          config: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' }
-            ]
-          }
-        });
-
-        peerInstanceRef.current = peer;
-
-        peer.on('open', () => {
-          if (!isMounted) return;
-          setIsConnecting(false);
-
-          if (!isAdmin) {
-            const hostPeerId = `ddson-host-${cleanRoom}`;
-            
-            const callHost = () => {
-              if (!isMounted || !streamInstance) return;
-              
-              const call = peer.call(hostPeerId, streamInstance, {
-                metadata: { userName: finalUserName }
-              });
-
-              if (!call) {
-                setTimeout(callHost, 3000);
-                return;
-              }
-
-              // Tipagem explícita para o MediaStream
-              call.on('stream', (remoteStream: MediaStream) => {
-                if (!isMounted) return;
-                setRemoteParticipants([{
-                  peerId: hostPeerId,
-                  userName: 'Técnico de Segurança (Apresentador)',
-                  stream: remoteStream
-                }]);
-              });
-
-              call.on('close', () => {
-                if (!isMounted) return;
-                setRemoteParticipants([]);
-                setTimeout(callHost, 3000);
-              });
-            };
-
-            callHost();
-          }
-        });
-
-        if (isAdmin) {
-          peer.on('call', (call: any) => {
-            if (!streamInstance) return;
-            
-            call.answer(streamInstance);
-            
-            const callerName = call.metadata?.userName || 'Colaborador';
-
-            // Tipagem explícita para o MediaStream
-            call.on('stream', (remoteStream: MediaStream) => {
-              if (!isMounted) return;
-              
-              setRemoteParticipants(prev => {
-                const existingParticipant = prev.find(p => p.peerId === call.peer);
-                
-                if (existingParticipant) {
-                  return prev.map(p => 
-                    p.peerId === call.peer 
-                      ? { ...p, stream: remoteStream } 
-                      : p
-                  );
-                }
-                
-                return [...prev, {
-                  peerId: call.peer,
-                  userName: callerName,
-                  stream: remoteStream
-                }];
-              });
-            });
-
-            call.on('close', () => {
-              if (!isMounted) return;
-              setRemoteParticipants(prev => prev.filter(p => p.peerId !== call.peer));
-            });
-          });
-        }
-
-      } catch (err) {
-        console.error("Erro ao iniciar conferência:", err);
-        setIsConnecting(false);
-      }
-    };
-
-    setupConference();
-
-    return () => {
-      isMounted = false;
-      if (streamInstance) {
-        streamInstance.getTracks().forEach(t => t.stop());
-      }
-      if (peerInstanceRef.current) {
-        peerInstanceRef.current.destroy();
-      }
-    };
-  }, [cleanRoom, finalUserName, isAdmin]);
-
-  const toggleScreenShare = async () => {
-    if (!isScreenSharing) {
-      try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: false
-        });
-
-        screenStream.getVideoTracks()[0].onended = () => {
-          setIsScreenSharing(false);
-          if (localStream && localVideoRef.current) {
-            localVideoRef.current.srcObject = localStream;
-          }
-        };
-
-        setIsScreenSharing(true);
-        setIsMirrored(false);
-
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = screenStream;
-        }
-
-        if (peerInstanceRef.current && isAdmin) {
-          // Lógica de substituição de track seria aplicada aqui para P2P avançado
-        }
-      } catch {}
-    } else {
-      setIsScreenSharing(false);
-      if (localStream && localVideoRef.current) {
-        localVideoRef.current.srcObject = localStream;
-      }
-    }
-  };
-
-  const toggleMute = () => {
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsMicMuted(!audioTrack.enabled);
-      }
-    }
-  };
-
-  const startRecording = () => {
-    if (!localStream) return;
-    setRecordedChunks([]);
-    setRecordedVideoUrl(null);
-    setRecordingTime(0);
-
+  // 1. Inicializar Câmera e Microfone do Técnico/Participante
+  const initLocalMedia = useCallback(async () => {
     try {
-      const mediaRecorder = new MediaRecorder(localStream, {
-        mimeType: 'video/webm;codecs=vp8,opus'
+      setHasMediaError(false);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        audio: true
       });
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          setRecordedChunks(prev => [...prev, event.data]);
-        }
+      localStreamRef.current = stream;
+
+      if (cameraVideoRef.current) {
+        cameraVideoRef.current.srcObject = stream;
+      }
+      if (pipCameraVideoRef.current) {
+        pipCameraVideoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Erro ao acessar câmera/microfone:", err);
+      setHasMediaError(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    initLocalMedia();
+
+    return () => {
+      // Limpeza ao desmontar componente
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [initLocalMedia]);
+
+  // 2. Ligar / Desligar Microfone
+  const toggleAudio = () => {
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsAudioMuted(!audioTrack.enabled);
+      }
+    }
+  };
+
+  // 3. Ligar / Desligar Câmera
+  const toggleVideo = () => {
+    if (localStreamRef.current) {
+      const videoTrack = localStreamRef.current.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setIsVideoOff(!videoTrack.enabled);
+      }
+    }
+  };
+
+  // 4. Iniciar e Parar Compartilhamento de Tela (Com Câmera em PiP)
+  const toggleScreenShare = async () => {
+    if (isScreenSharing) {
+      stopScreenShare();
+      return;
+    }
+
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: 'monitor' },
+        audio: false
+      });
+
+      screenStreamRef.current = screenStream;
+
+      if (screenVideoRef.current) {
+        screenVideoRef.current.srcObject = screenStream;
+      }
+
+      setIsScreenSharing(true);
+
+      // Conecta a câmera na miniatura flutuante (Google Meet style)
+      if (pipCameraVideoRef.current && localStreamRef.current) {
+        pipCameraVideoRef.current.srcObject = localStreamRef.current;
+      }
+
+      // Evento disparado quando o usuário clica em "Parar Compartilhamento" na barra do navegador
+      screenStream.getVideoTracks()[0].onended = () => {
+        stopScreenShare();
       };
 
-      mediaRecorder.start(1000);
-      mediaRecorderRef.current = mediaRecorder;
-      setIsRecording(true);
-    } catch {}
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
+    } catch (err) {
+      console.warn("Compartilhamento de tela cancelado ou não permitido:", err);
+      setIsScreenSharing(false);
     }
   };
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (isRecording) {
-      timer = setInterval(() => setRecordingTime(prev => prev + 1), 1000);
+  const stopScreenShare = () => {
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      screenStreamRef.current = null;
     }
-    return () => clearInterval(timer);
-  }, [isRecording]);
+    setIsScreenSharing(false);
 
-  useEffect(() => {
-    if (!isRecording && recordedChunks.length > 0) {
-      const blob = new Blob(recordedChunks, { type: 'video/webm' });
-      const url = URL.createObjectURL(blob);
-      setRecordedVideoUrl(url);
-    }
-  }, [isRecording, recordedChunks]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const totalVideoTiles = 1 + remoteParticipants.length;
-
-  const getGridCols = () => {
-    if (totalVideoTiles <= 1) return 'grid-cols-1';
-    if (totalVideoTiles === 2) return 'grid-cols-1 sm:grid-cols-2';
-    if (totalVideoTiles <= 4) return 'grid-cols-1 sm:grid-cols-2';
-    return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+    // Restaura o stream da câmera no quadro principal
+    setTimeout(() => {
+      if (cameraVideoRef.current && localStreamRef.current) {
+        cameraVideoRef.current.srcObject = localStreamRef.current;
+      }
+    }, 100);
   };
 
   return (
-    <div className="w-full h-full min-h-[480px] bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col justify-between">
+    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 md:p-6 space-y-4 shadow-2xl relative overflow-hidden">
       
-      {/* Topo da Transmissão */}
-      <div className="bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-800">
-        <div className="flex items-center gap-2.5">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+      {/* CABEÇALHO DA SALA AO VIVO */}
+      <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
           </span>
-          <span className="text-white text-xs font-bold flex items-center gap-1.5">
-            <Users size={15} className="text-green-400" />
-            Mosaico Ao Vivo ({totalVideoTiles} {totalVideoTiles === 1 ? 'câmera' : 'câmeras'})
-          </span>
+          <h3 className="text-sm font-bold text-white tracking-wide">
+            Sala Ao Vivo: <span className="font-mono text-green-400 font-bold">{roomName.slice(0, 8)}</span>
+          </h3>
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setViewMode(viewMode === 'MOSAIC' ? 'SPOTLIGHT' : 'MOSAIC')}
-            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors"
-          >
-            {viewMode === 'MOSAIC' ? <><Maximize2 size={13} /> Foco</> : <><LayoutGrid size={13} /> Grade</>}
-          </button>
-
-          {isAdmin ? (
-            <span className="text-[11px] bg-green-500/20 text-green-300 px-2.5 py-0.5 rounded-full font-semibold border border-green-500/30 flex items-center gap-1">
-              <ShieldCheck size={12} /> Organizador
-            </span>
-          ) : (
-            <span className="text-[11px] bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/30">
-              🎙️ Ao Vivo
-            </span>
-          )}
+          <span className="bg-slate-950 px-3 py-1 rounded-xl text-xs text-slate-300 font-semibold border border-slate-800 flex items-center gap-1.5">
+            <Users size={13} className="text-green-400" /> {attendees.length + 1} online
+          </span>
         </div>
       </div>
 
-      {/* ÁREA DO MOSAICO COM TRANSMISSÕES DE VÍDEO REAIS */}
-      <div className="relative flex-1 w-full bg-slate-950 p-3 overflow-y-auto">
+      {/* ÁREA CENTRAL DE VÍDEO (LAYOUT ESTILO GOOGLE MEET) */}
+      <div className="relative w-full aspect-video bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center shadow-inner group">
         
-        {isConnecting && (
-          <div className="absolute inset-0 bg-slate-950/90 z-20 flex flex-col items-center justify-center space-y-2">
-            <Loader2 className="w-8 h-8 text-green-400 animate-spin" />
-            <p className="text-xs text-slate-300 font-bold">Conectando Câmeras Ao Vivo...</p>
-          </div>
-        )}
+        {/* ========================================================================= */}
+        {/* CENÁRIO A: TRANSMISSÃO DE TELA ATIVA COM CÂMERA FLUTUANTE EM MINIATURA */}
+        {/* ========================================================================= */}
+        {isScreenSharing ? (
+          <div className="relative w-full h-full flex items-center justify-center bg-black">
+            {/* TELA PRINCIPAL TRANSMITIDA */}
+            <video
+              ref={screenVideoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-contain"
+            />
 
-        {/* GRADE DE MOSAICO */}
-        {viewMode === 'MOSAIC' && (
-          <div className={`grid ${getGridCols()} gap-3 w-full h-full min-h-[380px]`}>
-            
-            <div className="relative bg-slate-900 rounded-2xl overflow-hidden border border-green-500/40 shadow-lg flex items-center justify-center min-h-[200px] aspect-video">
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted={true}
-                className={`w-full h-full object-cover ${
-                  isMirrored && !isScreenSharing ? '-scale-x-100' : 'scale-x-100'
-                } ${!isCameraActive ? 'hidden' : ''}`}
-              />
-
-              {!isCameraActive && (
-                <div className="text-center p-4 text-slate-500">
-                  <VideoOff size={28} className="mx-auto text-slate-600 mb-1" />
-                  <p className="text-xs font-bold text-slate-400">Sua Câmera</p>
-                </div>
-              )}
-
-              <div className="absolute bottom-2 left-2 bg-slate-950/85 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-slate-800 flex items-center gap-1.5 z-10">
-                <span className="h-2 w-2 rounded-full bg-green-500"></span>
-                <span className="text-[11px] font-bold text-white truncate max-w-[140px]">
-                  {finalUserName} {isAdmin ? '(Você - Organizador)' : '(Você)'}
-                </span>
-              </div>
-
-              {isRecording && (
-                <div className="absolute top-2 left-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 animate-pulse z-10">
-                  <Circle size={8} className="fill-white" /> REC {formatTime(recordingTime)}
-                </div>
-              )}
+            {/* SELO DE TRANSMISSÃO */}
+            <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-green-500/30 flex items-center gap-2 z-10">
+              <Monitor size={14} className="text-green-400 animate-pulse" />
+              <span className="text-xs font-bold text-white">Você está transmitindo sua tela</span>
             </div>
 
-            {remoteParticipants.map((participant) => (
-              <RemoteVideoTile key={participant.peerId} participant={participant} />
-            ))}
-
-            {remoteParticipants.length === 0 && (
-              <div className="relative bg-slate-900/50 rounded-2xl border border-dashed border-slate-800 flex flex-col items-center justify-center p-6 text-center text-slate-500 space-y-1.5 min-h-[200px] aspect-video">
-                <Users size={32} className="text-slate-700 mx-auto" />
-                <p className="text-xs font-semibold text-slate-400">Aguardando participantes...</p>
-                <p className="text-[10px] text-slate-600 max-w-[200px]">
-                  {isAdmin ? 'Conforme os colaboradores entrarem, os vídeos ao vivo aparecerão aqui.' : 'Conectado à sala do técnico.'}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* MODO FOCO (SPOTLIGHT) */}
-        {viewMode === 'SPOTLIGHT' && (
-          <div className="flex flex-col h-full space-y-3">
-            <div className="relative flex-1 bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-xl flex items-center justify-center min-h-[280px]">
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted={true}
-                className={`w-full h-full object-cover ${
-                  isMirrored && !isScreenSharing ? '-scale-x-100' : 'scale-x-100'
-                } ${!isCameraActive ? 'hidden' : ''}`}
-              />
-              <div className="absolute bottom-2 left-2 bg-slate-950/85 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-slate-800 flex items-center gap-1.5 z-10">
-                <span className="h-2 w-2 rounded-full bg-green-500"></span>
-                <span className="text-[11px] font-bold text-white truncate max-w-[140px]">Apresentação Principal</span>
+            {/* MINIATURA FLUTUANTE DA CÂMERA (GOOGLE MEET PiP) */}
+            <div className="absolute bottom-4 right-4 w-40 sm:w-52 aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border-2 border-green-500/80 z-20 group/pip transition-transform hover:scale-105">
+              {!isVideoOff ? (
+                <video
+                  ref={pipCameraVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover scale-x-[-1]"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-500">
+                  <VideoOff size={20} />
+                  <span className="text-[10px] mt-1 font-semibold">Câmera Pausada</span>
+                </div>
+              )}
+              <div className="absolute bottom-1.5 left-2 bg-black/70 px-2 py-0.5 rounded-md text-[10px] font-bold text-white truncate max-w-[90%]">
+                {userName} (Você)
               </div>
             </div>
-
-            {remoteParticipants.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto pb-1 max-h-32">
-                {remoteParticipants.map(p => (
-                  <div key={p.peerId} className="relative w-32 h-24 bg-slate-900 rounded-xl overflow-hidden border border-slate-700 shrink-0">
-                    <RemoteVideoTile participant={p} />
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
-        )}
-
-      </div>
-
-      {/* Barra de Controles Inferior */}
-      <div className="bg-slate-900 p-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {isCameraActive && (
-            <>
-              <button
-                onClick={toggleMute}
-                className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
-                  isMicMuted
-                    ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                    : 'bg-slate-800 text-white hover:bg-slate-700 border-slate-700'
-                }`}
-                title={isMicMuted ? 'Ativar Microfone' : 'Mutar Microfone'}
-              >
-                {isMicMuted ? <MicOff size={16} /> : <Mic size={16} className="text-green-400" />}
-              </button>
-
-              {isAdmin && (
-                <button
-                  onClick={toggleScreenShare}
-                  className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
-                    isScreenSharing
-                      ? 'bg-green-600 text-white border-green-500'
-                      : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border-slate-700'
-                  }`}
-                >
-                  <Monitor size={16} className={isScreenSharing ? 'text-white' : 'text-green-400'} />
-                  <span className="hidden sm:inline">{isScreenSharing ? 'Parar Tela' : 'Apresentar Tela'}</span>
-                </button>
-              )}
-
-              {!isScreenSharing && (
-                <button
-                  onClick={() => setIsMirrored(!isMirrored)}
-                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all ${
-                    isMirrored
-                      ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                      : 'bg-slate-800 text-slate-400 border-slate-700'
-                  }`}
-                  title="Modo Espelho"
-                >
-                  <FlipHorizontal size={16} />
-                </button>
-              )}
-            </>
-          )}
-        </div>
-
-        {isAdmin && isCameraActive && (
-          <div className="flex items-center gap-2">
-            {!isRecording ? (
-              <button
-                onClick={startRecording}
-                className="px-4 py-2.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
-              >
-                <Circle size={12} className="fill-red-500" /> Gravar DDS
-              </button>
+        ) : (
+          /* ========================================================================= */
+          /* CENÁRIO B: CÂMERA NORMAL EM TELA CHEIA */
+          /* ========================================================================= */
+          <div className="relative w-full h-full flex items-center justify-center">
+            {!isVideoOff && !hasMediaError ? (
+              <video
+                ref={cameraVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover scale-x-[-1]"
+              />
             ) : (
-              <button
-                onClick={stopRecording}
-                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg animate-pulse"
-              >
-                <Square size={12} className="fill-white" /> Parar Gravação
-              </button>
+              <div className="flex flex-col items-center justify-center text-slate-500 space-y-2">
+                <div className="p-4 bg-slate-900 rounded-full border border-slate-800">
+                  {hasMediaError ? <AlertCircle size={36} className="text-amber-400" /> : <VideoOff size={36} className="text-slate-600" />}
+                </div>
+                <p className="text-xs font-bold text-slate-300">
+                  {hasMediaError ? 'Acesso à câmera bloqueado no navegador' : 'Sua câmera está desligada'}
+                </p>
+                {hasMediaError && (
+                  <button onClick={initLocalMedia} className="text-[11px] text-green-400 hover:underline">
+                    Tentar novamente
+                  </button>
+                )}
+              </div>
             )}
 
-            {recordedVideoUrl && (
-              <a
-                href={recordedVideoUrl}
-                download={`DDS_Gravacao_${new Date().toISOString().slice(0, 10)}.webm`}
-                className="px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-lg"
-              >
-                <Download size={15} /> Baixar Vídeo
-              </a>
-            )}
+            {/* Identificação do Usuário */}
+            <div className="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur-md px-3 py-1 rounded-xl text-xs font-bold text-white border border-slate-700/60 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-400"></span>
+              {userName} {isAdmin && <span className="text-[10px] text-green-400 font-normal">(Organizador)</span>}
+            </div>
           </div>
         )}
       </div>
+
+      {/* ========================================================================= */}
+      {/* BARRA DE CONTROLES INFERIOR (ESTILO MEET) */}
+      {/* ========================================================================= */}
+      <div className="flex items-center justify-center gap-3 pt-2">
+        {/* Botão Microfone */}
+        <button
+          onClick={toggleAudio}
+          className={`p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center transition-all shadow-md ${
+            isAudioMuted 
+              ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20' 
+              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+          }`}
+          title={isAudioMuted ? 'Ativar Microfone' : 'Silenciar Microfone'}
+        >
+          {isAudioMuted ? <MicOff size={18} /> : <Mic size={18} />}
+        </button>
+
+        {/* Botão Câmera */}
+        <button
+          onClick={toggleVideo}
+          className={`p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center transition-all shadow-md ${
+            isVideoOff 
+              ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20' 
+              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+          }`}
+          title={isVideoOff ? 'Ligar Câmera' : 'Desligar Câmera'}
+        >
+          {isVideoOff ? <VideoOff size={18} /> : <VideoIcon size={18} />}
+        </button>
+
+        {/* Botão Transmissão de Tela (Screen Share) */}
+        {isAdmin && (
+          <button
+            onClick={toggleScreenShare}
+            className={`px-5 py-3.5 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all shadow-md ${
+              isScreenSharing 
+                ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-orange-600/20 animate-pulse' 
+                : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-green-600/25'
+            }`}
+            title={isScreenSharing ? 'Parar Compartilhamento de Tela' : 'Compartilhar Tela com a Equipe'}
+          >
+            {isScreenSharing ? <MonitorOff size={18} /> : <Monitor size={18} />}
+            <span>{isScreenSharing ? 'Parar Tela' : 'Apresentar Tela'}</span>
+          </button>
+        )}
+      </div>
+
     </div>
   );
 }
-
-export default memo(DdsConferenceRoomComponent);
