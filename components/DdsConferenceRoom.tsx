@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Mic, MicOff, Video as VideoIcon, VideoOff, 
   Monitor, MonitorOff, Users, Hand, Crown, 
-  Check, Sparkles, Wifi, WifiOff, Maximize, Minimize
+  Check, Sparkles, Wifi, WifiOff, Maximize, Minimize, Volume2
 } from 'lucide-react';
 
 interface RemoteParticipant {
@@ -37,8 +37,8 @@ function playHandRaiseBeep() {
     gain.connect(ctx.destination);
 
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime); // Nota Lá (A5)
-    osc.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.1); // Nota Ré (D6)
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.1);
 
     gain.gain.setValueAtTime(0.2, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
@@ -192,6 +192,7 @@ export default function DdsConferenceRoom({
   // Streams
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const [remoteOrganizerStream, setRemoteOrganizerStream] = useState<MediaStream | null>(null);
 
   // WebRTC PeerJS
@@ -214,7 +215,38 @@ export default function DdsConferenceRoom({
   const cleanRoomId = roomName.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
   const hostPeerId = `dds-${cleanRoomId}-host`;
 
-  // 1. CARREGAR MOTOR WEBRTC (PEERJS)
+  // 1. LIMPEZA TOTAL DE MÍDIA (DESLIGA O LED DA CÂMERA IMEDIATAMENTE)
+  const cleanupAllMedia = useCallback(() => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
+      localStreamRef.current = null;
+    }
+
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
+      screenStreamRef.current = null;
+    }
+
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+
+    // Libera a trava de hardware dos elementos de vídeo
+    [localMainVideoRef, localPipVideoRef, localParticipantMosaicRef, screenShareVideoRef, organizerVideoRef].forEach(ref => {
+      if (ref.current) {
+        ref.current.srcObject = null;
+      }
+    });
+  }, []);
+
+  // 2. CARREGAR MOTOR WEBRTC (PEERJS)
   const loadPeerJs = useCallback((): Promise<any> => {
     return new Promise((resolve, reject) => {
       if ((window as any).Peer) {
@@ -230,7 +262,7 @@ export default function DdsConferenceRoom({
     });
   }, []);
 
-  // 2. INICIALIZAR MÍDIA LOCAL (COM FILTRO ANTI-ECO E CANCELAMENTO DE RUÍDO)
+  // 3. INICIALIZAR MÍDIA LOCAL (COM FILTRO ANTI-ECO E CANCELAMENTO DE RUÍDO)
   const initLocalMedia = useCallback(async () => {
     try {
       setHasMediaError(false);
@@ -245,9 +277,9 @@ export default function DdsConferenceRoom({
           facingMode: 'user' 
         },
         audio: {
-          echoCancellation: true,    // Cancela o próprio eco (Anti-Microfonia)
-          noiseSuppression: true,    // Remove ruído de fundo
-          autoGainControl: true      // Ajuste automático de volume
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
         }
       });
 
@@ -277,7 +309,17 @@ export default function DdsConferenceRoom({
     }
   }, [isAdmin, isScreenSharing]);
 
-  // 3. SINCRONIZAÇÃO DA TELA DO ORGANIZADOR
+  // 4. LIMPEZA AO FECHAR OU DESMONTAR O COMPONENTE
+  useEffect(() => {
+    return () => {
+      cleanupAllMedia();
+      if (peerInstance.current) {
+        peerInstance.current.destroy();
+      }
+    };
+  }, [cleanupAllMedia]);
+
+  // 5. SINCRONIZAÇÃO DA TELA DO ORGANIZADOR
   useEffect(() => {
     if (isScreenSharing && screenStreamRef.current) {
       if (screenShareVideoRef.current) {
@@ -295,7 +337,7 @@ export default function DdsConferenceRoom({
     }
   }, [isScreenSharing, isAdmin]);
 
-  // 4. SINCRONIZAÇÃO DO VÍDEO DO PARTICIPANTE NO MOSAICO
+  // 6. SINCRONIZAÇÃO DO VÍDEO DO PARTICIPANTE NO MOSAICO
   useEffect(() => {
     if (!isAdmin && localParticipantMosaicRef.current && localStreamRef.current) {
       localParticipantMosaicRef.current.srcObject = localStreamRef.current;
@@ -303,7 +345,7 @@ export default function DdsConferenceRoom({
     }
   }, [isAdmin, isVideoOff]);
 
-  // 5. CONEXÃO WEBRTC PEER-TO-PEER
+  // 7. CONEXÃO WEBRTC PEER-TO-PEER
   useEffect(() => {
     let isMounted = true;
 
@@ -314,7 +356,7 @@ export default function DdsConferenceRoom({
       if (!PeerClass || !isMounted) return;
 
       if (isAdmin) {
-        // MODO ORGANIZADOR (HOST DA SALA)
+        // MODO ORGANIZADOR (HOST)
         const peer = new PeerClass(hostPeerId, {
           debug: 1,
           config: {
@@ -481,13 +523,14 @@ export default function DdsConferenceRoom({
 
     return () => {
       isMounted = false;
+      cleanupAllMedia();
       if (peerInstance.current) {
         peerInstance.current.destroy();
       }
     };
-  }, [cleanRoomId, hostPeerId, isAdmin, userName, initLocalMedia, loadPeerJs]);
+  }, [cleanRoomId, hostPeerId, isAdmin, userName, initLocalMedia, loadPeerJs, cleanupAllMedia]);
 
-  // 6. SINCRONIZA VÍDEO DO ORGANIZADOR NO PARTICIPANTE
+  // 8. SINCRONIZA VÍDEO DO ORGANIZADOR NO PARTICIPANTE
   useEffect(() => {
     if (!isAdmin && remoteOrganizerStream && organizerVideoRef.current) {
       organizerVideoRef.current.srcObject = remoteOrganizerStream;
@@ -495,7 +538,7 @@ export default function DdsConferenceRoom({
     }
   }, [isAdmin, remoteOrganizerStream]);
 
-  // 7. APRESENTAÇÃO DE TELA (ORGANIZADOR)
+  // 9. APRESENTAÇÃO DE TELA COM ÁUDIO DO VÍDEO + VOZ DO INSTRUTOR MIXADOS
   const toggleScreenShare = async () => {
     if (!isAdmin) return;
 
@@ -505,26 +548,76 @@ export default function DdsConferenceRoom({
     }
 
     try {
+      // CAPTURA VÍDEO + ÁUDIO DO SISTEMA / GUIA (YOUTUBE / ARQUIVO MP4)
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: { displaySurface: 'monitor', frameRate: { ideal: 30 } },
-        audio: false
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
       });
 
       screenStreamRef.current = screenStream;
       setIsScreenSharing(true);
 
-      const screenTrack = screenStream.getVideoTracks()[0];
+      const screenVideoTrack = screenStream.getVideoTracks()[0];
+      const screenAudioTrack = screenStream.getAudioTracks()[0];
 
+      // MIXER DE ÁUDIO (Voz do Instrutor + Som do Vídeo)
+      let mixedAudioTrack: MediaStreamTrack | null = null;
+
+      if (screenAudioTrack && localStreamRef.current) {
+        try {
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+          const audioCtx = new AudioCtx();
+          audioContextRef.current = audioCtx;
+
+          const destination = audioCtx.createMediaStreamDestination();
+
+          // Conecta o microfone do técnico
+          const micAudioTrack = localStreamRef.current.getAudioTracks()[0];
+          if (micAudioTrack) {
+            const micStream = new MediaStream([micAudioTrack]);
+            const micSource = audioCtx.createMediaStreamSource(micStream);
+            micSource.connect(destination);
+          }
+
+          // Conecta o som do vídeo / apresentação
+          const sysStream = new MediaStream([screenAudioTrack]);
+          const sysSource = audioCtx.createMediaStreamSource(sysStream);
+          sysSource.connect(destination);
+
+          mixedAudioTrack = destination.stream.getAudioTracks()[0];
+        } catch (mixErr) {
+          console.warn("Mixer de áudio indisponível, usando áudio da tela direto:", mixErr);
+          mixedAudioTrack = screenAudioTrack;
+        }
+      }
+
+      // Substitui as trilhas de vídeo e áudio nos celulares dos colaboradores
       activeCalls.current.forEach((call) => {
         try {
           const pc = call.peerConnection;
           if (pc) {
             const senders = pc.getSenders();
+            
+            // Substitui Vídeo
             const videoSender = senders.find((s: any) => 
               (s.track && s.track.kind === 'video') || s.kind === 'video'
             );
             if (videoSender) {
-              videoSender.replaceTrack(screenTrack);
+              videoSender.replaceTrack(screenVideoTrack);
+            }
+
+            // Substitui Áudio (com som do vídeo)
+            if (mixedAudioTrack) {
+              const audioSender = senders.find((s: any) => 
+                (s.track && s.track.kind === 'audio') || s.kind === 'audio'
+              );
+              if (audioSender) {
+                audioSender.replaceTrack(mixedAudioTrack);
+              }
             }
           }
         } catch (err) {
@@ -532,7 +625,7 @@ export default function DdsConferenceRoom({
         }
       });
 
-      screenTrack.onended = () => {
+      screenVideoTrack.onended = () => {
         stopScreenShare();
       };
     } catch (err) {
@@ -546,30 +639,37 @@ export default function DdsConferenceRoom({
       screenStreamRef.current.getTracks().forEach(t => t.stop());
       screenStreamRef.current = null;
     }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
     setIsScreenSharing(false);
 
+    // Restaura a câmera e o microfone do organizador para todos
     if (localStreamRef.current) {
       const camTrack = localStreamRef.current.getVideoTracks()[0];
-      if (camTrack) {
-        activeCalls.current.forEach((call) => {
-          try {
-            const pc = call.peerConnection;
-            if (pc) {
-              const senders = pc.getSenders();
-              const videoSender = senders.find((s: any) => 
-                (s.track && s.track.kind === 'video') || s.kind === 'video'
-              );
-              if (videoSender) {
-                videoSender.replaceTrack(camTrack);
-              }
+      const micTrack = localStreamRef.current.getAudioTracks()[0];
+
+      activeCalls.current.forEach((call) => {
+        try {
+          const pc = call.peerConnection;
+          if (pc) {
+            const senders = pc.getSenders();
+            if (camTrack) {
+              const videoSender = senders.find((s: any) => (s.track && s.track.kind === 'video') || s.kind === 'video');
+              if (videoSender) videoSender.replaceTrack(camTrack);
             }
-          } catch (err) {}
-        });
-      }
+            if (micTrack) {
+              const audioSender = senders.find((s: any) => (s.track && s.track.kind === 'audio') || s.kind === 'audio');
+              if (audioSender) audioSender.replaceTrack(micTrack);
+            }
+          }
+        } catch (err) {}
+      });
     }
   };
 
-  // 8. LEVANTAR A MÃO (PARTICIPANTE)
+  // 10. LEVANTAR A MÃO (PARTICIPANTE)
   const toggleRaiseHand = () => {
     const nextState = !isMyHandRaised;
     setIsMyHandRaised(nextState);
@@ -583,7 +683,7 @@ export default function DdsConferenceRoom({
     }
   };
 
-  // 9. MODERAÇÃO DO ORGANIZADOR
+  // 11. MODERAÇÃO DO ORGANIZADOR
   const handleModerateMute = (peerId: string) => {
     const conn = participantConns.current.get(peerId);
     if (conn && conn.open) {
@@ -611,7 +711,7 @@ export default function DdsConferenceRoom({
     }
   };
 
-  // 10. CONTROLES DE ÁUDIO E VÍDEO LOCAL
+  // 12. CONTROLES DE ÁUDIO E VÍDEO LOCAL
   const toggleAudio = () => {
     if (localStreamRef.current) {
       const track = localStreamRef.current.getAudioTracks()[0];
@@ -632,7 +732,7 @@ export default function DdsConferenceRoom({
     }
   };
 
-  // 11. CONTROLE DE TELA CHEIA (FULLSCREEN)
+  // 13. TELA CHEIA (FULLSCREEN)
   const toggleFullscreen = () => {
     if (!stageContainerRef.current) return;
     if (!document.fullscreenElement) {
@@ -650,7 +750,7 @@ export default function DdsConferenceRoom({
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
-  // 12. ORDENAÇÃO DO MOSAICO
+  // 14. ORDENAÇÃO DO MOSAICO
   const sortedParticipants = [...remoteParticipants].sort((a, b) => {
     if (a.isHandRaised && !b.isHandRaised) return -1;
     if (!a.isHandRaised && b.isHandRaised) return 1;
@@ -734,11 +834,11 @@ export default function DdsConferenceRoom({
           <div className="flex items-center gap-2">
             {isScreenSharing && (
               <span className="text-[10px] font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-2.5 py-0.5 rounded-md flex items-center gap-1">
-                <Sparkles size={11} /> Apresentação em Destaque
+                <Volume2 size={11} className="animate-pulse" /> Áudio da Apresentação Ativo
               </span>
             )}
             
-            {/* BOTÃO DE TELA CHEIA (FULLSCREEN) */}
+            {/* BOTÃO DE TELA CHEIA */}
             <button
               type="button"
               onClick={toggleFullscreen}
@@ -769,9 +869,9 @@ export default function DdsConferenceRoom({
                 />
                 <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-green-500/30 flex items-center gap-2 z-10 shadow-lg">
                   <Monitor size={14} className="text-green-400 animate-pulse" />
-                  <span className="text-xs font-bold text-white">Transmitindo Tela para os Colaboradores</span>
+                  <span className="text-xs font-bold text-white">Transmitindo Tela e Áudio para a Equipe</span>
                 </div>
-                {/* Miniatura do Organizador no Canto */}
+                {/* Miniatura do Organizador */}
                 <div className="absolute bottom-4 right-4 w-44 sm:w-60 aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border-2 border-green-500 z-20">
                   <video
                     ref={localPipVideoRef}
@@ -816,7 +916,7 @@ export default function DdsConferenceRoom({
               </div>
             )
           ) : (
-            /* VISÃO DO PARTICIPANTE: 100% LIMPA (SEM NENHUMA JANELA TAMPANDO) */
+            /* VISÃO DO PARTICIPANTE (COM ÁUDIO DO VÍDEO TRANSMITIDO) */
             <div className="relative w-full h-full flex items-center justify-center bg-black">
               {remoteOrganizerStream ? (
                 <video
@@ -843,7 +943,7 @@ export default function DdsConferenceRoom({
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. MOSAICO DOS PARTICIPANTES (1º LUGAR PARA O PRÓPRIO PARTICIPANTE) */}
+      {/* 2. MOSAICO DOS PARTICIPANTES */}
       {/* ========================================================================= */}
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between border-t border-slate-800/80 pt-4 px-1">
@@ -1001,7 +1101,7 @@ export default function DdsConferenceRoom({
             }`}
           >
             {isScreenSharing ? <MonitorOff size={18} /> : <Monitor size={18} />}
-            <span>{isScreenSharing ? 'Parar Apresentação' : 'Apresentar Tela'}</span>
+            <span>{isScreenSharing ? 'Parar Apresentação' : 'Apresentar Tela com Áudio'}</span>
           </button>
         )}
       </div>
