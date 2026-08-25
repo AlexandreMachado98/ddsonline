@@ -1,11 +1,11 @@
  {
   "name": "DDS ON - Diálogo Diário de Segurança",
   "short_name": "DDS ON",
-  "description": "Plataforma Digital de Lista de Presença com Biometria e Assinatura Digital",
+  "description": "Plataforma Digital de SST, Biometria Facial e Lista de Presença",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#020617",
-  "theme_color": "#020617",
+  "background_color": "#091726",
+  "theme_color": "#091726",
   "icons": [
     {
       "src": "/icon-192x192.png",
