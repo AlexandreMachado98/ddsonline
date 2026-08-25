@@ -1,5 +1,6 @@
  import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 
 export const viewport: Viewport = {
   themeColor: "#091726",
@@ -56,16 +57,20 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="DDS ON" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
         <link rel="shortcut icon" href="/icon-192x192.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        {/* Registro do Service Worker para o Chrome reconhecer como App Instalável */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                  navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(err) {
                     console.log('SW registration failed: ', err);
                   });
                 });
@@ -76,6 +81,7 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased bg-slate-950 text-slate-100 min-h-screen">
         {children}
+        <PwaInstallPrompt />
       </body>
     </html>
   );
