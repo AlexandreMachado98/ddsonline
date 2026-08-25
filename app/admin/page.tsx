@@ -17,7 +17,7 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<'NEW_DDS' | 'HISTORY'>('NEW_DDS');
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
-  const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
+  const [isLoadingInitial, setIsLoadingInitial] = useState(true);
 
   // Formulário do Novo DDS
   const [meetingType, setMeetingType] = useState<'PRESENTIAL' | 'REMOTE'>('PRESENTIAL');
@@ -25,11 +25,11 @@ export default function AdminPanel() {
   const [farm, setFarm] = useState('');
   const [objective, setObjective] = useState('');
 
-  // Fotos da Equipe no Modo Presencial
+  // Fotos da Equipe
   const [teamPhotos, setTeamPhotos] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Filtros e Seleção Múltipla
+  // Filtros
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedMeetings, setSelectedMeetings] = useState<string[]>([]);
@@ -37,9 +37,8 @@ export default function AdminPanel() {
   const [activeMeeting, setActiveMeeting] = useState<any>(null);
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [exitNotification, setExitNotification] = useState<string | null>(null);
 
-  // Sistema de Notificações
+  // Notificações
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'info' }>({ show: false, message: '', type: 'info' });
   const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
@@ -56,30 +55,35 @@ export default function AdminPanel() {
     }
     try {
       const user = JSON.parse(auth);
-      setCurrentUser(user);
+      if (user && user.id) {
+        setCurrentUser(user);
+      } else {
+        localStorage.removeItem('dds_admin_auth');
+        window.location.replace('/');
+      }
     } catch {
       localStorage.removeItem('dds_admin_auth');
       window.location.replace('/');
     }
   }, []);
 
+  // Busca de Dados com Smart Diffing (Sem repintura desnecessária do DOM)
   const fetchAllData = useCallback(async () => {
+    if (!currentUser?.id) return;
+
     try {
-      const orgId = currentUser?.id || '';
-      let url = `/api/reuniao?organizerId=${orgId}&_t=${Date.now()}`;
+      let url = `/api/reuniao?organizerId=${currentUser.id}&_t=${Date.now()}`;
       if (startDate) url += `&startDate=${startDate}`;
       if (endDate) url += `&endDate=${endDate}`;
 
       const res = await fetch(url, {
         cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
       });
       
       if (!res.ok) return;
 
-      const responseText = await res.text();
-      let data: any = {};
-      try { data = JSON.parse(responseText); } catch { return; }
+      const data = await res.json();
       
       if (data.success) {
         if (data.meeting && data.meeting.status === 'LIVE') {
@@ -91,15 +95,6 @@ export default function AdminPanel() {
               if (Array.isArray(parsed) && teamPhotos.length === 0) setTeamPhotos(parsed);
             } catch {}
           }
-
-          if (data.meeting.attendees) {
-            data.meeting.attendees.forEach((person: any) => {
-              if (person.name.includes('(Saída:') && !exitNotification) {
-                setExitNotification(`⚠️ ${person.name.replace(/\(Saída:.*\)/, '')} precisou se ausentar.`);
-                setTimeout(() => setExitNotification(null), 8000);
-              }
-            });
-          }
         } else {
           setActiveMeeting(null);
         }
@@ -107,19 +102,19 @@ export default function AdminPanel() {
         setMeetingHistory(data.history || []);
       }
     } catch (error) {
-      console.error(error);
+      console.error("Erro no polling:", error);
     } finally {
-      setIsInitialLoadDone(true);
+      setIsLoadingInitial(false);
     }
-  }, [currentUser, startDate, endDate, exitNotification, teamPhotos.length]);
+  }, [currentUser?.id, startDate, endDate, teamPhotos.length]);
 
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser?.id) {
       fetchAllData();
-      const interval = setInterval(fetchAllData, 2000);
+      const interval = setInterval(fetchAllData, 3000);
       return () => clearInterval(interval);
     }
-  }, [currentUser, fetchAllData]);
+  }, [currentUser?.id, fetchAllData]);
 
   const handleStartNewMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,9 +139,7 @@ export default function AdminPanel() {
         })
       });
       
-      const responseText = await res.text();
-      let data: any = {};
-      try { data = JSON.parse(responseText); } catch { throw new Error('Falha ao ler resposta da API.'); }
+      const data = await res.json();
       
       if (res.ok && data.success && data.meeting) {
         setActiveMeeting(data.meeting);
@@ -243,11 +236,10 @@ export default function AdminPanel() {
     });
   };
 
-  // Exclusão Múltipla
-  const handleDeleteMeetings = (ids: string[], isMultiple = false, topic = '') => {
+  const handleDeleteMeetings = (ids: string[], isMultiple = false, topicName = '') => {
     setConfirmDialog({
       title: isMultiple ? 'Exclusão Múltipla' : 'Excluir DDS',
-      message: `⚠️ Tem certeza que deseja excluir permanentemente ${isMultiple ? `${ids.length} reuniões selecionadas` : `o DDS "${topic}"`} e todas as presenças vinculadas? Esta ação não pode ser desfeita.`,
+      message: `⚠️ Tem certeza que deseja excluir permanentemente ${isMultiple ? `${ids.length} reuniões selecionadas` : `o DDS "${topicName}"`} e todas as presenças vinculadas?`,
       onConfirm: async () => {
         try {
           const res = await fetch('/api/reuniao', {
@@ -257,7 +249,7 @@ export default function AdminPanel() {
           });
           const data = await res.json();
           if (data.success) {
-            showToast(isMultiple ? 'Reuniões excluídas com sucesso!' : 'DDS excluído do histórico com sucesso!', 'success');
+            showToast('Excluído com sucesso!', 'success');
             setSelectedMeetings([]);
             fetchAllData();
           } else {
@@ -331,15 +323,12 @@ export default function AdminPanel() {
     window.location.replace('/');
   };
 
-  // =========================================================================
-  // SALA DO DDS EM ANDAMENTO (PRESENCIAL OU REMOTO)
-  // =========================================================================
+  // SALA DO DDS EM ANDAMENTO
   if (isLiveMode && activeMeeting) {
     const isPresential = activeMeeting.type === 'PRESENTIAL';
 
     return (
       <main className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans relative text-white flex flex-col justify-between">
-        
         {toast.show && (
           <div className={`fixed top-6 right-6 z-[9999] px-5 py-3 rounded-2xl shadow-2xl border flex items-center gap-3 animate-in slide-in-from-top-5 duration-300 ${
             toast.type === 'success' ? 'bg-green-950/90 border-green-500/50 text-green-100' :
@@ -539,12 +528,9 @@ export default function AdminPanel() {
     );
   }
 
-  // =========================================================================
-  // DASHBOARD PRINCIPAL
-  // =========================================================================
+  // DASHBOARD PRINCIPAL (SEM FLICKERING)
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans flex flex-col justify-between">
-      
       {toast.show && (
         <div className={`fixed top-6 right-6 z-[9999] px-5 py-3 rounded-2xl shadow-2xl border flex items-center gap-3 animate-in slide-in-from-top-5 duration-300 ${
           toast.type === 'success' ? 'bg-green-950/90 border-green-500/50 text-green-100' :
@@ -575,7 +561,6 @@ export default function AdminPanel() {
       )}
 
       <div className="max-w-5xl mx-auto space-y-6 w-full">
-        
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/90 p-6 rounded-3xl border border-slate-800 shadow-xl backdrop-blur-sm">
           <div>
             <span className="text-2xl font-black tracking-tight">
@@ -596,7 +581,8 @@ export default function AdminPanel() {
           </div>
         </header>
 
-        {isInitialLoadDone && activeMeeting && (
+        {/* BANNER DE REUNIÃO ATIVA (SÓ EXIBE SE REALMENTE EXISTIR UMA REUNIÃO AO VIVO DESTE TÉCNICO) */}
+        {!isLoadingInitial && activeMeeting && activeMeeting.status === 'LIVE' && (
           <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-5 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-green-400/30 animate-in fade-in duration-300">
             <div className="flex items-center gap-3.5">
               <div className="p-3 bg-white/20 rounded-2xl"><Radio size={24} className="animate-pulse" /></div>
@@ -607,7 +593,7 @@ export default function AdminPanel() {
                 <h3 className="text-lg font-black">{activeMeeting.topic} ({activeMeeting.farm})</h3>
               </div>
             </div>
-            <button onClick={() => setIsLiveMode(true)} className="px-6 py-3 bg-white text-green-900 hover:bg-green-50 font-bold text-xs rounded-xl shadow-md">
+            <button onClick={() => setIsLiveMode(true)} className="px-6 py-3 bg-white text-green-900 hover:bg-green-50 font-bold text-xs rounded-xl shadow-md transition-all active:scale-95">
               Abrir Painel do DDS ➡️
             </button>
           </div>
@@ -659,10 +645,8 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* ABA 2: HISTÓRICO COM EXCLUSÃO MÚLTIPLA */}
         {activeTab === 'HISTORY' && (
           <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
-            
             <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
@@ -694,7 +678,6 @@ export default function AdminPanel() {
             </div>
 
             <div className="space-y-3">
-              {/* BOTÕES DE SELEÇÃO E EXCLUSÃO MÚLTIPLA */}
               {meetingHistory.length > 0 && (
                 <div className="flex items-center justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800">
                   <button 

@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    // 1. ROTA DO COLABORADOR: Verifica o status EXATO da reunião do link
+    // 1. ROTA DO COLABORADOR: Verifica o status do link
     if (meetingId) {
       const targetMeeting = await prisma.meeting.findUnique({
         where: { id: meetingId },
@@ -34,60 +34,64 @@ export async function GET(req: Request) {
       });
     }
 
-    // 2. ROTA DO ADMIN: Filtros de Histórico e Reunião Ativa
-    const dateFilter: any = {};
-    if (startDate) dateFilter.gte = new Date(`${startDate}T00:00:00.000Z`);
-    if (endDate) dateFilter.lte = new Date(`${endDate}T23:59:59.999Z`);
-
-    // Valida se o organizerId existe no banco
+    // 2. ROTA DO ADMIN: Validação estrita do Organizador (Evita Flash de Reuniões Fantasmas)
     let validUserId: string | null = null;
     let userCompanyId: string | null = null;
 
     if (organizerId && organizerId !== 'undefined' && organizerId !== 'null' && organizerId.trim() !== '') {
       const user = await prisma.user.findUnique({
-        where: { id: organizerId.trim() }
+        where: { id: organizerId.trim() },
+        select: { id: true, companyId: true, role: true }
       });
       if (user) {
         validUserId = user.id;
-        userCompanyId = user.companyId || null;
+        userCompanyId = user.companyId;
       }
     }
 
-    // Monta o filtro inteligente (se não achar pelo ID, não trava a busca)
-    const activeMeetingFilter: any = { status: 'LIVE' };
-    if (validUserId) {
-      if (userCompanyId) {
-        activeMeetingFilter.OR = [
-          { organizerId: validUserId },
-          { companyId: userCompanyId }
-        ];
-      } else {
-        activeMeetingFilter.organizerId = validUserId;
-      }
+    // Se o ID do usuário não for válido, não retorna reuniões aleatórias de outros técnicos
+    if (!validUserId) {
+      return NextResponse.json({ success: true, meeting: null, history: [] });
     }
 
+    // Filtro estrito: Apenas reuniões deste organizador ou de sua empresa
+    const ownerFilter: any = userCompanyId 
+      ? { OR: [{ organizerId: validUserId }, { companyId: userCompanyId }] }
+      : { organizerId: validUserId };
+
+    // Auto-encerra reuniões LIVE abandonadas com mais de 24 horas
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await prisma.meeting.updateMany({
+      where: {
+        status: 'LIVE',
+        ...ownerFilter,
+        createdAt: { lt: oneDayAgo }
+      },
+      data: { status: 'ENDED' }
+    });
+
+    // Busca a reunião ativa legítima
     const activeMeeting = await prisma.meeting.findFirst({
-      where: activeMeetingFilter,
+      where: {
+        status: 'LIVE',
+        ...ownerFilter
+      },
       include: {
         attendees: { orderBy: { createdAt: 'desc' } }
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    const meetingWhere: any = { status: 'ENDED' };
-    if (validUserId) {
-      if (userCompanyId) {
-        meetingWhere.OR = [
-          { organizerId: validUserId },
-          { companyId: userCompanyId }
-        ];
-      } else {
-        meetingWhere.organizerId = validUserId;
-      }
-    }
-    if (startDate || endDate) {
-      meetingWhere.createdAt = dateFilter;
-    }
+    // Filtros de Data para o Histórico
+    const dateFilter: any = {};
+    if (startDate) dateFilter.gte = new Date(`${startDate}T00:00:00.000Z`);
+    if (endDate) dateFilter.lte = new Date(`${endDate}T23:59:59.999Z`);
+
+    const meetingWhere: any = {
+      status: 'ENDED',
+      ...ownerFilter,
+      ...(startDate || endDate ? { createdAt: dateFilter } : {})
+    };
 
     const history = await prisma.meeting.findMany({
       where: meetingWhere,
@@ -121,7 +125,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Preencha o Tema e o Local da fazenda' }, { status: 400 });
     }
 
-    // Validação Segura do Organizador
     let validOrganizerId: string | null = null;
     let resolvedCompanyId: string | null = null;
 
@@ -145,7 +148,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Se o ID enviado não for encontrado, vincula ao primeiro usuário ativo disponível
     if (!validOrganizerId) {
       const defaultUser = await prisma.user.findFirst({
         where: { status: 'ACTIVE' }
@@ -156,7 +158,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Encerra qualquer reunião anterior que tenha ficado LIVE
+    // Encerra qualquer reunião anterior LIVE antes de abrir a nova
     try {
       await prisma.meeting.updateMany({
         where: {
@@ -167,7 +169,6 @@ export async function POST(req: Request) {
       });
     } catch (e) {}
 
-    // Cria a nova reunião
     const newMeeting = await prisma.meeting.create({
       data: {
         topic: String(topic).trim(),
@@ -184,7 +185,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, meeting: newMeeting });
   } catch (error: any) {
-    console.error("Erro ao criar reunião:", error);
     return NextResponse.json({ success: false, error: error?.message || 'Falha ao salvar' }, { status: 500 });
   }
 }
