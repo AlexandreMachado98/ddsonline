@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Mic, MicOff, Video as VideoIcon, VideoOff, 
   Monitor, MonitorOff, Users, Hand, Crown, 
-  Check, Sparkles, Wifi, WifiOff
+  Check, Sparkles, Wifi, WifiOff, Maximize, Minimize, BellRing
 } from 'lucide-react';
 
 interface RemoteParticipant {
@@ -24,7 +24,31 @@ interface DdsConferenceRoomProps {
   attendees?: any[];
 }
 
-// Componente para renderizar cada vídeo do mosaico de forma estável
+// Emissor de som de notificação de mão levantada (Web Audio API nativo)
+function playHandRaiseBeep() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime); // Nota Lá (A5)
+    osc.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.1); // Nota Ré (D6)
+
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.35);
+  } catch {}
+}
+
+// Componente para renderizar os cards dos participantes no Mosaico
 function ParticipantVideoCard({ 
   participant, 
   isAdmin, 
@@ -80,7 +104,7 @@ function ParticipantVideoCard({
         )}
       </div>
 
-      {/* TOPO: BADGE DE MÃO LEVANTADA OU PRESENÇA */}
+      {/* TOPO: BADGE DE MÃO LEVANTADA */}
       <div className="relative z-10 flex items-center justify-between">
         {participant.isHandRaised ? (
           <span className="bg-amber-500 text-slate-950 font-black px-2.5 py-1 rounded-xl text-[10px] flex items-center gap-1 shadow-md animate-bounce">
@@ -99,7 +123,7 @@ function ParticipantVideoCard({
         )}
       </div>
 
-      {/* RODAPÉ: NOME E CONTROLES DO MODERADOR */}
+      {/* RODAPÉ COM NOME E CONTROLES */}
       <div className="relative z-10 space-y-1.5">
         <div className="bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800 shadow-sm">
           <p className="text-xs font-bold text-white truncate">{participant.name}</p>
@@ -162,7 +186,8 @@ export default function DdsConferenceRoom({
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [hasMediaError, setHasMediaError] = useState(false);
   const [isMyHandRaised, setIsMyHandRaised] = useState(false);
-  const [handRaiseToast, setHandRaiseToast] = useState<string | null>(null);
+  const [handRaiseAlert, setHandRaiseAlert] = useState<{ peerId: string; name: string } | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Streams
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -176,6 +201,7 @@ export default function DdsConferenceRoom({
   const activeCalls = useRef<Map<string, any>>(new Map());
 
   // Elementos de Vídeo
+  const stageContainerRef = useRef<HTMLDivElement>(null);
   const localMainVideoRef = useRef<HTMLVideoElement>(null);
   const localPipVideoRef = useRef<HTMLVideoElement>(null);
   const localParticipantMosaicRef = useRef<HTMLVideoElement>(null);
@@ -188,7 +214,7 @@ export default function DdsConferenceRoom({
   const cleanRoomId = roomName.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
   const hostPeerId = `dds-${cleanRoomId}-host`;
 
-  // 1. CARREGAR MOTOR WEBRTC (PEERJS) VIA CDN
+  // 1. CARREGAR MOTOR WEBRTC (PEERJS)
   const loadPeerJs = useCallback((): Promise<any> => {
     return new Promise((resolve, reject) => {
       if ((window as any).Peer) {
@@ -219,7 +245,7 @@ export default function DdsConferenceRoom({
 
       localStreamRef.current = stream;
 
-      // Organizador: Conecta ao vídeo do palco
+      // Organizador: Conecta ao palco principal
       if (isAdmin && localMainVideoRef.current && !isScreenSharing) {
         localMainVideoRef.current.srcObject = stream;
         localMainVideoRef.current.play().catch(() => {});
@@ -229,7 +255,7 @@ export default function DdsConferenceRoom({
         localPipVideoRef.current.play().catch(() => {});
       }
 
-      // Participante: Conecta a sua câmera direto no seu card no Mosaico
+      // Participante: Conecta ao seu card no Mosaico
       if (!isAdmin && localParticipantMosaicRef.current) {
         localParticipantMosaicRef.current.srcObject = stream;
         localParticipantMosaicRef.current.play().catch(() => {});
@@ -243,7 +269,25 @@ export default function DdsConferenceRoom({
     }
   }, [isAdmin, isScreenSharing]);
 
-  // 3. SINCRONIZAÇÃO DO VÍDEO DO PARTICIPANTE NO MOSAICO
+  // 3. SINCRONIZAÇÃO DA TELA DO ORGANIZADOR (SEM TELA PRETA LOCAL)
+  useEffect(() => {
+    if (isScreenSharing && screenStreamRef.current) {
+      if (screenShareVideoRef.current) {
+        screenShareVideoRef.current.srcObject = screenStreamRef.current;
+        screenShareVideoRef.current.muted = true;
+        screenShareVideoRef.current.play().catch(() => {});
+      }
+      if (localPipVideoRef.current && localStreamRef.current) {
+        localPipVideoRef.current.srcObject = localStreamRef.current;
+        localPipVideoRef.current.play().catch(() => {});
+      }
+    } else if (isAdmin && localMainVideoRef.current && localStreamRef.current) {
+      localMainVideoRef.current.srcObject = localStreamRef.current;
+      localMainVideoRef.current.play().catch(() => {});
+    }
+  }, [isScreenSharing, isAdmin]);
+
+  // 4. SINCRONIZAÇÃO DO VÍDEO DO PARTICIPANTE NO MOSAICO
   useEffect(() => {
     if (!isAdmin && localParticipantMosaicRef.current && localStreamRef.current) {
       localParticipantMosaicRef.current.srcObject = localStreamRef.current;
@@ -251,7 +295,7 @@ export default function DdsConferenceRoom({
     }
   }, [isAdmin, isVideoOff]);
 
-  // 4. CONEXÃO WEBRTC PEER-TO-PEER
+  // 5. CONEXÃO WEBRTC PEER-TO-PEER
   useEffect(() => {
     let isMounted = true;
 
@@ -315,24 +359,42 @@ export default function DdsConferenceRoom({
           conn.on('data', (data: any) => {
             if (!isMounted) return;
 
+            // Recebe dados do participante
             if (data.type === 'USER_INFO') {
-              setRemoteParticipants(prev => prev.map(p => 
-                p.peerId === conn.peer ? { ...p, name: data.name } : p
-              ));
+              setRemoteParticipants(prev => {
+                const exists = prev.some(p => p.peerId === conn.peer);
+                if (exists) {
+                  return prev.map(p => p.peerId === conn.peer ? { ...p, name: data.name } : p);
+                }
+                return [...prev, { peerId: conn.peer, name: data.name, isHandRaised: false }];
+              });
             }
 
+            // RECEBE O SINAL DE MÃO LEVANTADA
             if (data.type === 'HAND_RAISE') {
-              setRemoteParticipants(prev => prev.map(p => 
-                p.peerId === conn.peer ? { 
-                  ...p, 
-                  isHandRaised: data.isHandRaised, 
-                  handRaisedAt: data.isHandRaised ? Date.now() : undefined 
-                } : p
-              ));
+              setRemoteParticipants(prev => {
+                const exists = prev.some(p => p.peerId === conn.peer);
+                if (exists) {
+                  return prev.map(p => p.peerId === conn.peer ? { 
+                    ...p, 
+                    name: data.name || p.name,
+                    isHandRaised: data.isHandRaised, 
+                    handRaisedAt: data.isHandRaised ? Date.now() : undefined 
+                  } : p);
+                }
+                return [...prev, {
+                  peerId: conn.peer,
+                  name: data.name || 'Participante',
+                  isHandRaised: data.isHandRaised,
+                  handRaisedAt: data.isHandRaised ? Date.now() : undefined
+                }];
+              });
 
               if (data.isHandRaised) {
-                setHandRaiseToast(`✋ ${data.name || 'Participante'} pediu a palavra!`);
-                setTimeout(() => setHandRaiseToast(null), 7000);
+                playHandRaiseBeep();
+                setHandRaiseAlert({ peerId: conn.peer, name: data.name || 'Colaborador' });
+              } else {
+                setHandRaiseAlert(prev => prev?.peerId === conn.peer ? null : prev);
               }
             }
           });
@@ -419,7 +481,7 @@ export default function DdsConferenceRoom({
     };
   }, [cleanRoomId, hostPeerId, isAdmin, userName, initLocalMedia, loadPeerJs]);
 
-  // 5. ATUALIZA VÍDEO DO ORGANIZADOR QUANDO RECEBIDO NO PARTICIPANTE
+  // 6. SINCRONIZA VÍDEO DO ORGANIZADOR NO PARTICIPANTE
   useEffect(() => {
     if (!isAdmin && remoteOrganizerStream && organizerVideoRef.current) {
       organizerVideoRef.current.srcObject = remoteOrganizerStream;
@@ -427,7 +489,7 @@ export default function DdsConferenceRoom({
     }
   }, [isAdmin, remoteOrganizerStream]);
 
-  // 6. TRANSMISSÃO DE TELA (ORGANIZADOR)
+  // 7. APRESENTAÇÃO DE TELA (ORGANIZADOR)
   const toggleScreenShare = async () => {
     if (!isAdmin) return;
 
@@ -447,10 +509,21 @@ export default function DdsConferenceRoom({
 
       const screenTrack = screenStream.getVideoTracks()[0];
 
+      // Atualiza os celulares dos colaboradores com a tela
       activeCalls.current.forEach((call) => {
-        const sender = call.peerConnection?.getSenders()?.find((s: any) => s.track?.kind === 'video');
-        if (sender) {
-          sender.replaceTrack(screenTrack);
+        try {
+          const pc = call.peerConnection;
+          if (pc) {
+            const senders = pc.getSenders();
+            const videoSender = senders.find((s: any) => 
+              (s.track && s.track.kind === 'video') || s.kind === 'video'
+            );
+            if (videoSender) {
+              videoSender.replaceTrack(screenTrack);
+            }
+          }
+        } catch (err) {
+          console.warn("Erro ao substituir track para peer:", err);
         }
       });
 
@@ -474,14 +547,24 @@ export default function DdsConferenceRoom({
       const camTrack = localStreamRef.current.getVideoTracks()[0];
       if (camTrack) {
         activeCalls.current.forEach((call) => {
-          const sender = call.peerConnection?.getSenders()?.find((s: any) => s.track?.kind === 'video');
-          if (sender) sender.replaceTrack(camTrack);
+          try {
+            const pc = call.peerConnection;
+            if (pc) {
+              const senders = pc.getSenders();
+              const videoSender = senders.find((s: any) => 
+                (s.track && s.track.kind === 'video') || s.kind === 'video'
+              );
+              if (videoSender) {
+                videoSender.replaceTrack(camTrack);
+              }
+            }
+          } catch (err) {}
         });
       }
     }
   };
 
-  // 7. LEVANTAR A MÃO (PARTICIPANTE)
+  // 8. LEVANTAR A MÃO (PARTICIPANTE)
   const toggleRaiseHand = () => {
     const nextState = !isMyHandRaised;
     setIsMyHandRaised(nextState);
@@ -495,7 +578,7 @@ export default function DdsConferenceRoom({
     }
   };
 
-  // 8. MODERAÇÃO DO ORGANIZADOR
+  // 9. MODERAÇÃO DO ORGANIZADOR
   const handleModerateMute = (peerId: string) => {
     const conn = participantConns.current.get(peerId);
     if (conn && conn.open) {
@@ -518,9 +601,12 @@ export default function DdsConferenceRoom({
       conn.send({ type: 'LOWER_HAND' });
     }
     setRemoteParticipants(prev => prev.map(p => p.peerId === peerId ? { ...p, isHandRaised: false } : p));
+    if (handRaiseAlert?.peerId === peerId) {
+      setHandRaiseAlert(null);
+    }
   };
 
-  // 9. CONTROLES DE ÁUDIO E VÍDEO LOCAL
+  // 10. CONTROLES DE ÁUDIO E VÍDEO LOCAL
   const toggleAudio = () => {
     if (localStreamRef.current) {
       const track = localStreamRef.current.getAudioTracks()[0];
@@ -541,7 +627,25 @@ export default function DdsConferenceRoom({
     }
   };
 
-  // 10. ORDENAÇÃO DO MOSAICO: QUEM LEVANTOU A MÃO FICA EM 1º LUGAR
+  // 11. CONTROLE DE TELA CHEIA (FULLSCREEN)
+  const toggleFullscreen = () => {
+    if (!stageContainerRef.current) return;
+    if (!document.fullscreenElement) {
+      stageContainerRef.current.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen().catch(() => {});
+      setIsFullscreen(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  // 12. ORDENAÇÃO DO MOSAICO (QUEM LEVANTA A MÃO VAI PARA 1º LUGAR)
   const sortedParticipants = [...remoteParticipants].sort((a, b) => {
     if (a.isHandRaised && !b.isHandRaised) return -1;
     if (!a.isHandRaised && b.isHandRaised) return 1;
@@ -554,11 +658,28 @@ export default function DdsConferenceRoom({
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 md:p-6 space-y-6 shadow-2xl relative overflow-hidden">
       
-      {/* TOAST DE MÃO LEVANTADA (PARA O ORGANIZADOR) */}
-      {handRaiseToast && (
-        <div className="fixed top-6 right-6 z-[9999] bg-amber-500 text-slate-950 px-5 py-3 rounded-2xl shadow-2xl font-black text-sm flex items-center gap-2 border-2 border-amber-300 animate-in slide-in-from-top-4 duration-300">
-          <Hand size={20} className="animate-bounce" />
-          <span>{handRaiseToast}</span>
+      {/* BANNER DE NOTIFICAÇÃO COM SOM E BOTÃO ATENDER (ORGANIZADOR) */}
+      {isAdmin && handRaiseAlert && (
+        <div className="bg-amber-500 text-slate-950 p-3.5 rounded-2xl shadow-xl flex items-center justify-between gap-3 animate-in slide-in-from-top-3 duration-300 border-2 border-amber-300">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-slate-950 text-amber-400 rounded-xl animate-bounce">
+              <Hand size={18} />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wide">Pedido de Palavra!</p>
+              <p className="text-sm font-bold"><strong>{handRaiseAlert.name}</strong> levantou a mão para falar.</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleLowerHand(handRaiseAlert.peerId)}
+              className="px-4 py-2 bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+            >
+              Atender / Baixar Mão
+            </button>
+          </div>
         </div>
       )}
 
@@ -596,7 +717,7 @@ export default function DdsConferenceRoom({
       </div>
 
       {/* ========================================================================= */}
-      {/* 1. PALCO PRINCIPAL (TRANSMISSÃO DO ORGANIZADOR - 100% LIMPO SEM OBSTRUÇÃO) */}
+      {/* 1. PALCO PRINCIPAL (TRANSMISSÃO DO ORGANIZADOR + BOTÃO TELA CHEIA) */}
       {/* ========================================================================= */}
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
@@ -604,15 +725,31 @@ export default function DdsConferenceRoom({
             <Crown size={15} className="text-amber-400" /> 
             {isAdmin ? (isScreenSharing ? 'Sua Apresentação de Tela' : 'Sua Câmera (Instrutor)') : 'Transmissão do Instrutor (Ao Vivo)'}
           </span>
-          {isScreenSharing && (
-            <span className="text-[10px] font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-2.5 py-0.5 rounded-md flex items-center gap-1">
-              <Sparkles size={11} /> Apresentação em Destaque
-            </span>
-          )}
+
+          <div className="flex items-center gap-2">
+            {isScreenSharing && (
+              <span className="text-[10px] font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                <Sparkles size={11} /> Apresentação em Destaque
+              </span>
+            )}
+            
+            {/* BOTÃO DE TELA CHEIA (FULLSCREEN) */}
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition-colors flex items-center gap-1 text-xs"
+              title={isFullscreen ? 'Sair da Tela Cheia' : 'Abrir Apresentação em Tela Cheia'}
+            >
+              {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+              <span className="hidden sm:inline text-[11px] font-semibold">{isFullscreen ? 'Minimizar' : 'Tela Cheia'}</span>
+            </button>
+          </div>
         </div>
 
-        <div className="relative w-full aspect-video bg-slate-950 rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex items-center justify-center">
-          
+        <div 
+          ref={stageContainerRef}
+          className="relative w-full aspect-video bg-slate-950 rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex items-center justify-center"
+        >
           {/* VISÃO DO ORGANIZADOR */}
           {isAdmin ? (
             isScreenSharing ? (
@@ -622,6 +759,7 @@ export default function DdsConferenceRoom({
                   autoPlay
                   playsInline
                   muted
+                  onLoadedMetadata={(e) => e.currentTarget.play()}
                   className="w-full h-full object-contain"
                 />
                 <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-green-500/30 flex items-center gap-2 z-10 shadow-lg">
@@ -673,7 +811,7 @@ export default function DdsConferenceRoom({
               </div>
             )
           ) : (
-            /* VISÃO DO PARTICIPANTE: 100% LIMPA (SEM NENHUMA JANELA TAMPANDO A APRESENTAÇÃO) */
+            /* VISÃO DO PARTICIPANTE: 100% LIMPA (SEM NENHUMA JANELA TAMPANDO) */
             <div className="relative w-full h-full flex items-center justify-center bg-black">
               {remoteOrganizerStream ? (
                 <video
@@ -700,7 +838,7 @@ export default function DdsConferenceRoom({
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. MOSAICO DOS PARTICIPANTES (COM O PRÓPRIO VÍDEO DO COLABORADOR EM 1º LUGAR) */}
+      {/* 2. MOSAICO DOS PARTICIPANTES (1º LUGAR PARA O PRÓPRIO PARTICIPANTE) */}
       {/* ========================================================================= */}
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between border-t border-slate-800/80 pt-4 px-1">
@@ -722,9 +860,7 @@ export default function DdsConferenceRoom({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           
-          {/* ===================================================================== */}
-          {/* CARD DO PRÓPRIO PARTICIPANTE (SEMPRE EM 1º LUGAR NA VISÃO DELE) */}
-          {/* ===================================================================== */}
+          {/* CARD DO PRÓPRIO PARTICIPANTE (SEMPRE EM 1º LUGAR NO MOSAICO DELE) */}
           {!isAdmin && (
             <div 
               className={`relative h-48 sm:h-52 bg-slate-950 rounded-3xl overflow-hidden border-2 flex flex-col justify-between p-3 transition-all duration-300 shadow-xl ${
@@ -733,7 +869,6 @@ export default function DdsConferenceRoom({
                   : 'border-green-500/60 ring-2 ring-green-500/10'
               }`}
             >
-              {/* VÍDEO LOCAL DO PRÓPRIO PARTICIPANTE */}
               <div className="absolute inset-0 flex items-center justify-center bg-slate-950">
                 <video
                   ref={localParticipantMosaicRef}
@@ -752,7 +887,7 @@ export default function DdsConferenceRoom({
                 )}
               </div>
 
-              {/* TOPO: STATUS E MÃO LEVANTADA */}
+              {/* Status */}
               <div className="relative z-10 flex items-center justify-between">
                 {isMyHandRaised ? (
                   <span className="bg-amber-500 text-slate-950 font-black px-2.5 py-1 rounded-xl text-[10px] flex items-center gap-1 shadow-md animate-bounce">
@@ -771,7 +906,7 @@ export default function DdsConferenceRoom({
                 )}
               </div>
 
-              {/* RODAPÉ COM SEU NOME */}
+              {/* Rodapé */}
               <div className="relative z-10">
                 <div className="bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800 shadow-sm flex items-center justify-between">
                   <p className="text-xs font-bold text-white truncate">{userName} (Você)</p>
@@ -781,7 +916,7 @@ export default function DdsConferenceRoom({
             </div>
           )}
 
-          {/* DEMAIS PARTICIPANTES REMOTOS NO MOSAICO */}
+          {/* DEMAIS PARTICIPANTES */}
           {sortedParticipants.map((p) => (
             <ParticipantVideoCard
               key={p.peerId}
@@ -793,7 +928,6 @@ export default function DdsConferenceRoom({
             />
           ))}
 
-          {/* Mensagem se não houver outros participantes */}
           {isAdmin && sortedParticipants.length === 0 && (
             <div className="col-span-full bg-slate-950/60 border border-slate-800 rounded-3xl p-10 text-center space-y-2">
               <Users size={36} className="mx-auto text-slate-600 mb-2" />
