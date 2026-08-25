@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Mic, MicOff, Video as VideoIcon, VideoOff, 
   Monitor, MonitorOff, Users, Hand, Crown, 
-  Check, Sparkles, Wifi, WifiOff, Maximize, Minimize, BellRing
+  Check, Sparkles, Wifi, WifiOff, Maximize, Minimize
 } from 'lucide-react';
 
 interface RemoteParticipant {
@@ -230,7 +230,7 @@ export default function DdsConferenceRoom({
     });
   }, []);
 
-  // 2. INICIALIZAR MÍDIA LOCAL
+  // 2. INICIALIZAR MÍDIA LOCAL (COM FILTRO ANTI-ECO E CANCELAMENTO DE RUÍDO)
   const initLocalMedia = useCallback(async () => {
     try {
       setHasMediaError(false);
@@ -239,8 +239,16 @@ export default function DdsConferenceRoom({
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-        audio: true
+        video: { 
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 }, 
+          facingMode: 'user' 
+        },
+        audio: {
+          echoCancellation: true,    // Cancela o próprio eco (Anti-Microfonia)
+          noiseSuppression: true,    // Remove ruído de fundo
+          autoGainControl: true      // Ajuste automático de volume
+        }
       });
 
       localStreamRef.current = stream;
@@ -269,7 +277,7 @@ export default function DdsConferenceRoom({
     }
   }, [isAdmin, isScreenSharing]);
 
-  // 3. SINCRONIZAÇÃO DA TELA DO ORGANIZADOR (SEM TELA PRETA LOCAL)
+  // 3. SINCRONIZAÇÃO DA TELA DO ORGANIZADOR
   useEffect(() => {
     if (isScreenSharing && screenStreamRef.current) {
       if (screenShareVideoRef.current) {
@@ -359,7 +367,6 @@ export default function DdsConferenceRoom({
           conn.on('data', (data: any) => {
             if (!isMounted) return;
 
-            // Recebe dados do participante
             if (data.type === 'USER_INFO') {
               setRemoteParticipants(prev => {
                 const exists = prev.some(p => p.peerId === conn.peer);
@@ -370,7 +377,6 @@ export default function DdsConferenceRoom({
               });
             }
 
-            // RECEBE O SINAL DE MÃO LEVANTADA
             if (data.type === 'HAND_RAISE') {
               setRemoteParticipants(prev => {
                 const exists = prev.some(p => p.peerId === conn.peer);
@@ -509,7 +515,6 @@ export default function DdsConferenceRoom({
 
       const screenTrack = screenStream.getVideoTracks()[0];
 
-      // Atualiza os celulares dos colaboradores com a tela
       activeCalls.current.forEach((call) => {
         try {
           const pc = call.peerConnection;
@@ -645,7 +650,7 @@ export default function DdsConferenceRoom({
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
-  // 12. ORDENAÇÃO DO MOSAICO (QUEM LEVANTA A MÃO VAI PARA 1º LUGAR)
+  // 12. ORDENAÇÃO DO MOSAICO
   const sortedParticipants = [...remoteParticipants].sort((a, b) => {
     if (a.isHandRaised && !b.isHandRaised) return -1;
     if (!a.isHandRaised && b.isHandRaised) return 1;
