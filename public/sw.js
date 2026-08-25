@@ -1,6 +1,4 @@
- const CACHE_NAME = 'dds-on-v1';
-
-self.addEventListener('install', (event) => {
+ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
