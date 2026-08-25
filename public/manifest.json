@@ -1,9 +1,12 @@
- {
+{
   "name": "DDS ON - Diálogo Diário de Segurança",
   "short_name": "DDS ON",
   "description": "Plataforma Digital de SST, Biometria Facial e Lista de Presença",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#091726",
   "theme_color": "#091726",
   "icons": [
@@ -11,13 +14,19 @@
       "src": "/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

@@ -2,14 +2,13 @@
 import "./globals.css";
 
 export const viewport: Viewport = {
-  themeColor: "#020617",
+  themeColor: "#091726",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
 };
 
 export const metadata: Metadata = {
-  // Substitua pela URL real do seu sistema na Vercel (ou domínio próprio)
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://seu-projeto.vercel.app'),
   title: "DDS ON - Diálogo Diário de Segurança Online",
   description: "Plataforma Digital de Lista de Presença com Biometria Facial, Assinatura Digital e Validade Jurídica.",
@@ -25,7 +24,6 @@ export const metadata: Metadata = {
       { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }
     ],
   },
-  // Configuração do Card de Compartilhamento (WhatsApp, Facebook, LinkedIn, etc.)
   openGraph: {
     title: "DDS ON - Diálogo Diário de Segurança Online",
     description: "Elimine o papel. Lista de presença com biometria facial, assinatura digital e atas em PDF instantâneas.",
@@ -58,10 +56,23 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <head>
-        {/* Garante que navegadores antigos e celulares usem o novo ícone PNG */}
         <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
         <link rel="shortcut icon" href="/icon-192x192.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        {/* Registro do Service Worker para o Chrome reconhecer como App Instalável */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                    console.log('SW registration failed: ', err);
+                  });
+                });
+              }
+            `,
+          }}
+        />
       </head>
       <body className="font-sans antialiased bg-slate-950 text-slate-100 min-h-screen">
         {children}
