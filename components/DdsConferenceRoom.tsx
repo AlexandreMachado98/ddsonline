@@ -532,15 +532,16 @@ export default function DdsConferenceRoom({
             if (data.type === 'SCREEN_SHARE_STATE') {
               setIsHostScreenSharing(Boolean(data.isSharing));
               
-              // Força o reinício completo do decodificador de vídeo no celular/navegador do participante
               if (organizerVideoRef.current && remoteOrganizerStream) {
-                try {
-                  organizerVideoRef.current.pause();
-                  organizerVideoRef.current.srcObject = null;
+                if (organizerVideoRef.current.srcObject !== remoteOrganizerStream) {
                   organizerVideoRef.current.srcObject = remoteOrganizerStream;
-                  organizerVideoRef.current.load();
-                  organizerVideoRef.current.play().catch(() => {});
-                } catch {}
+                }
+                organizerVideoRef.current.play().catch(() => {
+                  if (organizerVideoRef.current) {
+                    organizerVideoRef.current.muted = true;
+                    organizerVideoRef.current.play().catch(() => {});
+                  }
+                });
               }
             }
             if (data.type === 'LOWER_HAND') {
@@ -568,9 +569,13 @@ export default function DdsConferenceRoom({
               
               if (organizerVideoRef.current) {
                 organizerVideoRef.current.srcObject = organizerStream;
-                organizerVideoRef.current.muted = false;
                 organizerVideoRef.current.playsInline = true;
-                organizerVideoRef.current.play().catch(() => {});
+                organizerVideoRef.current.play().catch(() => {
+                  if (organizerVideoRef.current) {
+                    organizerVideoRef.current.muted = true;
+                    organizerVideoRef.current.play().catch(() => {});
+                  }
+                });
               }
 
               // Listener para acordar imediatamente o vídeo quando a trilha for substituída
@@ -606,9 +611,13 @@ export default function DdsConferenceRoom({
   useEffect(() => {
     if (!isAdmin && remoteOrganizerStream && organizerVideoRef.current) {
       organizerVideoRef.current.srcObject = remoteOrganizerStream;
-      organizerVideoRef.current.muted = false;
       organizerVideoRef.current.playsInline = true;
-      organizerVideoRef.current.play().catch(() => {});
+      organizerVideoRef.current.play().catch(() => {
+        if (organizerVideoRef.current) {
+          organizerVideoRef.current.muted = true;
+          organizerVideoRef.current.play().catch(() => {});
+        }
+      });
 
       const vTrack = remoteOrganizerStream.getVideoTracks()[0];
       if (vTrack) {
@@ -636,7 +645,8 @@ export default function DdsConferenceRoom({
       try {
         screenStream = await navigator.mediaDevices.getDisplayMedia({
           video: {
-            cursor: "always"
+            cursor: "always",
+            frameRate: { ideal: 30, max: 60 }
           } as any,
           audio: true
         });
@@ -654,7 +664,9 @@ export default function DdsConferenceRoom({
 
       // Aplica hint de detalhe para forçar codificadores WebRTC a transmitirem frames em alta nitidez
       if (screenVideoTrack) {
-        (screenVideoTrack as any).contentHint = 'detail';
+        if ('contentHint' in screenVideoTrack) {
+          (screenVideoTrack as any).contentHint = 'detail';
+        }
         screenVideoTrack.enabled = true;
       }
 
@@ -690,9 +702,9 @@ export default function DdsConferenceRoom({
       }
 
       // Substitui as trilhas de vídeo e áudio nos celulares dos colaboradores
-      activeCalls.current.forEach((call) => {
+      activeCalls.current.forEach(async (call) => {
         try {
-          const pc = call.peerConnection;
+          const pc = call.peerConnection || (call as any)._peerConnection;
           if (pc) {
             const senders = pc.getSenders();
             
@@ -701,7 +713,7 @@ export default function DdsConferenceRoom({
               (s.track && s.track.kind === 'video') || s.kind === 'video'
             );
             if (videoSender && screenVideoTrack) {
-              videoSender.replaceTrack(screenVideoTrack);
+              await videoSender.replaceTrack(screenVideoTrack);
             }
 
             // Substitui Áudio (com som do vídeo)
@@ -710,7 +722,7 @@ export default function DdsConferenceRoom({
                 (s.track && s.track.kind === 'audio') || s.kind === 'audio'
               );
               if (audioSender) {
-                audioSender.replaceTrack(mixedAudioTrack);
+                await audioSender.replaceTrack(mixedAudioTrack);
               }
             }
           }
@@ -752,22 +764,24 @@ export default function DdsConferenceRoom({
       const micTrack = localStreamRef.current.getAudioTracks()[0];
 
       if (camTrack) {
-        (camTrack as any).contentHint = 'motion';
+        if ('contentHint' in camTrack) {
+          (camTrack as any).contentHint = 'motion';
+        }
         camTrack.enabled = true;
       }
 
-      activeCalls.current.forEach((call) => {
+      activeCalls.current.forEach(async (call) => {
         try {
-          const pc = call.peerConnection;
+          const pc = call.peerConnection || (call as any)._peerConnection;
           if (pc) {
             const senders = pc.getSenders();
             if (camTrack) {
               const videoSender = senders.find((s: any) => (s.track && s.track.kind === 'video') || s.kind === 'video');
-              if (videoSender) videoSender.replaceTrack(camTrack);
+              if (videoSender) await videoSender.replaceTrack(camTrack);
             }
             if (micTrack) {
               const audioSender = senders.find((s: any) => (s.track && s.track.kind === 'audio') || s.kind === 'audio');
-              if (audioSender) audioSender.replaceTrack(micTrack);
+              if (audioSender) await audioSender.replaceTrack(micTrack);
             }
           }
         } catch (err) {}
@@ -1008,7 +1022,12 @@ export default function DdsConferenceRoom({
                     if (el && remoteOrganizerStream && el.srcObject !== remoteOrganizerStream) {
                       el.srcObject = remoteOrganizerStream;
                       el.playsInline = true;
-                      el.play().catch(() => {});
+                      el.play().catch(() => {
+                        if (el) {
+                          el.muted = true;
+                          el.play().catch(() => {});
+                        }
+                      });
                     }
                   }}
                   autoPlay
@@ -1069,7 +1088,12 @@ export default function DdsConferenceRoom({
                       if (el && remoteOrganizerStream && el.srcObject !== remoteOrganizerStream) {
                         el.srcObject = remoteOrganizerStream;
                         el.playsInline = true;
-                        el.play().catch(() => {});
+                        el.play().catch(() => {
+                          if (el) {
+                            el.muted = true;
+                            el.play().catch(() => {});
+                          }
+                        });
                       }
                     }}
                     autoPlay
