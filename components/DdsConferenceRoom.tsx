@@ -188,6 +188,38 @@ function ParticipantVideoCard({
   );
 }
 
+// Cria um stream dummy caso o participante ou apresentador esteja sem câmera local
+function createDummyStream(): MediaStream {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 2;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#090d16';
+      ctx.fillRect(0, 0, 2, 2);
+    }
+    const vidTrack = (canvas as any).captureStream ? (canvas as any).captureStream(1).getVideoTracks()[0] : null;
+
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    let audTrack: MediaStreamTrack | null = null;
+    if (AudioCtx) {
+      const audioCtx = new AudioCtx();
+      const osc = audioCtx.createOscillator();
+      const dst = audioCtx.createMediaStreamDestination();
+      osc.connect(dst);
+      osc.start();
+      audTrack = dst.stream.getAudioTracks()[0];
+      if (audTrack) audTrack.enabled = false;
+    }
+
+    const tracks = [vidTrack, audTrack].filter(Boolean) as MediaStreamTrack[];
+    return new MediaStream(tracks);
+  } catch {
+    return new MediaStream();
+  }
+}
+
 export default function DdsConferenceRoom({ 
   roomName, 
   userName, 
@@ -338,7 +370,7 @@ export default function DdsConferenceRoom({
 
       return stream;
     } catch (err) {
-      console.error("Erro ao acessar câmera:", err);
+      console.warn("Aviso ao acessar câmera (fallback ativado):", err);
       setHasMediaError(true);
       return null;
     }
@@ -413,7 +445,6 @@ export default function DdsConferenceRoom({
         });
 
         peer.on('call', (call: any) => {
-          // Usa SEMPRE a ref mais recente para não cair no bug do stale closure
           let currentOutStream: MediaStream | null = localStreamRef.current;
 
           if (isScreenSharingRef.current && screenStreamRef.current) {
@@ -423,6 +454,8 @@ export default function DdsConferenceRoom({
             if (screenVid) tracks.push(screenVid);
             if (micAud) tracks.push(micAud);
             currentOutStream = new MediaStream(tracks);
+          } else if (!currentOutStream) {
+            currentOutStream = createDummyStream();
           }
 
           call.answer(currentOutStream);
@@ -454,7 +487,6 @@ export default function DdsConferenceRoom({
           participantConns.current.set(conn.peer, conn);
 
           conn.on('open', () => {
-            // Notifica o novo participante sobre o estado atual do compartilhamento
             conn.send({ type: 'SCREEN_SHARE_STATE', isSharing: isScreenSharingRef.current });
           });
 
@@ -523,6 +555,30 @@ export default function DdsConferenceRoom({
 
         peerInstance.current = peer;
 
+        const handleIncomingStream = (organizerStream: MediaStream) => {
+          if (!isMounted) return;
+          setRemoteOrganizerStream(organizerStream);
+          
+          if (organizerVideoRef.current) {
+            organizerVideoRef.current.srcObject = organizerStream;
+            organizerVideoRef.current.playsInline = true;
+            organizerVideoRef.current.play().catch(() => {
+              if (organizerVideoRef.current) {
+                organizerVideoRef.current.muted = true;
+                organizerVideoRef.current.play().catch(() => {});
+              }
+            });
+          }
+
+          organizerStream.getVideoTracks().forEach(track => {
+            track.onunmute = () => {
+              if (organizerVideoRef.current) {
+                organizerVideoRef.current.play().catch(() => {});
+              }
+            };
+          });
+        };
+
         peer.on('open', () => {
           if (!isMounted) return;
           setIsConnected(true);
@@ -567,33 +623,20 @@ export default function DdsConferenceRoom({
             }
           });
 
-          if (stream) {
-            const call = peer.call(hostPeerId, stream);
-            call.on('stream', (organizerStream: MediaStream) => {
-              if (!isMounted) return;
-              setRemoteOrganizerStream(organizerStream);
-              
-              if (organizerVideoRef.current) {
-                organizerVideoRef.current.srcObject = organizerStream;
-                organizerVideoRef.current.playsInline = true;
-                organizerVideoRef.current.play().catch(() => {
-                  if (organizerVideoRef.current) {
-                    organizerVideoRef.current.muted = true;
-                    organizerVideoRef.current.play().catch(() => {});
-                  }
-                });
-              }
+          // Conecta a chamada de mídia usando stream local ou dummy para garantir recebimento do instrutor
+          const callStream = stream || createDummyStream();
+          const call = peer.call(hostPeerId, callStream);
+          call.on('stream', (organizerStream: MediaStream) => {
+            handleIncomingStream(organizerStream);
+          });
+        });
 
-              // Listener para acordar imediatamente o vídeo quando a trilha for substituída
-              organizerStream.getVideoTracks().forEach(track => {
-                track.onunmute = () => {
-                  if (organizerVideoRef.current) {
-                    organizerVideoRef.current.play().catch(() => {});
-                  }
-                };
-              });
-            });
-          }
+        // Escuta caso o instrutor faça um re-call direto
+        peer.on('call', (incomingCall: any) => {
+          incomingCall.answer();
+          incomingCall.on('stream', (organizerStream: MediaStream) => {
+            handleIncomingStream(organizerStream);
+          });
         });
 
         peer.on('error', (err: any) => {
