@@ -233,6 +233,7 @@ export default function DdsConferenceRoom({
   const isScreenSharingRef = useRef(false); // Ref para evitar Stale Closures no WebRTC
 
   const [isHostScreenSharing, setIsHostScreenSharing] = useState(false);
+  const [isAudioAutoMuted, setIsAudioAutoMuted] = useState(false);
   const [hasMediaError, setHasMediaError] = useState(false);
   const [isMyHandRaised, setIsMyHandRaised] = useState(false);
   const [handRaiseAlert, setHandRaiseAlert] = useState<{ peerId: string; name: string } | null>(null);
@@ -275,6 +276,16 @@ export default function DdsConferenceRoom({
     const mins = Math.floor(sec / 60);
     const secs = sec % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Função para desmutar explicitamente o áudio no participante
+  const unmuteAudio = () => {
+    if (organizerVideoRef.current) {
+      organizerVideoRef.current.muted = false;
+      organizerVideoRef.current.volume = 1.0;
+      organizerVideoRef.current.play().catch(() => {});
+      setIsAudioAutoMuted(false);
+    }
   };
 
   // 1. LIMPEZA TOTAL DE MÍDIA
@@ -560,13 +571,16 @@ export default function DdsConferenceRoom({
           setRemoteOrganizerStream(organizerStream);
           
           if (organizerVideoRef.current) {
-            organizerVideoRef.current.srcObject = organizerStream;
-            organizerVideoRef.current.playsInline = true;
-            organizerVideoRef.current.play().catch(() => {
-              if (organizerVideoRef.current) {
-                organizerVideoRef.current.muted = true;
-                organizerVideoRef.current.play().catch(() => {});
-              }
+            const el = organizerVideoRef.current;
+            el.srcObject = organizerStream;
+            el.playsInline = true;
+            el.autoplay = true;
+            el.play().then(() => {
+              setIsAudioAutoMuted(false);
+            }).catch(() => {
+              el.muted = true;
+              setIsAudioAutoMuted(true);
+              el.play().catch(() => {});
             });
           }
 
@@ -601,6 +615,7 @@ export default function DdsConferenceRoom({
                 organizerVideoRef.current.play().catch(() => {
                   if (organizerVideoRef.current) {
                     organizerVideoRef.current.muted = true;
+                    setIsAudioAutoMuted(true);
                     organizerVideoRef.current.play().catch(() => {});
                   }
                 });
@@ -665,9 +680,12 @@ export default function DdsConferenceRoom({
       }
       el.playsInline = true;
       el.autoplay = true;
-      el.play().catch(() => {
+      el.play().then(() => {
+        setIsAudioAutoMuted(false);
+      }).catch(() => {
         if (el) {
           el.muted = true;
+          setIsAudioAutoMuted(true);
           el.play().catch(() => {});
         }
       });
@@ -683,7 +701,7 @@ export default function DdsConferenceRoom({
     }
   }, [isAdmin, remoteOrganizerStream, isHostScreenSharing]);
 
-  // 9. APRESENTAÇÃO DE TELA COM ÁUDIO DO VÍDEO + VOZ DO INSTRUTOR MIXADOS
+  // 9. APRESENTAÇÃO DE TELA COM ÁUDIO DO VÍDEO + VOZ DO INSTRUTOR MIXADOS EM ALTA DEFINIÇÃO
   const toggleScreenShare = async () => {
     if (!isAdmin) return;
 
@@ -693,7 +711,7 @@ export default function DdsConferenceRoom({
     }
 
     try {
-      // CAPTURA VÍDEO DE TELA LIMPO E SEM RESTRIÇÕES DE HARDWARE
+      // CAPTURA VÍDEO DE TELA LIMPO COM SUPORTE A ÁUDIO DO SISTEMA / GUIA / VÍDEO
       let screenStream: MediaStream;
       try {
         screenStream = await navigator.mediaDevices.getDisplayMedia({
@@ -701,12 +719,23 @@ export default function DdsConferenceRoom({
             cursor: "always",
             frameRate: { ideal: 30, max: 60 }
           } as any,
-          audio: true
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+          }
         });
       } catch (displayErr) {
-        screenStream = await navigator.mediaDevices.getDisplayMedia({
-          video: true
-        });
+        try {
+          screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: true
+          });
+        } catch {
+          screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: true
+          });
+        }
       }
 
       screenStreamRef.current = screenStream;
@@ -724,35 +753,46 @@ export default function DdsConferenceRoom({
         screenVideoTrack.enabled = true;
       }
 
-      // MIXER DE ÁUDIO (Voz do Instrutor + Som da Apresentação)
+      // MIXER DE ÁUDIO DE ALTA FIDELIDADE (Voz do Instrutor + Som do Vídeo da Apresentação)
       let mixedAudioTrack: MediaStreamTrack | null = null;
 
-      if (screenAudioTrack && localStreamRef.current) {
-        try {
-          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
           const audioCtx = new AudioCtx();
+          if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+          }
           audioContextRef.current = audioCtx;
 
           const destination = audioCtx.createMediaStreamDestination();
 
-          // Conecta o microfone do técnico
-          const micAudioTrack = localStreamRef.current.getAudioTracks()[0];
+          // 1. Canal do Microfone do Instrutor
+          const micAudioTrack = localStreamRef.current?.getAudioTracks()[0];
           if (micAudioTrack) {
             const micStream = new MediaStream([micAudioTrack]);
             const micSource = audioCtx.createMediaStreamSource(micStream);
-            micSource.connect(destination);
+            const micGain = audioCtx.createGain();
+            micGain.gain.value = 1.0;
+            micSource.connect(micGain);
+            micGain.connect(destination);
           }
 
-          // Conecta o som do vídeo / apresentação
-          const sysStream = new MediaStream([screenAudioTrack]);
-          const sysSource = audioCtx.createMediaStreamSource(sysStream);
-          sysSource.connect(destination);
+          // 2. Canal do Áudio do Vídeo / Apresentação de Tela
+          if (screenAudioTrack) {
+            const sysStream = new MediaStream([screenAudioTrack]);
+            const sysSource = audioCtx.createMediaStreamSource(sysStream);
+            const sysGain = audioCtx.createGain();
+            sysGain.gain.value = 1.0;
+            sysSource.connect(sysGain);
+            sysGain.connect(destination);
+          }
 
-          mixedAudioTrack = destination.stream.getAudioTracks()[0];
-        } catch (mixErr) {
-          console.warn("Mixer de áudio indisponível:", mixErr);
-          mixedAudioTrack = screenAudioTrack;
+          mixedAudioTrack = destination.stream.getAudioTracks()[0] || null;
         }
+      } catch (mixErr) {
+        console.warn("Mixer de áudio indisponível:", mixErr);
+        mixedAudioTrack = screenAudioTrack || localStreamRef.current?.getAudioTracks()[0] || null;
       }
 
       // Substitui as trilhas de vídeo e áudio nos celulares dos colaboradores
@@ -770,7 +810,7 @@ export default function DdsConferenceRoom({
               await videoSender.replaceTrack(screenVideoTrack);
             }
 
-            // Substitui Áudio (com som do vídeo)
+            // Substitui Áudio (Mixado)
             if (mixedAudioTrack) {
               const audioSender = senders.find((s: any) => 
                 (s.track && s.track.kind === 'audio') || s.kind === 'audio'
@@ -915,15 +955,42 @@ export default function DdsConferenceRoom({
     }
   };
 
-  // 13. TELA CHEIA (FULLSCREEN)
-  const toggleFullscreen = () => {
+  // 13. TELA CHEIA COM ROTAÇÃO LANDSCAPE AUTOMÁTICA EM DISPOSITIVOS MÓVEIS
+  const toggleFullscreen = async () => {
     if (!stageContainerRef.current) return;
-    if (!document.fullscreenElement) {
-      stageContainerRef.current.requestFullscreen().catch(() => {});
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen().catch(() => {});
-      setIsFullscreen(false);
+    try {
+      unmuteAudio();
+      if (!document.fullscreenElement) {
+        if (stageContainerRef.current.requestFullscreen) {
+          await stageContainerRef.current.requestFullscreen();
+        } else if ((stageContainerRef.current as any).webkitRequestFullscreen) {
+          await (stageContainerRef.current as any).webkitRequestFullscreen();
+        }
+        setIsFullscreen(true);
+
+        // Bloqueia orientação em Modo Paisagem (Landscape) no mobile para máxima visibilidade
+        if (window.screen?.orientation && (window.screen.orientation as any).lock) {
+          try {
+            await (window.screen.orientation as any).lock('landscape');
+          } catch {}
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        }
+        setIsFullscreen(false);
+
+        // Libera a orientação ao sair da tela cheia
+        if (window.screen?.orientation && (window.screen.orientation as any).unlock) {
+          try {
+            (window.screen.orientation as any).unlock();
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.warn("Aviso toggle fullscreen:", err);
     }
   };
 
@@ -1036,21 +1103,35 @@ export default function DdsConferenceRoom({
             )}
           </span>
 
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="p-1 sm:px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition-colors flex items-center gap-1 text-[10px] font-bold cursor-pointer"
-            title={isFullscreen ? 'Sair da Tela Cheia' : 'Abrir em Tela Cheia'}
-          >
-            {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
-            <span className="hidden sm:inline">{isFullscreen ? 'Normal' : 'Tela Cheia'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {!isAdmin && isAudioAutoMuted && (
+              <button
+                type="button"
+                onClick={unmuteAudio}
+                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-[10px] font-black flex items-center gap-1 transition-all animate-pulse cursor-pointer shadow-md"
+                title="Ativar Áudio"
+              >
+                <Volume2 size={12} /> Ativar Som
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="p-1 sm:px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition-colors flex items-center gap-1 text-[10px] font-bold cursor-pointer"
+              title={isFullscreen ? 'Sair da Tela Cheia' : 'Abrir em Tela Cheia e Girar'}
+            >
+              {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
+              <span className="hidden sm:inline">{isFullscreen ? 'Normal' : 'Tela Cheia'}</span>
+            </button>
+          </div>
         </div>
 
         {/* CONTAINER DO PALCO DESMEMBRADO (SEM SOBREPOSIÇÃO) */}
         <div 
           ref={stageContainerRef}
-          className="relative w-full aspect-video sm:max-h-[520px] bg-black rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex items-center justify-center"
+          onClick={unmuteAudio}
+          className="relative w-full aspect-video sm:max-h-[520px] bg-black rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex items-center justify-center select-none"
         >
           {/* VISÃO DO ORGANIZADOR (HOST) */}
           {isAdmin ? (
@@ -1121,6 +1202,12 @@ export default function DdsConferenceRoom({
                 ref={organizerVideoRef}
                 autoPlay
                 playsInline
+                onLoadedMetadata={() => organizerVideoRef.current?.play().catch(() => {})}
+                onResize={() => {
+                  if (organizerVideoRef.current?.paused) {
+                    organizerVideoRef.current?.play().catch(() => {});
+                  }
+                }}
                 className="w-full h-full object-contain"
               />
 
@@ -1137,7 +1224,7 @@ export default function DdsConferenceRoom({
               )}
 
               {isHostScreenSharing && (
-                <div className="absolute top-3 left-3 bg-slate-900/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-emerald-500/40 flex items-center gap-2 z-10 shadow-xl">
+                <div className="absolute top-3 left-3 bg-slate-900/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-emerald-500/40 flex items-center gap-2 z-10 shadow-xl pointer-events-none">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -1146,6 +1233,21 @@ export default function DdsConferenceRoom({
                     Apresentação do Instrutor em Alta Definição
                   </span>
                 </div>
+              )}
+
+              {/* BOTÃO FLUTUANTE DE ATIVAÇÃO DE SOM CASO O NAVEGADOR TENHA SILENCIADO POR POLÍTICA DE AUTOPLAY */}
+              {isAudioAutoMuted && remoteOrganizerStream && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    unmuteAudio();
+                  }}
+                  className="absolute bottom-4 z-20 bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-2.5 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 shadow-2xl animate-bounce border-2 border-white/40 cursor-pointer"
+                >
+                  <Volume2 size={18} />
+                  <span>Toque para Ativar o Áudio do Vídeo</span>
+                </button>
               )}
             </div>
           )}
