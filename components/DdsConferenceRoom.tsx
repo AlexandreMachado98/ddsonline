@@ -243,8 +243,10 @@ export default function DdsConferenceRoom({
   // Streams
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
+  const mixedAudioTrackRef = useRef<MediaStreamTrack | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const [remoteOrganizerStream, setRemoteOrganizerStream] = useState<MediaStream | null>(null);
+  const [isScreenAudioDetected, setIsScreenAudioDetected] = useState<boolean | null>(null);
 
   // WebRTC PeerJS
   const peerInstance = useRef<any>(null);
@@ -252,13 +254,14 @@ export default function DdsConferenceRoom({
   const participantConns = useRef<Map<string, any>>(new Map());
   const activeCalls = useRef<Map<string, any>>(new Map());
 
-  // Elementos de Vídeo
+  // Elementos de Vídeo e Áudio
   const stageContainerRef = useRef<HTMLDivElement>(null);
   const localMainVideoRef = useRef<HTMLVideoElement>(null);
   const localDedicatedPresenterVideoRef = useRef<HTMLVideoElement>(null);
   const localParticipantMosaicRef = useRef<HTMLVideoElement>(null);
   const screenShareVideoRef = useRef<HTMLVideoElement>(null);
   const organizerVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
 
   // Participantes Remotos
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
@@ -284,8 +287,13 @@ export default function DdsConferenceRoom({
       organizerVideoRef.current.muted = false;
       organizerVideoRef.current.volume = 1.0;
       organizerVideoRef.current.play().catch(() => {});
-      setIsAudioAutoMuted(false);
     }
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = false;
+      remoteAudioRef.current.volume = 1.0;
+      remoteAudioRef.current.play().catch(() => {});
+    }
+    setIsAudioAutoMuted(false);
   };
 
   // 1. LIMPEZA TOTAL DE MÍDIA
@@ -460,10 +468,10 @@ export default function DdsConferenceRoom({
 
           if (isScreenSharingRef.current && screenStreamRef.current) {
             const screenVid = screenStreamRef.current.getVideoTracks()[0];
-            const micAud = localStreamRef.current?.getAudioTracks()[0];
+            const audTrack = mixedAudioTrackRef.current || localStreamRef.current?.getAudioTracks()[0];
             const tracks: MediaStreamTrack[] = [];
             if (screenVid) tracks.push(screenVid);
-            if (micAud) tracks.push(micAud);
+            if (audTrack) tracks.push(audTrack);
             currentOutStream = new MediaStream(tracks);
           } else if (!currentOutStream) {
             currentOutStream = createDummyStream();
@@ -584,6 +592,12 @@ export default function DdsConferenceRoom({
             });
           }
 
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = organizerStream;
+            remoteAudioRef.current.volume = 1.0;
+            remoteAudioRef.current.play().catch(() => {});
+          }
+
           organizerStream.getVideoTracks().forEach(track => {
             track.onunmute = () => {
               if (organizerVideoRef.current) {
@@ -619,6 +633,11 @@ export default function DdsConferenceRoom({
                     organizerVideoRef.current.play().catch(() => {});
                   }
                 });
+              }
+
+              if (remoteAudioRef.current && remoteOrganizerStream) {
+                remoteAudioRef.current.srcObject = remoteOrganizerStream;
+                remoteAudioRef.current.play().catch(() => {});
               }
             }
             if (data.type === 'LOWER_HAND') {
@@ -690,6 +709,11 @@ export default function DdsConferenceRoom({
         }
       });
 
+      if (remoteAudioRef.current && remoteAudioRef.current.srcObject !== remoteOrganizerStream) {
+        remoteAudioRef.current.srcObject = remoteOrganizerStream;
+        remoteAudioRef.current.play().catch(() => {});
+      }
+
       const vTrack = remoteOrganizerStream.getVideoTracks()[0];
       if (vTrack) {
         vTrack.onunmute = () => {
@@ -714,16 +738,14 @@ export default function DdsConferenceRoom({
       // CAPTURA VÍDEO DE TELA LIMPO COM SUPORTE A ÁUDIO DO SISTEMA / GUIA / VÍDEO
       let screenStream: MediaStream;
       try {
-        screenStream = await navigator.mediaDevices.getDisplayMedia({
+        screenStream = await (navigator.mediaDevices as any).getDisplayMedia({
           video: {
             cursor: "always",
             frameRate: { ideal: 30, max: 60 }
-          } as any,
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false
-          }
+          },
+          audio: true,
+          systemAudio: "include",
+          selfBrowserSurface: "include"
         });
       } catch (displayErr) {
         try {
@@ -745,6 +767,8 @@ export default function DdsConferenceRoom({
       const screenVideoTrack = screenStream.getVideoTracks()[0];
       const screenAudioTrack = screenStream.getAudioTracks()[0];
 
+      setIsScreenAudioDetected(Boolean(screenAudioTrack));
+
       // Aplica hint de detalhe para forçar codificadores WebRTC a transmitirem frames em alta nitidez
       if (screenVideoTrack) {
         if ('contentHint' in screenVideoTrack) {
@@ -755,45 +779,50 @@ export default function DdsConferenceRoom({
 
       // MIXER DE ÁUDIO DE ALTA FIDELIDADE (Voz do Instrutor + Som do Vídeo da Apresentação)
       let mixedAudioTrack: MediaStreamTrack | null = null;
+      const micAudioTrack = localStreamRef.current?.getAudioTracks()[0];
 
-      try {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx) {
-          const audioCtx = new AudioCtx();
-          if (audioCtx.state === 'suspended') {
-            await audioCtx.resume();
-          }
-          audioContextRef.current = audioCtx;
+      if (screenAudioTrack && micAudioTrack) {
+        try {
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+          if (AudioCtx) {
+            const audioCtx = new AudioCtx();
+            if (audioCtx.state === 'suspended') {
+              await audioCtx.resume();
+            }
+            audioContextRef.current = audioCtx;
 
-          const destination = audioCtx.createMediaStreamDestination();
+            const destination = audioCtx.createMediaStreamDestination();
+            destination.channelCount = 2;
 
-          // 1. Canal do Microfone do Instrutor
-          const micAudioTrack = localStreamRef.current?.getAudioTracks()[0];
-          if (micAudioTrack) {
+            // 1. Canal do Microfone do Instrutor
             const micStream = new MediaStream([micAudioTrack]);
             const micSource = audioCtx.createMediaStreamSource(micStream);
             const micGain = audioCtx.createGain();
             micGain.gain.value = 1.0;
             micSource.connect(micGain);
             micGain.connect(destination);
-          }
 
-          // 2. Canal do Áudio do Vídeo / Apresentação de Tela
-          if (screenAudioTrack) {
+            // 2. Canal do Áudio do Vídeo / Apresentação de Tela (com ganho de fidelidade)
             const sysStream = new MediaStream([screenAudioTrack]);
             const sysSource = audioCtx.createMediaStreamSource(sysStream);
             const sysGain = audioCtx.createGain();
-            sysGain.gain.value = 1.0;
+            sysGain.gain.value = 1.2;
             sysSource.connect(sysGain);
             sysGain.connect(destination);
-          }
 
-          mixedAudioTrack = destination.stream.getAudioTracks()[0] || null;
+            mixedAudioTrack = destination.stream.getAudioTracks()[0] || null;
+          }
+        } catch (mixErr) {
+          console.warn("Mixer de áudio indisponível, usando áudio direto da tela:", mixErr);
+          mixedAudioTrack = screenAudioTrack;
         }
-      } catch (mixErr) {
-        console.warn("Mixer de áudio indisponível:", mixErr);
-        mixedAudioTrack = screenAudioTrack || localStreamRef.current?.getAudioTracks()[0] || null;
+      } else if (screenAudioTrack) {
+        mixedAudioTrack = screenAudioTrack;
+      } else if (micAudioTrack) {
+        mixedAudioTrack = micAudioTrack;
       }
+
+      mixedAudioTrackRef.current = mixedAudioTrack;
 
       // Substitui as trilhas de vídeo e áudio nos celulares dos colaboradores
       activeCalls.current.forEach(async (call) => {
@@ -839,6 +868,7 @@ export default function DdsConferenceRoom({
       console.warn("Compartilhamento cancelado ou não permitido:", err);
       isScreenSharingRef.current = false;
       setIsScreenSharing(false);
+      setIsScreenAudioDetected(null);
     }
   };
 
@@ -852,6 +882,8 @@ export default function DdsConferenceRoom({
       audioContextRef.current = null;
     }
     isScreenSharingRef.current = false;
+    mixedAudioTrackRef.current = null;
+    setIsScreenAudioDetected(null);
     setIsScreenSharing(false);
 
     // Restaura a câmera e o microfone do organizador para todos
@@ -1162,6 +1194,15 @@ export default function DdsConferenceRoom({
                     Você está apresentando a tela
                   </span>
                 </div>
+
+                {isScreenAudioDetected === false && (
+                  <div className="absolute bottom-3 left-3 right-3 bg-amber-500/90 text-slate-950 backdrop-blur-md px-3 py-2 rounded-xl text-[10px] sm:text-xs font-bold border border-amber-300 flex items-center gap-2 z-10 shadow-xl">
+                    <Volume2 size={14} className="shrink-0 text-slate-950" />
+                    <span>
+                      Dica de Áudio: Para transmitir o som de vídeos do YouTube/Mídias, selecione &ldquo;Guia do Chrome&rdquo; ou &ldquo;Tela Inteira&rdquo; e marque a caixa &ldquo;Compartilhar áudio&rdquo;.
+                    </span>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="relative w-full h-full flex items-center justify-center bg-slate-950">
@@ -1209,6 +1250,14 @@ export default function DdsConferenceRoom({
                   }
                 }}
                 className="w-full h-full object-contain"
+              />
+
+              {/* CANAL DE ÁUDIO DEDICADO PARA PARTICIPANTE (ESTÉREO / ALTA FIDELIDADE) */}
+              <audio
+                ref={remoteAudioRef}
+                autoPlay
+                playsInline
+                className="hidden"
               />
 
               {!remoteOrganizerStream && (
