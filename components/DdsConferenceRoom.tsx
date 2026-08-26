@@ -184,6 +184,7 @@ export default function DdsConferenceRoom({
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isHostScreenSharing, setIsHostScreenSharing] = useState(false);
   const [hasMediaError, setHasMediaError] = useState(false);
   const [isMyHandRaised, setIsMyHandRaised] = useState(false);
   const [handRaiseAlert, setHandRaiseAlert] = useState<{ peerId: string; name: string } | null>(null);
@@ -325,14 +326,20 @@ export default function DdsConferenceRoom({
       if (screenShareVideoRef.current) {
         screenShareVideoRef.current.srcObject = screenStreamRef.current;
         screenShareVideoRef.current.muted = true;
+        screenShareVideoRef.current.playsInline = true;
+        screenShareVideoRef.current.onloadedmetadata = () => {
+          screenShareVideoRef.current?.play().catch(() => {});
+        };
         screenShareVideoRef.current.play().catch(() => {});
       }
       if (localPipVideoRef.current && localStreamRef.current) {
         localPipVideoRef.current.srcObject = localStreamRef.current;
+        localPipVideoRef.current.muted = true;
         localPipVideoRef.current.play().catch(() => {});
       }
     } else if (isAdmin && localMainVideoRef.current && localStreamRef.current) {
       localMainVideoRef.current.srcObject = localStreamRef.current;
+      localMainVideoRef.current.muted = true;
       localMainVideoRef.current.play().catch(() => {});
     }
   }, [isScreenSharing, isAdmin]);
@@ -374,9 +381,18 @@ export default function DdsConferenceRoom({
         });
 
         peer.on('call', (call: any) => {
-          const currentOutStream = isScreenSharing && screenStreamRef.current 
-            ? screenStreamRef.current 
-            : localStreamRef.current;
+          let currentOutStream: MediaStream | null = localStreamRef.current;
+
+          if (isScreenSharing && screenStreamRef.current && localStreamRef.current) {
+            const screenVid = screenStreamRef.current.getVideoTracks()[0];
+            const micAud = localStreamRef.current.getAudioTracks()[0];
+            const tracks: MediaStreamTrack[] = [];
+            if (screenVid) tracks.push(screenVid);
+            if (micAud) tracks.push(micAud);
+            currentOutStream = new MediaStream(tracks);
+          } else if (isScreenSharing && screenStreamRef.current) {
+            currentOutStream = screenStreamRef.current;
+          }
 
           call.answer(currentOutStream);
           activeCalls.current.set(call.peer, call);
@@ -483,6 +499,13 @@ export default function DdsConferenceRoom({
           });
 
           conn.on('data', (data: any) => {
+            if (data.type === 'SCREEN_SHARE_STATE') {
+              setIsHostScreenSharing(Boolean(data.isSharing));
+              if (organizerVideoRef.current && remoteOrganizerStream) {
+                organizerVideoRef.current.srcObject = remoteOrganizerStream;
+                organizerVideoRef.current.play().catch(() => {});
+              }
+            }
             if (data.type === 'LOWER_HAND') {
               setIsMyHandRaised(false);
             }
@@ -535,8 +558,17 @@ export default function DdsConferenceRoom({
     if (!isAdmin && remoteOrganizerStream && organizerVideoRef.current) {
       organizerVideoRef.current.srcObject = remoteOrganizerStream;
       organizerVideoRef.current.play().catch(() => {});
+
+      const vTrack = remoteOrganizerStream.getVideoTracks()[0];
+      if (vTrack) {
+        vTrack.onunmute = () => {
+          if (organizerVideoRef.current) {
+            organizerVideoRef.current.play().catch(() => {});
+          }
+        };
+      }
     }
-  }, [isAdmin, remoteOrganizerStream]);
+  }, [isAdmin, remoteOrganizerStream, isHostScreenSharing]);
 
   // 9. APRESENTAÇÃO DE TELA COM ÁUDIO DO VÍDEO + VOZ DO INSTRUTOR MIXADOS
   const toggleScreenShare = async () => {
@@ -548,15 +580,25 @@ export default function DdsConferenceRoom({
     }
 
     try {
-      // CAPTURA VÍDEO + ÁUDIO DO SISTEMA / GUIA (YOUTUBE / ARQUIVO MP4)
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { displaySurface: 'monitor', frameRate: { ideal: 30 } },
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false
-        }
-      });
+      // CAPTURA VÍDEO (Compatível com Janela, Guia ou Monitor Inteiro) + ÁUDIO OPCIONAL
+      let screenStream: MediaStream;
+      try {
+        screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            frameRate: { ideal: 30, max: 60 },
+            width: { ideal: 1920, max: 1920 },
+            height: { ideal: 1080, max: 1080 }
+          },
+          audio: true
+        });
+      } catch (displayErr) {
+        // Fallback caso o navegador não suporte captura de áudio com a tela
+        screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            frameRate: { ideal: 30, max: 60 }
+          }
+        });
+      }
 
       screenStreamRef.current = screenStream;
       setIsScreenSharing(true);
@@ -606,7 +648,7 @@ export default function DdsConferenceRoom({
             const videoSender = senders.find((s: any) => 
               (s.track && s.track.kind === 'video') || s.kind === 'video'
             );
-            if (videoSender) {
+            if (videoSender && screenVideoTrack) {
               videoSender.replaceTrack(screenVideoTrack);
             }
 
@@ -625,11 +667,18 @@ export default function DdsConferenceRoom({
         }
       });
 
+      // Notifica todos os participantes conectados via DataChannel
+      participantConns.current.forEach((conn) => {
+        if (conn && conn.open) {
+          conn.send({ type: 'SCREEN_SHARE_STATE', isSharing: true });
+        }
+      });
+
       screenVideoTrack.onended = () => {
         stopScreenShare();
       };
     } catch (err) {
-      console.warn("Compartilhamento cancelado:", err);
+      console.warn("Compartilhamento cancelado ou não permitido:", err);
       setIsScreenSharing(false);
     }
   };
@@ -667,6 +716,13 @@ export default function DdsConferenceRoom({
         } catch (err) {}
       });
     }
+
+    // Notifica todos os participantes que o compartilhamento encerrou
+    participantConns.current.forEach((conn) => {
+      if (conn && conn.open) {
+        conn.send({ type: 'SCREEN_SHARE_STATE', isSharing: false });
+      }
+    });
   };
 
   // 10. LEVANTAR A MÃO (PARTICIPANTE)
