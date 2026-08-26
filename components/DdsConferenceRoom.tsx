@@ -5,7 +5,7 @@ import {
   Mic, MicOff, Video as VideoIcon, VideoOff, 
   Monitor, MonitorOff, Users, Hand, Crown, 
   Check, Sparkles, Wifi, WifiOff, Maximize, Minimize, Volume2,
-  PhoneOff, Eye, EyeOff, LayoutGrid, Radio, ShieldCheck, Clock
+  PhoneOff, Eye, EyeOff, LayoutGrid, Radio, ShieldCheck, Clock, Presentation
 } from 'lucide-react';
 
 interface RemoteParticipant {
@@ -49,7 +49,7 @@ function playHandRaiseBeep() {
   } catch {}
 }
 
-// Componente para renderizar os cards dos participantes no Mosaico
+// Card de vídeo de participante remoto
 function ParticipantVideoCard({ 
   participant, 
   isAdmin, 
@@ -65,9 +65,21 @@ function ParticipantVideoCard({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  const attachStream = useCallback((el: HTMLVideoElement | null) => {
+    if (el && participant.stream) {
+      if (el.srcObject !== participant.stream) {
+        el.srcObject = participant.stream;
+        el.muted = true;
+        el.playsInline = true;
+        el.play().catch(() => {});
+      }
+    }
+  }, [participant.stream]);
+
   useEffect(() => {
     if (videoRef.current && participant.stream) {
       videoRef.current.srcObject = participant.stream;
+      videoRef.current.muted = true;
       videoRef.current.play().catch(() => {});
     }
   }, [participant.stream]);
@@ -84,9 +96,10 @@ function ParticipantVideoCard({
       <div className="absolute inset-0 flex items-center justify-center bg-slate-950">
         {participant.stream && !participant.isVideoOff ? (
           <video
-            ref={videoRef}
+            ref={attachStream}
             autoPlay
             playsInline
+            muted
             className="w-full h-full object-cover"
           />
         ) : (
@@ -186,7 +199,6 @@ export default function DdsConferenceRoom({
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isHostScreenSharing, setIsHostScreenSharing] = useState(false);
-  const [showPip, setShowPip] = useState(true); // Controle de Miniatura do Apresentador
   const [hasMediaError, setHasMediaError] = useState(false);
   const [isMyHandRaised, setIsMyHandRaised] = useState(false);
   const [handRaiseAlert, setHandRaiseAlert] = useState<{ peerId: string; name: string } | null>(null);
@@ -208,7 +220,7 @@ export default function DdsConferenceRoom({
   // Elementos de Vídeo
   const stageContainerRef = useRef<HTMLDivElement>(null);
   const localMainVideoRef = useRef<HTMLVideoElement>(null);
-  const localPipVideoRef = useRef<HTMLVideoElement>(null);
+  const localDedicatedPresenterVideoRef = useRef<HTMLVideoElement>(null);
   const localParticipantMosaicRef = useRef<HTMLVideoElement>(null);
   const screenShareVideoRef = useRef<HTMLVideoElement>(null);
   const organizerVideoRef = useRef<HTMLVideoElement>(null);
@@ -254,7 +266,7 @@ export default function DdsConferenceRoom({
       audioContextRef.current = null;
     }
 
-    [localMainVideoRef, localPipVideoRef, localParticipantMosaicRef, screenShareVideoRef, organizerVideoRef].forEach(ref => {
+    [localMainVideoRef, localDedicatedPresenterVideoRef, localParticipantMosaicRef, screenShareVideoRef, organizerVideoRef].forEach(ref => {
       if (ref.current) {
         ref.current.srcObject = null;
       }
@@ -287,8 +299,9 @@ export default function DdsConferenceRoom({
 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
-          width: { ideal: 1280 }, 
-          height: { ideal: 720 }, 
+          width: { ideal: 1280, max: 1920 }, 
+          height: { ideal: 720, max: 1080 }, 
+          frameRate: { ideal: 30, max: 60 },
           facingMode: 'user' 
         },
         audio: {
@@ -300,16 +313,18 @@ export default function DdsConferenceRoom({
 
       localStreamRef.current = stream;
 
-      // Organizador: Conecta ao palco principal
-      if (isAdmin && localMainVideoRef.current && !isScreenSharing) {
-        localMainVideoRef.current.srcObject = stream;
-        localMainVideoRef.current.muted = true;
-        localMainVideoRef.current.play().catch(() => {});
-      }
-      if (isAdmin && localPipVideoRef.current) {
-        localPipVideoRef.current.srcObject = stream;
-        localPipVideoRef.current.muted = true;
-        localPipVideoRef.current.play().catch(() => {});
+      // Organizador: Conecta aos players
+      if (isAdmin) {
+        if (localMainVideoRef.current) {
+          localMainVideoRef.current.srcObject = stream;
+          localMainVideoRef.current.muted = true;
+          localMainVideoRef.current.play().catch(() => {});
+        }
+        if (localDedicatedPresenterVideoRef.current) {
+          localDedicatedPresenterVideoRef.current.srcObject = stream;
+          localDedicatedPresenterVideoRef.current.muted = true;
+          localDedicatedPresenterVideoRef.current.play().catch(() => {});
+        }
       }
 
       // Participante: Conecta ao seu card no Mosaico
@@ -325,7 +340,7 @@ export default function DdsConferenceRoom({
       setHasMediaError(true);
       return null;
     }
-  }, [isAdmin, isScreenSharing]);
+  }, [isAdmin]);
 
   // 4. LIMPEZA AO DESMONTAR
   useEffect(() => {
@@ -344,15 +359,12 @@ export default function DdsConferenceRoom({
         screenShareVideoRef.current.srcObject = screenStreamRef.current;
         screenShareVideoRef.current.muted = true;
         screenShareVideoRef.current.playsInline = true;
-        screenShareVideoRef.current.onloadedmetadata = () => {
-          screenShareVideoRef.current?.play().catch(() => {});
-        };
         screenShareVideoRef.current.play().catch(() => {});
       }
-      if (localPipVideoRef.current && localStreamRef.current) {
-        localPipVideoRef.current.srcObject = localStreamRef.current;
-        localPipVideoRef.current.muted = true;
-        localPipVideoRef.current.play().catch(() => {});
+      if (localDedicatedPresenterVideoRef.current && localStreamRef.current) {
+        localDedicatedPresenterVideoRef.current.srcObject = localStreamRef.current;
+        localDedicatedPresenterVideoRef.current.muted = true;
+        localDedicatedPresenterVideoRef.current.play().catch(() => {});
       }
     } else if (isAdmin && localMainVideoRef.current && localStreamRef.current) {
       localMainVideoRef.current.srcObject = localStreamRef.current;
@@ -519,9 +531,16 @@ export default function DdsConferenceRoom({
           conn.on('data', (data: any) => {
             if (data.type === 'SCREEN_SHARE_STATE') {
               setIsHostScreenSharing(Boolean(data.isSharing));
+              
+              // Força o reinício completo do decodificador de vídeo no celular/navegador do participante
               if (organizerVideoRef.current && remoteOrganizerStream) {
-                organizerVideoRef.current.srcObject = remoteOrganizerStream;
-                organizerVideoRef.current.play().catch(() => {});
+                try {
+                  organizerVideoRef.current.pause();
+                  organizerVideoRef.current.srcObject = null;
+                  organizerVideoRef.current.srcObject = remoteOrganizerStream;
+                  organizerVideoRef.current.load();
+                  organizerVideoRef.current.play().catch(() => {});
+                } catch {}
               }
             }
             if (data.type === 'LOWER_HAND') {
@@ -546,10 +565,22 @@ export default function DdsConferenceRoom({
             call.on('stream', (organizerStream: MediaStream) => {
               if (!isMounted) return;
               setRemoteOrganizerStream(organizerStream);
+              
               if (organizerVideoRef.current) {
                 organizerVideoRef.current.srcObject = organizerStream;
+                organizerVideoRef.current.muted = false;
+                organizerVideoRef.current.playsInline = true;
                 organizerVideoRef.current.play().catch(() => {});
               }
+
+              // Listener para acordar imediatamente o vídeo quando a trilha for substituída
+              organizerStream.getVideoTracks().forEach(track => {
+                track.onunmute = () => {
+                  if (organizerVideoRef.current) {
+                    organizerVideoRef.current.play().catch(() => {});
+                  }
+                };
+              });
             });
           }
         });
@@ -575,6 +606,8 @@ export default function DdsConferenceRoom({
   useEffect(() => {
     if (!isAdmin && remoteOrganizerStream && organizerVideoRef.current) {
       organizerVideoRef.current.srcObject = remoteOrganizerStream;
+      organizerVideoRef.current.muted = false;
+      organizerVideoRef.current.playsInline = true;
       organizerVideoRef.current.play().catch(() => {});
 
       const vTrack = remoteOrganizerStream.getVideoTracks()[0];
@@ -598,23 +631,18 @@ export default function DdsConferenceRoom({
     }
 
     try {
-      // CAPTURA VÍDEO (Compatível com Janela, Guia ou Monitor Inteiro) + ÁUDIO OPCIONAL
+      // CAPTURA VÍDEO DE TELA LIMPO E SEM RESTRIÇÕES DE HARDWARE
       let screenStream: MediaStream;
       try {
         screenStream = await navigator.mediaDevices.getDisplayMedia({
           video: {
-            frameRate: { ideal: 30, max: 60 },
-            width: { ideal: 1920, max: 1920 },
-            height: { ideal: 1080, max: 1080 }
-          },
+            cursor: "always"
+          } as any,
           audio: true
         });
       } catch (displayErr) {
-        // Fallback caso o navegador não suporte captura de áudio com a tela
         screenStream = await navigator.mediaDevices.getDisplayMedia({
-          video: {
-            frameRate: { ideal: 30, max: 60 }
-          }
+          video: true
         });
       }
 
@@ -624,7 +652,13 @@ export default function DdsConferenceRoom({
       const screenVideoTrack = screenStream.getVideoTracks()[0];
       const screenAudioTrack = screenStream.getAudioTracks()[0];
 
-      // MIXER DE ÁUDIO (Voz do Instrutor + Som do Vídeo)
+      // Aplica hint de detalhe para forçar codificadores WebRTC a transmitirem frames em alta nitidez
+      if (screenVideoTrack) {
+        (screenVideoTrack as any).contentHint = 'detail';
+        screenVideoTrack.enabled = true;
+      }
+
+      // MIXER DE ÁUDIO (Voz do Instrutor + Som da Apresentação)
       let mixedAudioTrack: MediaStreamTrack | null = null;
 
       if (screenAudioTrack && localStreamRef.current) {
@@ -650,7 +684,7 @@ export default function DdsConferenceRoom({
 
           mixedAudioTrack = destination.stream.getAudioTracks()[0];
         } catch (mixErr) {
-          console.warn("Mixer de áudio indisponível, usando áudio da tela direto:", mixErr);
+          console.warn("Mixer de áudio indisponível:", mixErr);
           mixedAudioTrack = screenAudioTrack;
         }
       }
@@ -716,6 +750,11 @@ export default function DdsConferenceRoom({
     if (localStreamRef.current) {
       const camTrack = localStreamRef.current.getVideoTracks()[0];
       const micTrack = localStreamRef.current.getAudioTracks()[0];
+
+      if (camTrack) {
+        (camTrack as any).contentHint = 'motion';
+        camTrack.enabled = true;
+      }
 
       activeCalls.current.forEach((call) => {
         try {
@@ -834,6 +873,8 @@ export default function DdsConferenceRoom({
 
   const totalHandsRaised = remoteParticipants.filter(p => p.isHandRaised).length;
 
+  const isCurrentlySharingScreen = isAdmin ? isScreenSharing : isHostScreenSharing;
+
   return (
     <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-3 sm:p-5 space-y-4 sm:space-y-5 shadow-2xl relative overflow-hidden text-slate-100 font-sans">
       
@@ -905,92 +946,101 @@ export default function DdsConferenceRoom({
       </div>
 
       {/* ========================================================================= */}
-      {/* 1. PALCO PRINCIPAL (TRANSMISSÃO DO ORGANIZADOR / TELA COMPARTILHADA)      */}
+      {/* 1. PALCO PRINCIPAL (DESMEMBRADO: APRESENTAÇÃO + CÂMERA EM SLOTS SEPARADOS) */}
       {/* ========================================================================= */}
-      <div className="space-y-2">
+      <div className="space-y-3">
+        
+        {/* Cabeçalho do Palco */}
         <div className="flex items-center justify-between px-1">
           <span className="text-[11px] sm:text-xs font-extrabold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-            <Crown size={14} className="text-amber-400 shrink-0" /> 
-            {isAdmin 
-              ? (isScreenSharing ? 'Sua Apresentação de Tela' : 'Sua Câmera (Instrutor)') 
-              : (isHostScreenSharing ? 'Apresentação do Instrutor' : 'Transmissão do Instrutor')}
+            {isCurrentlySharingScreen ? (
+              <>
+                <Presentation size={15} className="text-emerald-400 shrink-0" />
+                <span>Palco de Apresentação (Tela Compartilhada)</span>
+              </>
+            ) : (
+              <>
+                <Crown size={15} className="text-amber-400 shrink-0" />
+                <span>{isAdmin ? 'Sua Câmera (Instrutor)' : 'Transmissão do Instrutor'}</span>
+              </>
+            )}
           </span>
 
-          <div className="flex items-center gap-1.5">
-            {isScreenSharing && (
-              <button
-                type="button"
-                onClick={() => setShowPip(!showPip)}
-                className="p-1 sm:px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
-                title={showPip ? 'Ocultar Miniatura da Câmera (Modo Foco)' : 'Exibir Miniatura da Câmera'}
-              >
-                {showPip ? <EyeOff size={12} /> : <Eye size={12} />}
-                <span className="hidden sm:inline">{showPip ? 'Foco na Tela' : 'Ver Câmera'}</span>
-              </button>
-            )}
-
-            {/* BOTÃO TELA CHEIA */}
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              className="p-1 sm:px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition-colors flex items-center gap-1 text-[10px] font-bold cursor-pointer"
-              title={isFullscreen ? 'Sair da Tela Cheia' : 'Abrir em Tela Cheia'}
-            >
-              {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
-              <span className="hidden sm:inline">{isFullscreen ? 'Normal' : 'Tela Cheia'}</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className="p-1 sm:px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition-colors flex items-center gap-1 text-[10px] font-bold cursor-pointer"
+            title={isFullscreen ? 'Sair da Tela Cheia' : 'Abrir em Tela Cheia'}
+          >
+            {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
+            <span className="hidden sm:inline">{isFullscreen ? 'Normal' : 'Tela Cheia'}</span>
+          </button>
         </div>
 
-        {/* CONTAINER DO PALCO COM PROPORÇÃO RESPONSIVA */}
+        {/* CONTAINER DO PALCO DESMEMBRADO (SEM SOBREPOSIÇÃO) */}
         <div 
           ref={stageContainerRef}
-          className="relative w-full aspect-video sm:max-h-[520px] bg-slate-950 rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex items-center justify-center"
+          className="relative w-full aspect-video sm:max-h-[520px] bg-black rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex items-center justify-center"
         >
-          {/* VISÃO DO ORGANIZADOR */}
-          {isAdmin ? (
-            isScreenSharing ? (
-              <div className="relative w-full h-full flex items-center justify-center bg-black">
+          {/* MODO 1: APRESENTAÇÃO DE TELA ATIVA (HOST OU PARTICIPANTE) */}
+          {isCurrentlySharingScreen ? (
+            <div className="relative w-full h-full flex items-center justify-center bg-black">
+              {isAdmin ? (
                 <video
-                  ref={screenShareVideoRef}
+                  ref={(el) => {
+                    (screenShareVideoRef as any).current = el;
+                    if (el && screenStreamRef.current && el.srcObject !== screenStreamRef.current) {
+                      el.srcObject = screenStreamRef.current;
+                      el.muted = true;
+                      el.playsInline = true;
+                      el.play().catch(() => {});
+                    }
+                  }}
                   autoPlay
                   playsInline
                   muted
                   className="w-full h-full object-contain"
                 />
-                
-                {/* Badge de Transmissão de Tela */}
-                <div className="absolute top-3 left-3 bg-slate-900/90 backdrop-blur-md px-3 py-1 rounded-xl border border-emerald-500/30 flex items-center gap-1.5 z-10 shadow-lg">
-                  <Monitor size={12} className="text-emerald-400 animate-pulse" />
-                  <span className="text-[10px] sm:text-xs font-extrabold text-white">Transmitindo Tela em Alta Definição</span>
-                </div>
-
-                {/* Miniatura do Organizador (PiP Flutuante com Toggle) */}
-                {showPip && (
-                  <div className="absolute bottom-3 right-3 w-36 sm:w-52 aspect-video bg-slate-900 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-emerald-500 z-20 transition-all">
-                    <video
-                      ref={localPipVideoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className={`w-full h-full object-cover scale-x-[-1] ${isVideoOff ? 'hidden' : 'block'}`}
-                    />
-                    {isVideoOff && (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-500">
-                        <VideoOff size={16} />
-                        <span className="text-[9px] mt-0.5 font-bold">Câmera Pausada</span>
-                      </div>
-                    )}
-                    <div className="absolute bottom-1 left-1.5 bg-black/80 px-1.5 py-0.5 rounded text-[9px] font-bold text-white flex items-center gap-1">
-                      <Crown size={9} className="text-amber-400" /> Você
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="relative w-full h-full flex items-center justify-center">
+              ) : (
                 <video
-                  ref={localMainVideoRef}
+                  ref={(el) => {
+                    (organizerVideoRef as any).current = el;
+                    if (el && remoteOrganizerStream && el.srcObject !== remoteOrganizerStream) {
+                      el.srcObject = remoteOrganizerStream;
+                      el.playsInline = true;
+                      el.play().catch(() => {});
+                    }
+                  }}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+              )}
+
+              <div className="absolute top-3 left-3 bg-slate-900/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-emerald-500/40 flex items-center gap-2 z-10 shadow-xl">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-[10px] sm:text-xs font-black text-white">
+                  {isAdmin ? 'Você está apresentando a tela' : 'Apresentação do Instrutor em Alta Definição'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            /* MODO 2: APENAS CÂMERA DO INSTRUTOR (SEM TELA COMPARTILHADA) */
+            isAdmin ? (
+              <div className="relative w-full h-full flex items-center justify-center bg-slate-950">
+                <video
+                  ref={(el) => {
+                    (localMainVideoRef as any).current = el;
+                    if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
+                      el.srcObject = localStreamRef.current;
+                      el.muted = true;
+                      el.playsInline = true;
+                      el.play().catch(() => {});
+                    }
+                  }}
                   autoPlay
                   playsInline
                   muted
@@ -1010,29 +1060,35 @@ export default function DdsConferenceRoom({
                   <span className="text-[9px] text-emerald-400 font-black bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/30">Instrutor</span>
                 </div>
               </div>
+            ) : (
+              <div className="relative w-full h-full flex items-center justify-center bg-black">
+                {remoteOrganizerStream ? (
+                  <video
+                    ref={(el) => {
+                      (organizerVideoRef as any).current = el;
+                      if (el && remoteOrganizerStream && el.srcObject !== remoteOrganizerStream) {
+                        el.srcObject = remoteOrganizerStream;
+                        el.playsInline = true;
+                        el.play().catch(() => {});
+                      }
+                    }}
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-slate-500 space-y-2.5 p-6 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/30 text-emerald-400 flex items-center justify-center animate-pulse">
+                      <Crown size={24} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-extrabold text-white">Aguardando o Instrutor...</h4>
+                      <p className="text-[11px] text-slate-400">A transmissão ao vivo começará em instantes.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             )
-          ) : (
-            /* VISÃO DO PARTICIPANTE (COM STREAM DO INSTRUTOR) */
-            <div className="relative w-full h-full flex items-center justify-center bg-black">
-              {remoteOrganizerStream ? (
-                <video
-                  ref={organizerVideoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-contain"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center text-slate-500 space-y-2.5 p-6 text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/30 text-emerald-400 flex items-center justify-center animate-pulse">
-                    <Crown size={24} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-extrabold text-white">Aguardando o Instrutor...</h4>
-                    <p className="text-[11px] text-slate-400">A transmissão ao vivo começará em instantes.</p>
-                  </div>
-                </div>
-              )}
-            </div>
           )}
         </div>
       </div>
@@ -1107,27 +1163,80 @@ export default function DdsConferenceRoom({
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. MOSAICO DINÂMICO DOS PARTICIPANTES (GRID MOBILE-FIRST)                 */}
+      {/* 3. MOSAICO DINÂMICO DOS PARTICIPANTES + SLOT DEDICADO DO APRESENTADOR     */}
       {/* ========================================================================= */}
       <div className="space-y-2.5 pt-2">
         <div className="flex items-center justify-between border-t border-slate-800/80 pt-3 px-1">
           <span className="text-[11px] sm:text-xs font-extrabold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
             <LayoutGrid size={13} className="text-emerald-400" />
-            <span>Mosaico da Equipe ({remoteParticipants.length + (isAdmin ? 0 : 1)})</span>
+            <span>Mosaico da Equipe ({remoteParticipants.length + 1})</span>
           </span>
 
           <span className="text-[10px] text-slate-400">
-            {remoteParticipants.length === 0 ? 'Aguardando colaboradores...' : 'Todos online'}
+            {isCurrentlySharingScreen ? 'Modo Apresentação: Câmeras em slots separados' : 'Todos online'}
           </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
+          
+          {/* SLOT DEDICADO DO INSTRUTOR (QUANDO ESTIVER APRESENTANDO A TELA) */}
+          {isAdmin && isScreenSharing && (
+            <div className="relative h-44 sm:h-48 bg-slate-950 rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-emerald-500/60 flex flex-col justify-between p-2.5 sm:p-3 shadow-xl">
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-950">
+                <video
+                  ref={(el) => {
+                    (localDedicatedPresenterVideoRef as any).current = el;
+                    if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
+                      el.srcObject = localStreamRef.current;
+                      el.muted = true;
+                      el.playsInline = true;
+                      el.play().catch(() => {});
+                    }
+                  }}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={`w-full h-full object-cover scale-x-[-1] ${isVideoOff ? 'hidden' : 'block'}`}
+                />
+                {isVideoOff && (
+                  <div className="flex flex-col items-center justify-center space-y-1 text-slate-500 p-2">
+                    <VideoOff size={20} />
+                    <span className="text-[9px] font-bold text-slate-400">Câmera Pausada</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="relative z-10 flex items-center justify-between">
+                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-lg text-[9px] font-black flex items-center gap-1">
+                  <Crown size={10} className="text-amber-400" /> INSTRUTOR
+                </span>
+                {isAudioMuted && (
+                  <span className="bg-red-500/20 text-red-400 p-1 rounded-lg border border-red-500/30">
+                    <MicOff size={10} />
+                  </span>
+                )}
+              </div>
+
+              <div className="relative z-10 bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-xl border border-slate-800">
+                <p className="text-[11px] font-bold text-white truncate">{userName} (Você)</p>
+              </div>
+            </div>
+          )}
+
           {/* Card do próprio participante caso seja colaborador */}
           {!isAdmin && (
             <div className="relative h-44 sm:h-48 bg-slate-950 rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-emerald-500/40 flex flex-col justify-between p-2.5 sm:p-3 shadow-lg">
               <div className="absolute inset-0 flex items-center justify-center bg-slate-950">
                 <video
-                  ref={localParticipantMosaicRef}
+                  ref={(el) => {
+                    (localParticipantMosaicRef as any).current = el;
+                    if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
+                      el.srcObject = localStreamRef.current;
+                      el.muted = true;
+                      el.playsInline = true;
+                      el.play().catch(() => {});
+                    }
+                  }}
                   autoPlay
                   playsInline
                   muted
