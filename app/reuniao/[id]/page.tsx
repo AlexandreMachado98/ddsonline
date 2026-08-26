@@ -1,10 +1,10 @@
- 'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { 
   CheckCircle, Users, LogOut, AlertTriangle, X, 
-  Loader2, Send, PhoneOff, ShieldCheck, ExternalLink, MapPin
+  Loader2, Send, PhoneOff, ShieldCheck, ExternalLink, MapPin, Sparkles, User, Fingerprint, Camera
 } from 'lucide-react';
 import SignaturePad from '@/components/SignaturePad';
 import SelfieCapture from '@/components/SelfieCapture';
@@ -173,24 +173,24 @@ export default function MeetingRoomPage() {
   // =========================================================================
   if (currentStep === 'EXPIRED') {
     return (
-      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-5 shadow-2xl animate-in fade-in zoom-in duration-300">
-          <div className="bg-red-500/10 text-red-400 p-4 rounded-2xl inline-flex border border-red-500/20">
-            <PhoneOff size={36} />
+      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 text-center font-sans">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl space-y-4 shadow-2xl animate-in fade-in zoom-in duration-300">
+          <div className="bg-red-500/15 text-red-400 p-3.5 rounded-2xl inline-flex border border-red-500/30">
+            <PhoneOff size={32} />
           </div>
 
-          <div className="space-y-1.5">
-            <span className="text-[11px] font-bold text-red-400 uppercase tracking-widest bg-red-500/10 px-3 py-1 rounded-full border border-red-500/20 inline-block">
+          <div className="space-y-1">
+            <span className="text-[10px] font-extrabold text-red-400 uppercase tracking-widest bg-red-500/10 px-3 py-1 rounded-full border border-red-500/20 inline-block">
               Acesso Encerrado
             </span>
-            <h1 className="text-xl font-bold text-white tracking-tight">Reunião Finalizada</h1>
+            <h1 className="text-lg sm:text-xl font-black text-white">Reunião Finalizada</h1>
           </div>
 
           <p className="text-slate-300 text-xs leading-relaxed">
-            O organizador já finalizou este DDS. O link de acesso foi <strong>desativado para novas assinaturas</strong> por conformidade de segurança.
+            O técnico de segurança já finalizou este DDS. O link foi <strong>desativado para novas assinaturas</strong> por conformidade de segurança.
           </p>
 
-          <div className="pt-5 border-t border-slate-800 text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
+          <div className="pt-4 border-t border-slate-800 text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
             <AlertTriangle size={14} className="text-amber-500" />
             Caso não tenha conseguido assinar, contate o TST da sua unidade.
           </div>
@@ -204,17 +204,17 @@ export default function MeetingRoomPage() {
   // =========================================================================
   if (currentStep === 'EXIT_SUCCESS') {
     return (
-      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-5 shadow-2xl animate-in fade-in zoom-in duration-300">
-          <div className="bg-green-500/10 text-green-400 p-4 rounded-2xl inline-flex border border-green-500/20">
+      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 text-center font-sans">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl space-y-4 shadow-2xl animate-in fade-in zoom-in duration-300">
+          <div className="bg-emerald-500/15 text-emerald-400 p-3.5 rounded-2xl inline-flex border border-emerald-500/30">
             <CheckCircle size={36} />
           </div>
 
-          <div className="space-y-1.5">
-            <span className="text-[11px] font-bold text-green-400 uppercase tracking-widest bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20 inline-block">
+          <div className="space-y-1">
+            <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 inline-block">
               Desconectado com Sucesso
             </span>
-            <h1 className="text-xl font-bold text-white tracking-tight">Participação Registrada</h1>
+            <h1 className="text-lg sm:text-xl font-black text-white">Participação Registrada</h1>
           </div>
 
           <p className="text-slate-300 text-xs leading-relaxed">
@@ -230,26 +230,26 @@ export default function MeetingRoomPage() {
   // =========================================================================
   if (currentStep === 'SUCCESS') {
     return (
-      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-5 shadow-2xl animate-in fade-in zoom-in duration-300">
-          <div className="bg-green-500/10 text-green-400 p-4 rounded-2xl inline-flex border border-green-500/20">
-            <CheckCircle size={44} />
+      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 text-center font-sans">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl space-y-4 shadow-2xl animate-in fade-in zoom-in duration-300">
+          <div className="bg-emerald-500/15 text-emerald-400 p-4 rounded-2xl inline-flex border border-emerald-500/30 shadow-lg shadow-emerald-950/40">
+            <CheckCircle size={40} />
           </div>
 
-          <div className="space-y-1.5">
-            <span className="text-[11px] font-bold text-green-400 uppercase tracking-widest bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20 inline-block">
+          <div className="space-y-1">
+            <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 inline-block">
               Presença Confirmada
             </span>
-            <h1 className="text-xl font-bold text-white tracking-tight">Assinatura Concluída!</h1>
+            <h1 className="text-lg sm:text-xl font-black text-white">Assinatura Concluída!</h1>
           </div>
 
           <p className="text-slate-300 text-xs leading-relaxed">
-            Obrigado, <strong>{name}</strong>. Sua presença com biometria facial foi adicionada à ata oficial do DDS.
+            Obrigado, <strong>{name}</strong>. Sua presença com biometria facial e assinatura foi anexada à ata oficial do DDS.
           </p>
 
           <button
             onClick={handlePassThePhone}
-            className="w-full mt-4 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 text-white font-bold text-sm rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+            className="w-full mt-3 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
           >
             <Users size={16} /> Passar Celular para Próximo Colega
           </button>
@@ -263,31 +263,31 @@ export default function MeetingRoomPage() {
   // =========================================================================
   if (currentStep === 'ROOM') {
     return (
-      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center p-3 md:p-6 font-sans relative">
-        <div className="w-full max-w-5xl flex flex-col space-y-4 flex-1">
+      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center p-2.5 sm:p-5 font-sans relative">
+        <div className="w-full max-w-5xl flex flex-col space-y-3.5 flex-1">
           
           {/* Barra Superior do Participante */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="bg-green-500/20 p-2 rounded-xl text-green-400">
-                <CheckCircle size={22} />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-2xl shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <div className="bg-emerald-500/20 p-2 rounded-xl text-emerald-400">
+                <CheckCircle size={18} />
               </div>
               <div>
-                <p className="text-[11px] text-slate-400">DDS ON • Participante Conectado</p>
-                <h2 className="text-sm font-bold text-white">{name} ({topic})</h2>
+                <p className="text-[10px] text-slate-400 font-mono">DDS ON • Colaborador Online</p>
+                <h2 className="text-xs sm:text-sm font-bold text-white truncate max-w-xs">{name} ({topic})</h2>
               </div>
             </div>
 
             <button
               onClick={() => setShowExitModal(true)}
-              className="px-3.5 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
+              className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all self-end sm:self-auto cursor-pointer"
             >
-              <LogOut size={14} /> Registrar Saída
+              <LogOut size={13} /> Registrar Saída
             </button>
           </div>
 
           {/* COMPONENTE DA SALA WEBRTC (COMO PARTICIPANTE) */}
-          <div className="flex-1 min-h-[500px]">
+          <div className="flex-1 min-h-[450px]">
             <DdsConferenceRoom
               roomName={meetingId}
               userName={name.trim()}
@@ -298,25 +298,25 @@ export default function MeetingRoomPage() {
 
         {/* Modal de Saída Antecipada */}
         {showExitModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white text-slate-900 w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in duration-200">
-              <div className="flex items-center justify-between border-b pb-3">
-                <div className="flex items-center gap-2 text-amber-600">
-                  <AlertTriangle size={20} />
-                  <h3 className="font-bold text-slate-800 text-sm">Registro de Saída Antecipada</h3>
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+            <div className="bg-slate-900 text-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl border border-slate-800 space-y-4 animate-in fade-in zoom-in duration-200">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2 text-amber-400">
+                  <AlertTriangle size={18} />
+                  <h3 className="font-extrabold text-sm text-white">Registro de Saída Antecipada</h3>
                 </div>
-                <button onClick={() => setShowExitModal(false)} className="text-slate-400 hover:text-slate-600">
+                <button onClick={() => setShowExitModal(false)} className="text-slate-400 hover:text-white p-1 cursor-pointer">
                   <X size={18} />
                 </button>
               </div>
 
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Motivo da Saída:</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Motivo da Saída:</label>
                   <select
                     value={exitReason}
                     onChange={(e) => setExitReason(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-emerald-500"
                   >
                     <option value="Chamado Operacional no Campo">Chamado Operacional no Campo</option>
                     <option value="Mal-estar / Atendimento Médico">Mal-estar / Atendimento Médico</option>
@@ -333,27 +333,27 @@ export default function MeetingRoomPage() {
                       value={customReason}
                       onChange={(e) => setCustomReason(e.target.value)}
                       placeholder="Descreva o motivo..."
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-emerald-500"
                     />
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Assine para confirmar sua saída:</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Assine com o dedo para confirmar:</label>
                   <SignaturePad onSave={(sig) => setExitSignature(sig)} />
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2.5 pt-2">
                 <button
                   onClick={() => setShowExitModal(false)}
-                  className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl"
+                  className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl cursor-pointer"
                 >
                   Voltar ao DDS
                 </button>
                 <button
                   onClick={handleConfirmExit}
-                  className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md"
+                  className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-md cursor-pointer"
                 >
                   Confirmar Saída
                 </button>
@@ -369,106 +369,116 @@ export default function MeetingRoomPage() {
   // TELA: FORMULÁRIO DE ENTRADA DO COLABORADOR
   // =========================================================================
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center py-6 px-4 font-sans">
-      <header className="w-full max-w-md flex items-center justify-between bg-slate-900 border border-slate-800 px-4 py-3 rounded-2xl shadow-sm mb-6">
+    <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center py-5 px-3.5 sm:px-4 font-sans">
+      <header className="w-full max-w-md flex items-center justify-between bg-slate-900 border border-slate-800 px-4 py-3 rounded-2xl shadow-sm mb-4">
         <div className="flex items-center gap-2">
           <span className="text-base font-black tracking-tight">
             <span className="text-white">DDS </span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">ON</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
           </span>
-          <span className="text-[11px] text-slate-400 font-medium border-l border-slate-700 pl-2">
-            Registro de Presença
+          <span className="text-[10px] text-slate-400 font-medium border-l border-slate-700 pl-2">
+            Lista de Presença
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-green-400 bg-green-500/10 px-2.5 py-1 rounded-full border border-green-500/20">
-          <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-          Conectado
+        <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          Ao Vivo
         </div>
       </header>
 
-      <div className="w-full max-w-md bg-gradient-to-r from-green-700 to-emerald-800 text-white p-5 rounded-3xl shadow-lg mb-6 text-center border border-green-500/30">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-green-200">
-          {meetingType === 'PRESENTIAL' ? 'DDS Presencial no Campo' : 'Treinamento Remoto Ao Vivo'}
+      <div className="w-full max-w-md bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 text-white p-4 sm:p-5 rounded-3xl shadow-xl mb-4 text-center border border-emerald-500/30">
+        <span className="text-[9px] font-black uppercase tracking-widest text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-500/30 inline-block">
+          {meetingType === 'PRESENTIAL' ? 'DDS Presencial em Campo' : 'Transmissão Remota Ao Vivo'}
         </span>
-        <h1 className="text-xl font-bold mt-1 text-white">{topic}</h1>
+        <h1 className="text-lg sm:text-xl font-black mt-1 text-white leading-snug">{topic}</h1>
         {farm && (
-          <p className="text-xs text-green-100 mt-0.5 flex items-center justify-center gap-1">
-            <MapPin size={12} /> {farm}
+          <p className="text-xs text-emerald-200 mt-0.5 flex items-center justify-center gap-1">
+            <MapPin size={11} className="text-emerald-400" /> {farm}
           </p>
         )}
       </div>
 
-      <div className="w-full max-w-md space-y-6 pb-20">
-        <div className="bg-slate-900 border border-slate-800 text-slate-300 text-xs p-3.5 rounded-xl text-center flex items-center justify-center gap-2">
-          <ShieldCheck size={16} className="text-green-400 shrink-0" />
-          <span>Valide seus dados abaixo para acessar a transmissão.</span>
+      <div className="w-full max-w-md space-y-4 pb-16">
+        <div className="bg-slate-900 border border-slate-800 text-slate-300 text-xs p-3 rounded-xl text-center flex items-center justify-center gap-2">
+          <ShieldCheck size={16} className="text-emerald-400 shrink-0" />
+          <span>Preencha seus dados para auditoria oficial de conformidade.</span>
         </div>
 
-        <section className="space-y-4 bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
-          <h2 className="text-sm font-bold text-white">1. Seus Dados</h2>
+        {/* 1. Dados Pessoais */}
+        <section className="space-y-3 bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-800 shadow-sm">
+          <h2 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+            <User size={14} className="text-emerald-400" /> 1. Seus Dados
+          </h2>
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Nome Completo</label>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">Nome Completo</label>
             <input 
               type="text" 
               value={name} 
               onChange={(e) => setName(e.target.value)}
               placeholder="Digite seu nome completo"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold placeholder-slate-600 focus:border-emerald-500 outline-none transition-all"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">CPF</label>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">CPF</label>
             <input 
               type="tel" 
               value={cpf} 
               onChange={handleCpfChange}
               placeholder="000.000.000-00"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold font-mono placeholder-slate-600 focus:border-emerald-500 outline-none transition-all"
             />
           </div>
         </section>
 
-        <section className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
-          <h2 className="text-sm font-bold text-white mb-3">2. Biometria Facial</h2>
+        {/* 2. Biometria Facial */}
+        <section className="bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-800 shadow-sm">
+          <h2 className="text-xs font-black text-white uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+            <Camera size={14} className="text-emerald-400" /> 2. Biometria Facial
+          </h2>
           <SelfieCapture onConfirm={(selfie) => setSavedSelfie(selfie)} />
         </section>
 
-        <section className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
-          <h2 className="text-sm font-bold text-white mb-3">3. Assinatura Digital</h2>
+        {/* 3. Assinatura Digital */}
+        <section className="bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-800 shadow-sm">
+          <h2 className="text-xs font-black text-white uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+            <Fingerprint size={14} className="text-emerald-400" /> 3. Assinatura Digital
+          </h2>
           <SignaturePad onSave={(signature) => setSavedSignature(signature)} />
         </section>
 
+        {/* Botão de Envio */}
         <button 
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 active:scale-[0.98] text-white font-bold text-sm rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-600/25"
+          className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-slate-950 font-black text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-950/60 active:scale-[0.99] cursor-pointer"
         >
           {isSubmitting ? (
             <>
-              <Loader2 size={20} className="animate-spin" /> Registrando Presença...
+              <Loader2 size={18} className="animate-spin" /> Registrando Presença...
             </>
           ) : (
             <>
-              <Send size={18} /> {meetingType === 'PRESENTIAL' ? 'Registrar Presença Oficial' : 'Confirmar Presença e Entrar no Vídeo'}
+              <Send size={16} /> {meetingType === 'PRESENTIAL' ? 'Confirmar Presença Oficial' : 'Confirmar e Acessar Transmissão'}
             </>
           )}
         </button>
       </div>
 
-      <footer className="mt-4 pt-6 border-t border-slate-800/80 text-center space-y-1.5 w-full max-w-md">
-        <p className="text-[11px] text-slate-400 font-normal">
+      <footer className="mt-2 pt-4 border-t border-slate-800/80 text-center space-y-1 w-full max-w-md">
+        <p className="text-[10px] text-slate-400">
           © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
         </p>
-        <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500">
+        <div className="flex items-center justify-center gap-1 text-[10px] text-slate-500">
           <span>Desenvolvido e Auditado por</span>
           <a
             href="https://amtst.vercel.app"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-green-400 hover:text-green-300 font-bold inline-flex items-center gap-1 transition-colors underline underline-offset-2"
+            className="text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2"
           >
-            AM TST <ExternalLink size={10} />
+            AM TST <ExternalLink size={9} />
           </a>
         </div>
       </footer>

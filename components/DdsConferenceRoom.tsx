@@ -1,10 +1,11 @@
- 'use client';
+'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Mic, MicOff, Video as VideoIcon, VideoOff, 
   Monitor, MonitorOff, Users, Hand, Crown, 
-  Check, Sparkles, Wifi, WifiOff, Maximize, Minimize, Volume2
+  Check, Sparkles, Wifi, WifiOff, Maximize, Minimize, Volume2,
+  PhoneOff, Eye, EyeOff, LayoutGrid, Radio, ShieldCheck, Clock
 } from 'lucide-react';
 
 interface RemoteParticipant {
@@ -73,10 +74,10 @@ function ParticipantVideoCard({
 
   return (
     <div 
-      className={`relative h-48 sm:h-52 bg-slate-950 rounded-3xl overflow-hidden border-2 flex flex-col justify-between p-3 transition-all duration-300 shadow-xl ${
+      className={`relative h-44 sm:h-48 bg-slate-950 rounded-2xl sm:rounded-3xl overflow-hidden border transition-all duration-300 shadow-lg flex flex-col justify-between p-2.5 sm:p-3 ${
         participant.isHandRaised 
-          ? 'border-amber-400 ring-4 ring-amber-400/20 bg-gradient-to-b from-amber-950/30 to-slate-950 scale-[1.02] z-20' 
-          : 'border-slate-800 hover:border-slate-700'
+          ? 'border-amber-400 ring-4 ring-amber-400/20 bg-gradient-to-b from-amber-950/40 to-slate-950 scale-[1.02] z-20 shadow-amber-500/10' 
+          : 'border-slate-800/90 hover:border-slate-700 bg-slate-950/90'
       }`}
     >
       {/* VÍDEO DO PARTICIPANTE OU AVATAR */}
@@ -89,83 +90,83 @@ function ParticipantVideoCard({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="flex flex-col items-center justify-center space-y-2">
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center font-black text-lg shadow-md ${
+          <div className="flex flex-col items-center justify-center space-y-2 p-2">
+            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center font-black text-sm sm:text-base shadow-md transition-all ${
               participant.isHandRaised 
-                ? 'bg-amber-500 text-slate-950 border-2 border-amber-300 shadow-amber-500/20' 
-                : 'bg-green-500/20 border border-green-500/40 text-green-400'
+                ? 'bg-amber-500 text-slate-950 border-2 border-amber-300 shadow-amber-500/30' 
+                : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
             }`}>
               {participant.name.slice(0, 2).toUpperCase()}
             </div>
-            <span className="text-[10px] text-slate-400 font-medium">
+            <span className="text-[10px] text-slate-400 font-medium truncate max-w-[120px]">
               {participant.isVideoOff ? 'Câmera Desativada' : 'Ao Vivo'}
             </span>
           </div>
         )}
       </div>
 
-      {/* TOPO: BADGE DE MÃO LEVANTADA */}
+      {/* TOPO: BADGE DE MÃO LEVANTADA OU PRESENÇA */}
       <div className="relative z-10 flex items-center justify-between">
         {participant.isHandRaised ? (
-          <span className="bg-amber-500 text-slate-950 font-black px-2.5 py-1 rounded-xl text-[10px] flex items-center gap-1 shadow-md animate-bounce">
-            <Hand size={12} /> Pediu a Palavra
+          <span className="bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded-lg text-[9px] sm:text-[10px] flex items-center gap-1 shadow-md animate-bounce">
+            <Hand size={11} /> Pediu a Palavra
           </span>
         ) : (
-          <span className="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1">
-            <Check size={10} /> Presente
+          <span className="bg-slate-900/80 backdrop-blur-md text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-lg text-[9px] font-bold flex items-center gap-1">
+            <Check size={9} /> Presente
           </span>
         )}
 
         {participant.isMuted && (
-          <span className="bg-red-500/20 text-red-400 p-1.5 rounded-lg border border-red-500/30">
-            <MicOff size={13} />
+          <span className="bg-red-500/20 text-red-400 p-1 rounded-lg border border-red-500/30 backdrop-blur-md">
+            <MicOff size={11} />
           </span>
         )}
       </div>
 
       {/* RODAPÉ COM NOME E CONTROLES */}
-      <div className="relative z-10 space-y-1.5">
-        <div className="bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800 shadow-sm">
-          <p className="text-xs font-bold text-white truncate">{participant.name}</p>
+      <div className="relative z-10 space-y-1">
+        <div className="bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-xl border border-slate-800 shadow-sm">
+          <p className="text-[11px] font-bold text-white truncate">{participant.name}</p>
         </div>
 
         {isAdmin && (
-          <div className="flex items-center gap-1.5 pt-0.5">
+          <div className="flex items-center gap-1 pt-0.5">
             {participant.isHandRaised && (
               <button
                 type="button"
                 onClick={() => onLowerHand(participant.peerId)}
-                className="flex-1 py-1 px-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1"
-                title="Baixar a mão do participante"
+                className="flex-1 py-1 px-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[9px] rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                title="Atender pedido de palavra"
               >
-                <Hand size={10} /> Atender
+                <Hand size={9} /> Atender
               </button>
             )}
 
             <button
               type="button"
               onClick={() => onModerateMute(participant.peerId)}
-              className={`flex-1 py-1 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-colors ${
+              className={`flex-1 py-1 rounded-lg text-[9px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer ${
                 participant.isMuted 
                   ? 'bg-red-600 text-white' 
-                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                  : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300'
               }`}
               title={participant.isMuted ? 'Desmutar' : 'Silenciar'}
             >
-              {participant.isMuted ? <MicOff size={11} /> : <Mic size={11} />}
+              {participant.isMuted ? <MicOff size={10} /> : <Mic size={10} />}
             </button>
 
             <button
               type="button"
               onClick={() => onModerateVideo(participant.peerId)}
-              className={`flex-1 py-1 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-colors ${
+              className={`flex-1 py-1 rounded-lg text-[9px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer ${
                 participant.isVideoOff 
                   ? 'bg-amber-600 text-white' 
-                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                  : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300'
               }`}
               title={participant.isVideoOff ? 'Permitir Câmera' : 'Cortar Câmera'}
             >
-              {participant.isVideoOff ? <VideoOff size={11} /> : <VideoIcon size={11} />}
+              {participant.isVideoOff ? <VideoOff size={10} /> : <VideoIcon size={10} />}
             </button>
           </div>
         )}
@@ -185,10 +186,12 @@ export default function DdsConferenceRoom({
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isHostScreenSharing, setIsHostScreenSharing] = useState(false);
+  const [showPip, setShowPip] = useState(true); // Controle de Miniatura do Apresentador
   const [hasMediaError, setHasMediaError] = useState(false);
   const [isMyHandRaised, setIsMyHandRaised] = useState(false);
   const [handRaiseAlert, setHandRaiseAlert] = useState<{ peerId: string; name: string } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Streams
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -216,7 +219,19 @@ export default function DdsConferenceRoom({
   const cleanRoomId = roomName.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
   const hostPeerId = `dds-${cleanRoomId}-host`;
 
-  // 1. LIMPEZA TOTAL DE MÍDIA (DESLIGA O LED DA CÂMERA IMEDIATAMENTE)
+  // Timer de Duração do DDS
+  useEffect(() => {
+    const timer = setInterval(() => setElapsedSeconds(prev => prev + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatElapsed = (sec: number) => {
+    const mins = Math.floor(sec / 60);
+    const secs = sec % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // 1. LIMPEZA TOTAL DE MÍDIA
   const cleanupAllMedia = useCallback(() => {
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
@@ -239,7 +254,6 @@ export default function DdsConferenceRoom({
       audioContextRef.current = null;
     }
 
-    // Libera a trava de hardware dos elementos de vídeo
     [localMainVideoRef, localPipVideoRef, localParticipantMosaicRef, screenShareVideoRef, organizerVideoRef].forEach(ref => {
       if (ref.current) {
         ref.current.srcObject = null;
@@ -263,7 +277,7 @@ export default function DdsConferenceRoom({
     });
   }, []);
 
-  // 3. INICIALIZAR MÍDIA LOCAL (COM FILTRO ANTI-ECO E CANCELAMENTO DE RUÍDO)
+  // 3. INICIALIZAR MÍDIA LOCAL
   const initLocalMedia = useCallback(async () => {
     try {
       setHasMediaError(false);
@@ -289,16 +303,19 @@ export default function DdsConferenceRoom({
       // Organizador: Conecta ao palco principal
       if (isAdmin && localMainVideoRef.current && !isScreenSharing) {
         localMainVideoRef.current.srcObject = stream;
+        localMainVideoRef.current.muted = true;
         localMainVideoRef.current.play().catch(() => {});
       }
       if (isAdmin && localPipVideoRef.current) {
         localPipVideoRef.current.srcObject = stream;
+        localPipVideoRef.current.muted = true;
         localPipVideoRef.current.play().catch(() => {});
       }
 
       // Participante: Conecta ao seu card no Mosaico
       if (!isAdmin && localParticipantMosaicRef.current) {
         localParticipantMosaicRef.current.srcObject = stream;
+        localParticipantMosaicRef.current.muted = true;
         localParticipantMosaicRef.current.play().catch(() => {});
       }
 
@@ -310,7 +327,7 @@ export default function DdsConferenceRoom({
     }
   }, [isAdmin, isScreenSharing]);
 
-  // 4. LIMPEZA AO FECHAR OU DESMONTAR O COMPONENTE
+  // 4. LIMPEZA AO DESMONTAR
   useEffect(() => {
     return () => {
       cleanupAllMedia();
@@ -348,6 +365,7 @@ export default function DdsConferenceRoom({
   useEffect(() => {
     if (!isAdmin && localParticipantMosaicRef.current && localStreamRef.current) {
       localParticipantMosaicRef.current.srcObject = localStreamRef.current;
+      localParticipantMosaicRef.current.muted = true;
       localParticipantMosaicRef.current.play().catch(() => {});
     }
   }, [isAdmin, isVideoOff]);
@@ -817,99 +835,117 @@ export default function DdsConferenceRoom({
   const totalHandsRaised = remoteParticipants.filter(p => p.isHandRaised).length;
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 md:p-6 space-y-6 shadow-2xl relative overflow-hidden">
+    <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-3 sm:p-5 space-y-4 sm:space-y-5 shadow-2xl relative overflow-hidden text-slate-100 font-sans">
       
-      {/* BANNER DE NOTIFICAÇÃO COM SOM E BOTÃO ATENDER (ORGANIZADOR) */}
+      {/* BANNER DE NOTIFICAÇÃO DE MÃO LEVANTADA (ORGANIZADOR) */}
       {isAdmin && handRaiseAlert && (
-        <div className="bg-amber-500 text-slate-950 p-3.5 rounded-2xl shadow-xl flex items-center justify-between gap-3 animate-in slide-in-from-top-3 duration-300 border-2 border-amber-300">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-slate-950 text-amber-400 rounded-xl animate-bounce">
-              <Hand size={18} />
+        <div className="bg-amber-500 text-slate-950 p-3 sm:p-3.5 rounded-2xl shadow-xl flex items-center justify-between gap-2.5 animate-in slide-in-from-top-3 duration-300 border-2 border-amber-300">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-2 bg-slate-950 text-amber-400 rounded-xl shrink-0">
+              <Hand size={16} />
             </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-wide">Pedido de Palavra!</p>
-              <p className="text-sm font-bold"><strong>{handRaiseAlert.name}</strong> levantou a mão para falar.</p>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-wider">Pedido de Palavra!</p>
+              <p className="text-xs sm:text-sm font-bold truncate"><strong>{handRaiseAlert.name}</strong> quer falar.</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => handleLowerHand(handRaiseAlert.peerId)}
-              className="px-4 py-2 bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-md transition-all"
-            >
-              Atender / Baixar Mão
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => handleLowerHand(handRaiseAlert.peerId)}
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-md transition-all shrink-0 cursor-pointer"
+          >
+            Atender
+          </button>
         </div>
       )}
 
-      {/* CABEÇALHO DA SALA */}
-      <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-        <div className="flex items-center gap-3">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+      {/* HEADER DA SALA (TIMER, STATUS, CONTADOR DE PRESENTES) */}
+      <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-3 flex-wrap">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="relative flex h-3 w-3 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
           </span>
-          <div>
-            <h3 className="text-sm font-bold text-white tracking-wide flex items-center gap-2">
-              DDS Ao Vivo • <span className="font-mono text-green-400">{roomName.slice(0, 8)}</span>
+          <div className="min-w-0">
+            <h3 className="text-xs sm:text-sm font-extrabold text-white tracking-wide flex items-center gap-1.5 truncate">
+              <span>DDS Ao Vivo</span>
+              <span className="text-slate-500 font-normal">•</span>
+              <span className="font-mono text-emerald-400">{roomName.slice(0, 10)}</span>
             </h3>
-            <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
+            <div className="flex items-center gap-2 text-[10px] text-slate-400">
+              <span className="flex items-center gap-1">
+                <Clock size={10} className="text-slate-500" />
+                <span className="font-mono">{formatElapsed(elapsedSeconds)}</span>
+              </span>
+              <span>•</span>
               {isConnected ? (
-                <span className="text-green-400 flex items-center gap-1"><Wifi size={11} /> Conexão P2P Ativa</span>
+                <span className="text-emerald-400 flex items-center gap-1 font-bold">
+                  <Wifi size={10} /> Conectado
+                </span>
               ) : (
-                <span className="text-amber-400 flex items-center gap-1"><WifiOff size={11} /> Conectando à sala...</span>
+                <span className="text-amber-400 flex items-center gap-1 font-bold">
+                  <WifiOff size={10} /> Conectando...
+                </span>
               )}
-            </span>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           {totalHandsRaised > 0 && (
-            <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-3 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 animate-pulse">
-              <Hand size={14} /> {totalHandsRaised} pedindo a palavra
+            <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-xl text-[10px] sm:text-xs font-black flex items-center gap-1 animate-pulse">
+              <Hand size={12} /> {totalHandsRaised}
             </span>
           )}
-          <span className="bg-slate-950 px-3 py-1 rounded-xl text-xs text-slate-300 font-semibold border border-slate-800 flex items-center gap-1.5">
-            <Users size={13} className="text-green-400" /> {remoteParticipants.length + 1} na chamada
+          <span className="bg-slate-950 px-2.5 py-1 rounded-xl text-[11px] text-slate-300 font-bold border border-slate-800 flex items-center gap-1.5">
+            <Users size={12} className="text-emerald-400" /> {remoteParticipants.length + 1}
           </span>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* 1. PALCO PRINCIPAL (TRANSMISSÃO DO ORGANIZADOR + BOTÃO TELA CHEIA) */}
+      {/* 1. PALCO PRINCIPAL (TRANSMISSÃO DO ORGANIZADOR / TELA COMPARTILHADA)      */}
       {/* ========================================================================= */}
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
-          <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-            <Crown size={15} className="text-amber-400" /> 
-            {isAdmin ? (isScreenSharing ? 'Sua Apresentação de Tela' : 'Sua Câmera (Instrutor)') : 'Transmissão do Instrutor (Ao Vivo)'}
+          <span className="text-[11px] sm:text-xs font-extrabold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Crown size={14} className="text-amber-400 shrink-0" /> 
+            {isAdmin 
+              ? (isScreenSharing ? 'Sua Apresentação de Tela' : 'Sua Câmera (Instrutor)') 
+              : (isHostScreenSharing ? 'Apresentação do Instrutor' : 'Transmissão do Instrutor')}
           </span>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {isScreenSharing && (
-              <span className="text-[10px] font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-2.5 py-0.5 rounded-md flex items-center gap-1">
-                <Volume2 size={11} className="animate-pulse" /> Áudio da Apresentação Ativo
-              </span>
+              <button
+                type="button"
+                onClick={() => setShowPip(!showPip)}
+                className="p-1 sm:px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                title={showPip ? 'Ocultar Miniatura da Câmera (Modo Foco)' : 'Exibir Miniatura da Câmera'}
+              >
+                {showPip ? <EyeOff size={12} /> : <Eye size={12} />}
+                <span className="hidden sm:inline">{showPip ? 'Foco na Tela' : 'Ver Câmera'}</span>
+              </button>
             )}
-            
-            {/* BOTÃO DE TELA CHEIA */}
+
+            {/* BOTÃO TELA CHEIA */}
             <button
               type="button"
               onClick={toggleFullscreen}
-              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition-colors flex items-center gap-1 text-xs"
-              title={isFullscreen ? 'Sair da Tela Cheia' : 'Abrir Apresentação em Tela Cheia'}
+              className="p-1 sm:px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition-colors flex items-center gap-1 text-[10px] font-bold cursor-pointer"
+              title={isFullscreen ? 'Sair da Tela Cheia' : 'Abrir em Tela Cheia'}
             >
-              {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
-              <span className="hidden sm:inline text-[11px] font-semibold">{isFullscreen ? 'Minimizar' : 'Tela Cheia'}</span>
+              {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
+              <span className="hidden sm:inline">{isFullscreen ? 'Normal' : 'Tela Cheia'}</span>
             </button>
           </div>
         </div>
 
+        {/* CONTAINER DO PALCO COM PROPORÇÃO RESPONSIVA */}
         <div 
           ref={stageContainerRef}
-          className="relative w-full aspect-video bg-slate-950 rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex items-center justify-center"
+          className="relative w-full aspect-video sm:max-h-[520px] bg-slate-950 rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex items-center justify-center"
         >
           {/* VISÃO DO ORGANIZADOR */}
           {isAdmin ? (
@@ -920,32 +956,36 @@ export default function DdsConferenceRoom({
                   autoPlay
                   playsInline
                   muted
-                  onLoadedMetadata={(e) => e.currentTarget.play()}
                   className="w-full h-full object-contain"
                 />
-                <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-green-500/30 flex items-center gap-2 z-10 shadow-lg">
-                  <Monitor size={14} className="text-green-400 animate-pulse" />
-                  <span className="text-xs font-bold text-white">Transmitindo Tela e Áudio para a Equipe</span>
+                
+                {/* Badge de Transmissão de Tela */}
+                <div className="absolute top-3 left-3 bg-slate-900/90 backdrop-blur-md px-3 py-1 rounded-xl border border-emerald-500/30 flex items-center gap-1.5 z-10 shadow-lg">
+                  <Monitor size={12} className="text-emerald-400 animate-pulse" />
+                  <span className="text-[10px] sm:text-xs font-extrabold text-white">Transmitindo Tela em Alta Definição</span>
                 </div>
-                {/* Miniatura do Organizador */}
-                <div className="absolute bottom-4 right-4 w-44 sm:w-60 aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border-2 border-green-500 z-20">
-                  <video
-                    ref={localPipVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className={`w-full h-full object-cover scale-x-[-1] ${isVideoOff ? 'hidden' : 'block'}`}
-                  />
-                  {isVideoOff && (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-500">
-                      <VideoOff size={20} />
-                      <span className="text-[10px] mt-1 font-semibold">Câmera Pausada</span>
+
+                {/* Miniatura do Organizador (PiP Flutuante com Toggle) */}
+                {showPip && (
+                  <div className="absolute bottom-3 right-3 w-36 sm:w-52 aspect-video bg-slate-900 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-emerald-500 z-20 transition-all">
+                    <video
+                      ref={localPipVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className={`w-full h-full object-cover scale-x-[-1] ${isVideoOff ? 'hidden' : 'block'}`}
+                    />
+                    {isVideoOff && (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-500">
+                        <VideoOff size={16} />
+                        <span className="text-[9px] mt-0.5 font-bold">Câmera Pausada</span>
+                      </div>
+                    )}
+                    <div className="absolute bottom-1 left-1.5 bg-black/80 px-1.5 py-0.5 rounded text-[9px] font-bold text-white flex items-center gap-1">
+                      <Crown size={9} className="text-amber-400" /> Você
                     </div>
-                  )}
-                  <div className="absolute bottom-1.5 left-2 bg-black/80 px-2 py-0.5 rounded-md text-[10px] font-bold text-white truncate max-w-[90%] flex items-center gap-1">
-                    <Crown size={10} className="text-amber-400" /> Você (Instrutor)
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               <div className="relative w-full h-full flex items-center justify-center">
@@ -957,22 +997,22 @@ export default function DdsConferenceRoom({
                   className={`w-full h-full object-cover scale-x-[-1] ${isVideoOff || hasMediaError ? 'hidden' : 'block'}`}
                 />
                 {(isVideoOff || hasMediaError) && (
-                  <div className="flex flex-col items-center justify-center text-slate-500 space-y-2">
-                    <div className="p-4 bg-slate-900 rounded-full border border-slate-800">
-                      <VideoOff size={36} className="text-slate-600" />
+                  <div className="flex flex-col items-center justify-center text-slate-500 space-y-2 p-4 text-center">
+                    <div className="p-3 bg-slate-900 rounded-2xl border border-slate-800">
+                      <VideoOff size={28} className="text-slate-600" />
                     </div>
-                    <p className="text-xs font-bold text-slate-300">Sua Câmera está Pausada</p>
+                    <p className="text-xs font-bold text-slate-300">Sua Câmera está Desativada</p>
                   </div>
                 )}
-                <div className="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur-md px-3.5 py-1.5 rounded-xl text-xs font-bold text-white border border-slate-700/60 flex items-center gap-2">
-                  <Crown size={14} className="text-amber-400" />
+                <div className="absolute bottom-3 left-3 bg-slate-900/85 backdrop-blur-md px-3 py-1 rounded-xl text-xs font-bold text-white border border-slate-700/60 flex items-center gap-1.5">
+                  <Crown size={12} className="text-amber-400" />
                   <span>{userName}</span>
-                  <span className="text-[10px] text-green-400 font-normal bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">Instrutor</span>
+                  <span className="text-[9px] text-emerald-400 font-black bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/30">Instrutor</span>
                 </div>
               </div>
             )
           ) : (
-            /* VISÃO DO PARTICIPANTE (COM ÁUDIO DO VÍDEO TRANSMITIDO) */
+            /* VISÃO DO PARTICIPANTE (COM STREAM DO INSTRUTOR) */
             <div className="relative w-full h-full flex items-center justify-center bg-black">
               {remoteOrganizerStream ? (
                 <video
@@ -982,54 +1022,109 @@ export default function DdsConferenceRoom({
                   className="w-full h-full object-contain"
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center text-slate-500 space-y-3 p-6 text-center">
-                  <div className="w-16 h-16 rounded-full bg-green-500/10 border-2 border-green-500/30 text-green-400 flex items-center justify-center animate-pulse">
-                    <Crown size={28} />
+                <div className="flex flex-col items-center justify-center text-slate-500 space-y-2.5 p-6 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/30 text-emerald-400 flex items-center justify-center animate-pulse">
+                    <Crown size={24} />
                   </div>
                   <div>
-                    <h4 className="text-base font-bold text-white">Conectando à Transmissão do Instrutor...</h4>
-                    <p className="text-xs text-slate-400">Aguarde o início do vídeo e da apresentação.</p>
+                    <h4 className="text-sm font-extrabold text-white">Aguardando o Instrutor...</h4>
+                    <p className="text-[11px] text-slate-400">A transmissão ao vivo começará em instantes.</p>
                   </div>
                 </div>
               )}
             </div>
           )}
-
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. MOSAICO DOS PARTICIPANTES */}
+      {/* 2. DOCK ERGONÔMICO DE CONTROLES INFERIORES (TOUCH & MOBILE-FIRST)          */}
       {/* ========================================================================= */}
-      <div className="space-y-3 pt-2">
-        <div className="flex items-center justify-between border-t border-slate-800/80 pt-4 px-1">
-          <div>
-            <h4 className="text-base font-bold text-white flex items-center gap-2">
-              <Users size={18} className="text-green-400" /> Mosaico dos Participantes ({sortedParticipants.length + (!isAdmin ? 1 : 0)})
-            </h4>
-            <p className="text-xs text-slate-400">
-              Colaboradores presentes • Quem levanta a mão fica em destaque
-            </p>
-          </div>
+      <div className="flex items-center justify-center gap-2 sm:gap-3 py-1 bg-slate-950/80 border border-slate-800 rounded-2xl p-2 shadow-inner">
+        {/* Microfone */}
+        <button
+          type="button"
+          onClick={toggleAudio}
+          className={`p-3 sm:px-4 sm:py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
+            isAudioMuted
+              ? 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-950/50'
+              : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
+          }`}
+          title={isAudioMuted ? 'Ativar Microfone' : 'Silenciar Microfone'}
+        >
+          {isAudioMuted ? <MicOff size={16} /> : <Mic size={16} />}
+          <span className="hidden sm:inline">{isAudioMuted ? 'Mutado' : 'Microfone'}</span>
+        </button>
 
-          {isAdmin && (
-            <span className="text-[11px] font-semibold text-slate-300 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-              🛡️ Painel de Moderação Ativo
-            </span>
-          )}
+        {/* Câmera */}
+        <button
+          type="button"
+          onClick={toggleVideo}
+          className={`p-3 sm:px-4 sm:py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
+            isVideoOff
+              ? 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-950/50'
+              : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
+          }`}
+          title={isVideoOff ? 'Ligar Câmera' : 'Desligar Câmera'}
+        >
+          {isVideoOff ? <VideoOff size={16} /> : <VideoIcon size={16} />}
+          <span className="hidden sm:inline">{isVideoOff ? 'Sem Vídeo' : 'Câmera'}</span>
+        </button>
+
+        {/* Compartilhamento de Tela (Exclusivo Instrutor) */}
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={toggleScreenShare}
+            className={`p-3 sm:px-4 sm:py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
+              isScreenSharing
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-400 shadow-lg shadow-emerald-950/50'
+                : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
+            }`}
+            title={isScreenSharing ? 'Parar Apresentação de Tela' : 'Apresentar Tela / Vídeo'}
+          >
+            {isScreenSharing ? <MonitorOff size={16} /> : <Monitor size={16} />}
+            <span className="hidden sm:inline">{isScreenSharing ? 'Parar Tela' : 'Compartilhar Tela'}</span>
+          </button>
+        )}
+
+        {/* Levantar a Mão (Participante) */}
+        {!isAdmin && (
+          <button
+            type="button"
+            onClick={toggleRaiseHand}
+            className={`p-3 sm:px-4 sm:py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
+              isMyHandRaised
+                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black ring-2 ring-amber-300 shadow-lg'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+            }`}
+            title={isMyHandRaised ? 'Baixar a Mão' : 'Pedir a Palavra'}
+          >
+            <Hand size={16} />
+            <span className="hidden sm:inline">{isMyHandRaised ? 'Mão Levantada' : 'Pedir Palavra'}</span>
+          </button>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. MOSAICO DINÂMICO DOS PARTICIPANTES (GRID MOBILE-FIRST)                 */}
+      {/* ========================================================================= */}
+      <div className="space-y-2.5 pt-2">
+        <div className="flex items-center justify-between border-t border-slate-800/80 pt-3 px-1">
+          <span className="text-[11px] sm:text-xs font-extrabold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <LayoutGrid size={13} className="text-emerald-400" />
+            <span>Mosaico da Equipe ({remoteParticipants.length + (isAdmin ? 0 : 1)})</span>
+          </span>
+
+          <span className="text-[10px] text-slate-400">
+            {remoteParticipants.length === 0 ? 'Aguardando colaboradores...' : 'Todos online'}
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          
-          {/* CARD DO PRÓPRIO PARTICIPANTE (SEMPRE EM 1º LUGAR NO MOSAICO DELE) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
+          {/* Card do próprio participante caso seja colaborador */}
           {!isAdmin && (
-            <div 
-              className={`relative h-48 sm:h-52 bg-slate-950 rounded-3xl overflow-hidden border-2 flex flex-col justify-between p-3 transition-all duration-300 shadow-xl ${
-                isMyHandRaised 
-                  ? 'border-amber-400 ring-4 ring-amber-400/20 bg-gradient-to-b from-amber-950/30 to-slate-950 scale-[1.02] z-20' 
-                  : 'border-green-500/60 ring-2 ring-green-500/10'
-              }`}
-            >
+            <div className="relative h-44 sm:h-48 bg-slate-950 rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-emerald-500/40 flex flex-col justify-between p-2.5 sm:p-3 shadow-lg">
               <div className="absolute inset-0 flex items-center justify-center bg-slate-950">
                 <video
                   ref={localParticipantMosaicRef}
@@ -1039,127 +1134,42 @@ export default function DdsConferenceRoom({
                   className={`w-full h-full object-cover scale-x-[-1] ${isVideoOff ? 'hidden' : 'block'}`}
                 />
                 {isVideoOff && (
-                  <div className="flex flex-col items-center justify-center space-y-2">
-                    <div className="w-14 h-14 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-black text-lg">
-                      {userName.slice(0, 2).toUpperCase()}
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-medium">Sua Câmera está Desligada</span>
+                  <div className="flex flex-col items-center justify-center space-y-1 text-slate-500 p-2">
+                    <VideoOff size={20} />
+                    <span className="text-[9px] font-bold text-slate-400">Sua Câmera</span>
                   </div>
                 )}
               </div>
 
-              {/* Status */}
               <div className="relative z-10 flex items-center justify-between">
-                {isMyHandRaised ? (
-                  <span className="bg-amber-500 text-slate-950 font-black px-2.5 py-1 rounded-xl text-[10px] flex items-center gap-1 shadow-md animate-bounce">
-                    <Hand size={12} /> Sua Mão está Levantada
-                  </span>
-                ) : (
-                  <span className="bg-green-500 text-slate-950 font-bold px-2 py-0.5 rounded-lg text-[10px] flex items-center gap-1">
-                    <Check size={10} /> Você (Conectado)
-                  </span>
-                )}
-
+                <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-lg text-[9px] font-black">
+                  VOCÊ
+                </span>
                 {isAudioMuted && (
-                  <span className="bg-red-500/20 text-red-400 p-1.5 rounded-lg border border-red-500/30">
-                    <MicOff size={13} />
+                  <span className="bg-red-500/20 text-red-400 p-1 rounded-lg border border-red-500/30">
+                    <MicOff size={10} />
                   </span>
                 )}
               </div>
 
-              {/* Rodapé */}
-              <div className="relative z-10">
-                <div className="bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800 shadow-sm flex items-center justify-between">
-                  <p className="text-xs font-bold text-white truncate">{userName} (Você)</p>
-                  <span className="text-[9px] text-green-400 font-bold uppercase tracking-wider">Seu Vídeo</span>
-                </div>
+              <div className="relative z-10 bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-xl border border-slate-800">
+                <p className="text-[11px] font-bold text-white truncate">{userName} (Você)</p>
               </div>
             </div>
           )}
 
-          {/* DEMAIS PARTICIPANTES */}
-          {sortedParticipants.map((p) => (
+          {/* Cards dos outros participantes */}
+          {sortedParticipants.map(participant => (
             <ParticipantVideoCard
-              key={p.peerId}
-              participant={p}
-              isAdmin={isAdmin}
+              key={participant.peerId}
+              participant={participant}
+              isAdmin={Boolean(isAdmin)}
               onModerateMute={handleModerateMute}
               onModerateVideo={handleModerateVideo}
               onLowerHand={handleLowerHand}
             />
           ))}
-
-          {isAdmin && sortedParticipants.length === 0 && (
-            <div className="col-span-full bg-slate-950/60 border border-slate-800 rounded-3xl p-10 text-center space-y-2">
-              <Users size={36} className="mx-auto text-slate-600 mb-2" />
-              <p className="text-sm font-bold text-slate-300">Aguardando colaboradores entrarem na chamada...</p>
-              <p className="text-xs text-slate-500">Assim que os participantes acessarem o link, suas câmeras aparecerão aqui no mosaico.</p>
-            </div>
-          )}
         </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 3. BARRA DE CONTROLES INFERIOR */}
-      {/* ========================================================================= */}
-      <div className="flex items-center justify-center gap-3 pt-4 border-t border-slate-800/80">
-        <button
-          type="button"
-          onClick={toggleAudio}
-          className={`p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center transition-all shadow-md ${
-            isAudioMuted 
-              ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20' 
-              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-          }`}
-          title={isAudioMuted ? 'Ativar Meu Microfone' : 'Silenciar Meu Microfone'}
-        >
-          {isAudioMuted ? <MicOff size={18} /> : <Mic size={18} />}
-        </button>
-
-        <button
-          type="button"
-          onClick={toggleVideo}
-          className={`p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center transition-all shadow-md ${
-            isVideoOff 
-              ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20' 
-              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-          }`}
-          title={isVideoOff ? 'Ligar Minha Câmera' : 'Desligar Minha Câmera'}
-        >
-          {isVideoOff ? <VideoOff size={18} /> : <VideoIcon size={18} />}
-        </button>
-
-        {/* BOTÃO LEVANTAR A MÃO (PARTICIPANTE) */}
-        {!isAdmin && (
-          <button
-            type="button"
-            onClick={toggleRaiseHand}
-            className={`px-5 py-3.5 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all shadow-md ${
-              isMyHandRaised 
-                ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/25 ring-2 ring-amber-300' 
-                : 'bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700'
-            }`}
-          >
-            <Hand size={18} />
-            <span>{isMyHandRaised ? 'Mão Levantada ✋' : 'Pedir a Palavra'}</span>
-          </button>
-        )}
-
-        {/* BOTÃO APRESENTAR TELA (ORGANIZADOR) */}
-        {isAdmin && (
-          <button
-            type="button"
-            onClick={toggleScreenShare}
-            className={`px-5 py-3.5 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all shadow-md ${
-              isScreenSharing 
-                ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-orange-600/20 animate-pulse' 
-                : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-green-600/25'
-            }`}
-          >
-            {isScreenSharing ? <MonitorOff size={18} /> : <Monitor size={18} />}
-            <span>{isScreenSharing ? 'Parar Apresentação' : 'Apresentar Tela com Áudio'}</span>
-          </button>
-        )}
       </div>
 
     </div>

@@ -1,7 +1,7 @@
- 'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Lock, Mail, ArrowRight, User, Building, Briefcase, ExternalLink, Eye, EyeOff, CheckCircle2, Clock, Loader2, KeyRound } from 'lucide-react';
+import { Lock, Mail, ArrowRight, User, Building, Briefcase, ExternalLink, Eye, EyeOff, CheckCircle2, Clock, Loader2, KeyRound, ShieldCheck, Sparkles } from 'lucide-react';
 
 export default function HomePage() {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -76,7 +76,6 @@ export default function HomePage() {
             setIsRegisteredSuccess(true);
           }
         } else {
-          // Salva o usuário com o UUID real retornado do Supabase
           localStorage.setItem('dds_admin_auth', JSON.stringify(data.user));
           window.location.replace('/admin');
         }
@@ -94,25 +93,25 @@ export default function HomePage() {
   if (isRegisteredSuccess) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
-        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6 text-center animate-in fade-in zoom-in">
-          <div className="p-4 bg-green-500/10 text-green-400 rounded-2xl inline-flex border border-green-500/20">
-            <CheckCircle2 size={42} />
+        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 text-center animate-in fade-in zoom-in">
+          <div className="p-3.5 bg-emerald-500/15 text-emerald-400 rounded-2xl inline-flex border border-emerald-500/30 shadow-lg shadow-emerald-950/40">
+            <CheckCircle2 size={38} />
           </div>
-          <div className="space-y-1.5">
-            <span className="text-[11px] font-bold text-amber-400 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 inline-block">
+          <div className="space-y-1">
+            <span className="text-[10px] font-extrabold text-amber-400 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 inline-block">
               Aguardando Aprovação
             </span>
-            <h1 className="text-2xl font-black text-white">Cadastro Enviado!</h1>
+            <h1 className="text-xl sm:text-2xl font-black text-white">Cadastro Enviado!</h1>
           </div>
           <p className="text-slate-300 text-xs leading-relaxed">
             Obrigado, <strong>{name}</strong>. Como nenhuma Palavra-Chave foi informada, seus dados estão na fila de liberação da <strong>AM TST</strong>.
           </p>
-          <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 text-xs text-slate-400 text-left space-y-1.5">
-            <p className="font-semibold text-slate-200 flex items-center gap-1.5">
+          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs text-slate-400 text-left space-y-1.5">
+            <p className="font-bold text-slate-200 flex items-center gap-1.5">
               <Clock size={14} className="text-amber-400" /> Próximo passo:
             </p>
-            <p className="text-[11px] leading-relaxed">
-              Assim que o DDS MASTER aprovar a sua conta, basta voltar nesta tela e fazer login com seu e-mail e senha.
+            <p className="text-[11px] leading-relaxed text-slate-400">
+              Assim que o DDS MASTER aprovar sua conta, basta fazer login com seu e-mail e senha.
             </p>
           </div>
           <button
@@ -121,7 +120,7 @@ export default function HomePage() {
               setIsRegisterMode(false);
               setName(''); setEmail(''); setPassword(''); setError(''); setSecretKey('');
             }}
-            className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-all border border-slate-700"
+            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-all border border-slate-700 cursor-pointer"
           >
             Voltar para a Tela de Login
           </button>
@@ -131,107 +130,107 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-green-600/15 blur-[140px] rounded-full pointer-events-none"></div>
+    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-3.5 sm:p-6 font-sans relative overflow-hidden">
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-96 h-80 sm:h-96 bg-emerald-600/15 blur-[130px] rounded-full pointer-events-none"></div>
 
-      <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10 space-y-6 backdrop-blur-md">
+      <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative z-10 space-y-5 backdrop-blur-md">
         
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-xs font-bold tracking-wide mb-1">
-            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-            Plataforma Digital de SST
+        <div className="text-center space-y-1.5">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-[11px] font-bold tracking-wide mb-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            Plataforma Digital de SST & NR
           </div>
-          <h1 className="text-3xl font-black tracking-tight text-white">
-            DDS <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">ON</span>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            DDS <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
           </h1>
           <p className="text-xs text-slate-300 font-medium max-w-xs mx-auto leading-relaxed">
             {isRegisterMode 
               ? 'Insira a Palavra-Chave da sua empresa para acesso instantâneo.' 
-              : 'A nova forma de realizar, auditar e transmitir o Diálogo Diário de Segurança.'}
+              : 'Diálogo Diário de Segurança com Biometria Facial e Videoconferência.'}
           </p>
         </div>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3.5 rounded-xl text-center font-medium leading-relaxed">
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl text-center font-medium leading-relaxed">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3.5">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {isRegisterMode && (
             <>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">Nome Completo</label>
                 <div className="relative flex items-center">
-                  <User className="absolute left-3.5 text-slate-500" size={17} />
-                  <input type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Digite seu nome completo" className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all" />
+                  <User className="absolute left-3.5 text-slate-500" size={16} />
+                  <input type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Digite seu nome completo" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Cargo / Função</label>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">Cargo / Função</label>
                 <div className="relative flex items-center">
-                  <Briefcase className="absolute left-3.5 text-slate-500" size={17} />
-                  <input type="text" value={role} onChange={(e) => setRole(e.target.value)} placeholder="Ex: Técnico de Segurança" className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all" />
+                  <Briefcase className="absolute left-3.5 text-slate-500" size={16} />
+                  <input type="text" value={role} onChange={(e) => setRole(e.target.value)} placeholder="Ex: Técnico de Segurança" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Empresa</label>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">Empresa / Unidade</label>
                 <div className="relative flex items-center">
-                  <Building className="absolute left-3.5 text-slate-500" size={17} />
-                  <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Ex: Fazenda Ouro Verde" className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all" />
+                  <Building className="absolute left-3.5 text-slate-500" size={16} />
+                  <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Ex: Fazenda Ouro Verde" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" />
                 </div>
               </div>
 
-              <div className="bg-green-500/10 p-3 rounded-2xl border border-green-500/20">
-                <label className="block text-xs font-bold text-green-400 mb-1 flex items-center gap-1.5">
-                  <KeyRound size={13} /> Palavra-Chave da Empresa (Opcional)
+              <div className="bg-emerald-500/10 p-3 rounded-2xl border border-emerald-500/20">
+                <label className="block text-[11px] font-bold text-emerald-400 mb-0.5 flex items-center gap-1.5">
+                  <KeyRound size={12} /> Palavra-Chave da Empresa (Opcional)
                 </label>
-                <p className="text-[10px] text-slate-400 mb-2">Digite o código da sua empresa para aprovação imediata.</p>
-                <input type="text" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} placeholder="Código da Empresa" className="w-full bg-slate-950/80 border border-green-500/30 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all uppercase font-mono" />
+                <p className="text-[10px] text-slate-400 mb-1.5">Digite o código da sua empresa para aprovação imediata.</p>
+                <input type="text" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} placeholder="Código da Empresa" className="w-full bg-slate-950 border border-emerald-500/30 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none uppercase font-mono" />
               </div>
             </>
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">E-mail Corporativo</label>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">E-mail Corporativo</label>
             <div className="relative flex items-center">
-              <Mail className="absolute left-3.5 text-slate-500" size={17} />
-              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Digite seu e-mail" className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-10 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all" />
+              <Mail className="absolute left-3.5 text-slate-500" size={16} />
+              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Digite seu e-mail" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Senha de Acesso</label>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">Senha de Acesso</label>
             <div className="relative flex items-center">
-              <Lock className="absolute left-3.5 text-slate-500" size={17} />
-              <input type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Digite sua senha" className="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-10 pr-11 py-2.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-green-500 outline-none transition-all" />
-              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 text-slate-500 hover:text-slate-300 transition-colors p-1" title={showPassword ? "Ocultar senha" : "Ver senha"}>
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              <Lock className="absolute left-3.5 text-slate-500" size={16} />
+              <input type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Digite sua senha" className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-11 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 text-slate-500 hover:text-slate-300 p-1 cursor-pointer" title={showPassword ? "Ocultar senha" : "Ver senha"}>
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
 
-          <button type="submit" disabled={loading} className="w-full py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 active:scale-[0.98] text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-600/25 mt-2">
-            {loading ? <><Loader2 size={16} className="animate-spin" /> Processando...</> : <>{isRegisterMode ? 'Cadastrar Minha Conta' : 'Acessar o Painel'} <ArrowRight size={16} /></>}
+          <button type="submit" disabled={loading} className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-slate-950 font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-950/60 active:scale-[0.98] mt-1 cursor-pointer">
+            {loading ? <><Loader2 size={16} className="animate-spin" /> Processando...</> : <>{isRegisterMode ? 'Cadastrar Minha Conta' : 'Acessar o Painel TST'} <ArrowRight size={15} /></>}
           </button>
         </form>
 
         <div className="pt-1 text-center">
-          <button type="button" onClick={() => { setIsRegisterMode(!isRegisterMode); setError(''); }} className="text-xs text-green-400 hover:text-green-300 font-semibold transition-colors">
+          <button type="button" onClick={() => { setIsRegisterMode(!isRegisterMode); setError(''); }} className="text-xs text-emerald-400 hover:text-emerald-300 font-bold transition-colors cursor-pointer">
             {isRegisterMode ? 'Já possui conta? Fazer login' : 'Primeiro acesso? Cadastre-se como organizador'}
           </button>
         </div>
 
-        <footer className="pt-5 border-t border-slate-800/80 text-center space-y-1.5">
-          <p className="text-[11px] text-slate-400 font-normal">
+        <footer className="pt-4 border-t border-slate-800/80 text-center space-y-1">
+          <p className="text-[10px] text-slate-400">
             © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
           </p>
-          <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500">
+          <div className="flex items-center justify-center gap-1 text-[10px] text-slate-500">
             <span>Desenvolvido e Auditado por</span>
-            <a href="https://amtst.vercel.app" target="_blank" rel="noopener noreferrer" className="text-green-400 hover:text-green-300 font-bold inline-flex items-center gap-1 transition-colors underline underline-offset-2">
-              AM TST <ExternalLink size={10} />
+            <a href="https://amtst.vercel.app" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2">
+              AM TST <ExternalLink size={9} />
             </a>
           </div>
         </footer>
