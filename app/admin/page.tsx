@@ -573,6 +573,24 @@ export default function AdminPanel() {
               </div>
             </div>
           </div>
+
+          {/* Rodapé Oficial com Direitos Autorais */}
+          <footer className="pt-6 pb-2 border-t border-slate-800/80 text-center space-y-1">
+            <p className="text-[10px] sm:text-xs text-slate-400">
+              © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
+            </p>
+            <div className="flex items-center justify-center gap-1 text-[10px] sm:text-xs text-slate-500">
+              <span>Desenvolvido e Auditado por</span>
+              <a
+                href="https://amtst.vercel.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2"
+              >
+                AM TST <ExternalLink size={10} />
+              </a>
+            </div>
+          </footer>
         </div>
       </main>
     );
@@ -912,6 +930,24 @@ export default function AdminPanel() {
             )}
           </div>
         )}
+
+        {/* Rodapé Oficial com Direitos Autorais */}
+        <footer className="pt-8 pb-4 border-t border-slate-800/80 text-center space-y-1">
+          <p className="text-[10px] sm:text-xs text-slate-400">
+            © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
+          </p>
+          <div className="flex items-center justify-center gap-1 text-[10px] sm:text-xs text-slate-500">
+            <span>Desenvolvido e Auditado por</span>
+            <a
+              href="https://amtst.vercel.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2"
+            >
+              AM TST <ExternalLink size={10} />
+            </a>
+          </div>
+        </footer>
       </div>
     </main>
   );

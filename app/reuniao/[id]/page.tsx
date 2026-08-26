@@ -195,6 +195,18 @@ export default function MeetingRoomPage() {
             Caso não tenha conseguido assinar, contate o TST da sua unidade.
           </div>
         </div>
+
+        <footer className="mt-6 text-center space-y-1 w-full max-w-md">
+          <p className="text-[10px] text-slate-500">
+            © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
+          </p>
+          <div className="flex items-center justify-center gap-1 text-[10px] text-slate-600">
+            <span>Desenvolvido por</span>
+            <a href="https://amtst.vercel.app" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2">
+              AM TST <ExternalLink size={9} />
+            </a>
+          </div>
+        </footer>
       </main>
     );
   }
@@ -221,6 +233,18 @@ export default function MeetingRoomPage() {
             Sua participação foi concluída e devidamente registrada na ata oficial de conformidade da <strong>AM TST</strong>.
           </p>
         </div>
+
+        <footer className="mt-6 text-center space-y-1 w-full max-w-md">
+          <p className="text-[10px] text-slate-500">
+            © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
+          </p>
+          <div className="flex items-center justify-center gap-1 text-[10px] text-slate-600">
+            <span>Desenvolvido por</span>
+            <a href="https://amtst.vercel.app" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2">
+              AM TST <ExternalLink size={9} />
+            </a>
+          </div>
+        </footer>
       </main>
     );
   }
@@ -254,6 +278,18 @@ export default function MeetingRoomPage() {
             <Users size={16} /> Passar Celular para Próximo Colega
           </button>
         </div>
+
+        <footer className="mt-6 text-center space-y-1 w-full max-w-md">
+          <p className="text-[10px] text-slate-500">
+            © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
+          </p>
+          <div className="flex items-center justify-center gap-1 text-[10px] text-slate-600">
+            <span>Desenvolvido por</span>
+            <a href="https://amtst.vercel.app" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2">
+              AM TST <ExternalLink size={9} />
+            </a>
+          </div>
+        </footer>
       </main>
     );
   }
@@ -294,6 +330,19 @@ export default function MeetingRoomPage() {
               isAdmin={false}
             />
           </div>
+
+          {/* Rodapé do Participante */}
+          <footer className="pt-4 pb-2 text-center space-y-1 w-full">
+            <p className="text-[10px] text-slate-500">
+              © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
+            </p>
+            <div className="flex items-center justify-center gap-1 text-[10px] text-slate-600">
+              <span>Desenvolvido por</span>
+              <a href="https://amtst.vercel.app" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2">
+                AM TST <ExternalLink size={9} />
+              </a>
+            </div>
+          </footer>
         </div>
 
         {/* Modal de Saída Antecipada */}
