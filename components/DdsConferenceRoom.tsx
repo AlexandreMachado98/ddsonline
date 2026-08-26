@@ -327,12 +327,13 @@ export default function DdsConferenceRoom({
       screenStreamRef.current = null;
     }
 
-    if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
+    if (hostDataConn.current && hostDataConn.current.open) {
+      try {
+        hostDataConn.current.send({ type: 'USER_LEAVE' });
+      } catch {}
     }
 
-    [localMainVideoRef, localDedicatedPresenterVideoRef, localParticipantMosaicRef, screenShareVideoRef, organizerVideoRef].forEach(ref => {
+    [localMainVideoRef, localDedicatedPresenterVideoRef, localParticipantMosaicRef, screenShareVideoRef, organizerVideoRef, remoteAudioRef].forEach(ref => {
       if (ref.current) {
         ref.current.srcObject = null;
       }
@@ -493,6 +494,26 @@ export default function DdsConferenceRoom({
           call.answer(currentOutStream);
           activeCalls.current.set(call.peer, call);
 
+          const pc = call.peerConnection || (call as any)._peerConnection;
+          if (pc) {
+            pc.onconnectionstatechange = () => {
+              if (['disconnected', 'closed', 'failed'].includes(pc.connectionState)) {
+                setRemoteParticipants(prev => prev.filter(p => p.peerId !== call.peer));
+                activeCalls.current.delete(call.peer);
+                participantConns.current.delete(call.peer);
+                setHandRaiseAlert(prev => prev?.peerId === call.peer ? null : prev);
+              }
+            };
+            pc.oniceconnectionstatechange = () => {
+              if (['disconnected', 'closed', 'failed'].includes(pc.iceConnectionState)) {
+                setRemoteParticipants(prev => prev.filter(p => p.peerId !== call.peer));
+                activeCalls.current.delete(call.peer);
+                participantConns.current.delete(call.peer);
+                setHandRaiseAlert(prev => prev?.peerId === call.peer ? null : prev);
+              }
+            };
+          }
+
           call.on('stream', (remoteStream: MediaStream) => {
             if (!isMounted) return;
             setRemoteParticipants(prev => {
@@ -512,6 +533,8 @@ export default function DdsConferenceRoom({
           call.on('close', () => {
             setRemoteParticipants(prev => prev.filter(p => p.peerId !== call.peer));
             activeCalls.current.delete(call.peer);
+            participantConns.current.delete(call.peer);
+            setHandRaiseAlert(prev => prev?.peerId === call.peer ? null : prev);
           });
         });
 
@@ -524,6 +547,13 @@ export default function DdsConferenceRoom({
 
           conn.on('data', (data: any) => {
             if (!isMounted) return;
+
+            if (data.type === 'USER_LEAVE') {
+              setRemoteParticipants(prev => prev.filter(p => p.peerId !== conn.peer));
+              participantConns.current.delete(conn.peer);
+              activeCalls.current.delete(conn.peer);
+              setHandRaiseAlert(prev => prev?.peerId === conn.peer ? null : prev);
+            }
 
             if (data.type === 'USER_INFO') {
               setRemoteParticipants(prev => {
@@ -565,6 +595,9 @@ export default function DdsConferenceRoom({
 
           conn.on('close', () => {
             participantConns.current.delete(conn.peer);
+            setRemoteParticipants(prev => prev.filter(p => p.peerId !== conn.peer));
+            activeCalls.current.delete(conn.peer);
+            setHandRaiseAlert(prev => prev?.peerId === conn.peer ? null : prev);
           });
         });
 

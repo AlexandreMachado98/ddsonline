@@ -501,20 +501,27 @@ export default function AdminPanel() {
             <div className="lg:col-span-5 space-y-4">
               <div className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-3xl flex items-center justify-around text-center shadow-lg">
                 <div>
-                  <span className="text-2xl sm:text-3xl font-black text-white">{activeMeeting.attendees?.length || 0}</span>
-                  <span className="text-slate-400 text-[10px] sm:text-xs block mt-0.5">Presenças Auditadas</span>
+                  <span className="text-2xl sm:text-3xl font-black text-white">
+                    {activeMeeting.attendees?.filter((a: any) => !a.leftAt && !a.exitReason).length || 0}
+                  </span>
+                  <span className="text-slate-400 text-[10px] sm:text-xs block mt-0.5">Online no DDS</span>
                 </div>
                 <div className="h-8 w-[1px] bg-slate-800"></div>
                 <div>
-                  <span className="text-2xl sm:text-3xl font-black text-emerald-400">100%</span>
-                  <span className="text-slate-400 text-[10px] sm:text-xs block mt-0.5">Validade Jurídica NR</span>
+                  <span className="text-2xl sm:text-3xl font-black text-emerald-400">{activeMeeting.attendees?.length || 0}</span>
+                  <span className="text-slate-400 text-[10px] sm:text-xs block mt-0.5">Total Auditadas</span>
                 </div>
               </div>
 
               <div className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-3xl shadow-lg">
-                <h3 className="font-extrabold text-white mb-3 flex items-center gap-2 text-xs sm:text-sm">
-                  <FileText size={16} className="text-emerald-400" /> Lista de Presença ao Vivo
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-extrabold text-white flex items-center gap-2 text-xs sm:text-sm">
+                    <FileText size={16} className="text-emerald-400" /> Lista de Presença ao Vivo
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Atualização em Tempo Real
+                  </span>
+                </div>
                 
                 {(!activeMeeting.attendees || activeMeeting.attendees.length === 0) ? (
                   <div className="text-center py-8 text-slate-500 text-xs">
@@ -523,27 +530,44 @@ export default function AdminPanel() {
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
-                    {activeMeeting.attendees.map((attendee: any, idx: number) => (
-                      <div key={idx} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {attendee.selfie ? (
-                            <img src={attendee.selfie} alt={attendee.name} className="w-8 h-8 rounded-full object-cover border border-slate-700 shrink-0" />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 font-black text-xs flex items-center justify-center shrink-0">
-                              {attendee.name.slice(0, 2).toUpperCase()}
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-white truncate">{attendee.name}</p>
-                            <p className="text-[10px] text-slate-400 font-mono truncate">{attendee.cpf}</p>
-                          </div>
-                        </div>
+                    {activeMeeting.attendees.map((attendee: any, idx: number) => {
+                      const hasLeft = Boolean(attendee.leftAt || attendee.exitReason);
 
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
-                          OK
-                        </span>
-                      </div>
-                    ))}
+                      return (
+                        <div key={idx} className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+                          hasLeft 
+                            ? 'bg-slate-950/60 border-amber-500/30 opacity-75' 
+                            : 'bg-slate-950 border-slate-800'
+                        }`}>
+                          <div className="flex items-center gap-2 min-w-0">
+                            {attendee.selfie ? (
+                              <img src={attendee.selfie} alt={attendee.name} className="w-8 h-8 rounded-full object-cover border border-slate-700 shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 font-black text-xs flex items-center justify-center shrink-0">
+                                {attendee.name.slice(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-white truncate">{attendee.name}</p>
+                              <p className="text-[10px] text-slate-400 font-mono truncate">{attendee.cpf}</p>
+                            </div>
+                          </div>
+
+                          {hasLeft ? (
+                            <span 
+                              className="text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 shrink-0"
+                              title={attendee.exitReason ? `Motivo: ${attendee.exitReason}` : 'Saída Registrada'}
+                            >
+                              Saída
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
+                              Presente
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
