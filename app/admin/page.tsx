@@ -811,7 +811,31 @@ export default function AdminPanel() {
                 <p className="text-xs text-slate-400 mt-0.5">Consulte, exporte relatórios consolidados ou baixe atas individuais.</p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {meetingHistory.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border cursor-pointer ${
+                      selectedMeetings.length === meetingHistory.length && meetingHistory.length > 0
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                    }`}
+                    title={selectedMeetings.length === meetingHistory.length ? 'Desmarcar todos' : 'Marcar todas as caixas'}
+                  >
+                    {selectedMeetings.length === meetingHistory.length && meetingHistory.length > 0 ? (
+                      <CheckSquare size={14} className="text-emerald-400" />
+                    ) : (
+                      <Square size={14} className="text-slate-400" />
+                    )}
+                    <span>
+                      {selectedMeetings.length === meetingHistory.length && meetingHistory.length > 0
+                        ? 'Desmarcar Todos'
+                        : `Selecionar Tudo (${meetingHistory.length})`}
+                    </span>
+                  </button>
+                )}
+
                 {meetingHistory.length > 0 && (
                   <button
                     onClick={handleDownloadConsolidatedPdf}
@@ -825,10 +849,10 @@ export default function AdminPanel() {
                 {selectedMeetings.length > 0 && (
                   <button
                     onClick={() => handleDeleteMeetings(selectedMeetings, true)}
-                    className="px-3.5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="px-3.5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md animate-in fade-in"
                   >
                     <Trash2 size={14} />
-                    <span>Excluir ({selectedMeetings.length})</span>
+                    <span>Excluir Selecionados ({selectedMeetings.length})</span>
                   </button>
                 )}
               </div>
