@@ -64,25 +64,30 @@ function ParticipantVideoCard({
   onLowerHand: (id: string) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const attachStream = useCallback((el: HTMLVideoElement | null) => {
     if (el && participant.stream) {
       if (el.srcObject !== participant.stream) {
         el.srcObject = participant.stream;
-        el.muted = true;
+        el.muted = true; // Vídeo mutado localmente para evitar feedback interno
         el.playsInline = true;
         el.play().catch(() => {});
       }
     }
   }, [participant.stream]);
 
+  // Áudio real do participante direcionado ao alto-falante do instrutor
   useEffect(() => {
-    if (videoRef.current && participant.stream) {
-      videoRef.current.srcObject = participant.stream;
-      videoRef.current.muted = true;
-      videoRef.current.play().catch(() => {});
+    if (audioRef.current && participant.stream) {
+      if (audioRef.current.srcObject !== participant.stream) {
+        audioRef.current.srcObject = participant.stream;
+      }
+      audioRef.current.muted = Boolean(participant.isMuted);
+      audioRef.current.volume = 1.0;
+      audioRef.current.play().catch(() => {});
     }
-  }, [participant.stream]);
+  }, [participant.stream, participant.isMuted]);
 
   return (
     <div 
@@ -92,6 +97,14 @@ function ParticipantVideoCard({
           : 'border-slate-800/90 hover:border-slate-700 bg-slate-950/90'
       }`}
     >
+      {/* CANAL DE ÁUDIO DO PARTICIPANTE (REPRODUZ A VOZ PARA O INSTRUTOR) */}
+      <audio
+        ref={audioRef}
+        autoPlay
+        playsInline
+        className="hidden"
+      />
+
       {/* VÍDEO DO PARTICIPANTE OU AVATAR */}
       <div className="absolute inset-0 flex items-center justify-center bg-slate-950">
         {participant.stream && !participant.isVideoOff ? (
@@ -1263,16 +1276,17 @@ export default function DdsConferenceRoom({
               {!remoteOrganizerStream && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 space-y-2.5 p-6 text-center bg-slate-950">
                   <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/30 text-emerald-400 flex items-center justify-center animate-pulse">
-                    <Crown size={24} />
+                    <Presentation size={24} />
                   </div>
                   <div>
-                    <h4 className="text-sm font-extrabold text-white">Aguardando o Instrutor...</h4>
-                    <p className="text-[11px] text-slate-400">A transmissão ao vivo começará em instantes.</p>
+                    <h4 className="text-sm font-extrabold text-white">Aguardando Apresentação</h4>
+                    <p className="text-[11px] text-slate-400">O instrutor iniciará a transmissão em instantes.</p>
                   </div>
                 </div>
               )}
 
-              {isHostScreenSharing && (
+              {/* STATUS DE APRESENTAÇÃO ATIVA OU ENCERRADA */}
+              {isHostScreenSharing ? (
                 <div className="absolute top-3 left-3 bg-slate-900/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-emerald-500/40 flex items-center gap-2 z-10 shadow-xl pointer-events-none">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -1282,6 +1296,31 @@ export default function DdsConferenceRoom({
                     Apresentação do Instrutor em Alta Definição
                   </span>
                 </div>
+              ) : (
+                remoteOrganizerStream && (
+                  <div className="absolute top-3 left-3 bg-slate-900/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/80 flex items-center gap-2 z-10 shadow-xl pointer-events-none">
+                    <Presentation size={13} className="text-slate-400" />
+                    <span className="text-[10px] sm:text-xs font-bold text-slate-300">
+                      Apresentação Encerrada • Câmera do Instrutor
+                    </span>
+                  </div>
+                )
+              )}
+
+              {/* BOTÃO FLUTUANTE EXCLUSIVO PARA SAIR DA TELA CHEIA */}
+              {isFullscreen && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleFullscreen();
+                  }}
+                  className="absolute top-4 right-4 z-40 bg-slate-900/95 hover:bg-slate-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700 shadow-2xl backdrop-blur-md cursor-pointer transition-all active:scale-95"
+                  title="Sair do Modo Tela Cheia"
+                >
+                  <Minimize size={15} className="text-emerald-400" />
+                  <span>Sair da Tela Cheia</span>
+                </button>
               )}
 
               {/* BOTÃO FLUTUANTE DE ATIVAÇÃO DE SOM CASO O NAVEGADOR TENHA SILENCIADO POR POLÍTICA DE AUTOPLAY */}
