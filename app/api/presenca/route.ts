@@ -1,111 +1,63 @@
- import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
-const prisma = globalForPrisma.prisma || new PrismaClient();
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const { action, name, cpf, savedSelfie, savedSignature, meetingId, exitReason, exitSignature } = body;
+    const body = await req.json();
+    const { name, cpf, savedSelfie, savedSignature, meetingId } = body;
 
-    // --- 1. AÇÃO DE SAÍDA ANTECIPADA ---
-    if (action === 'register_exit') {
-      const cleanCpf = String(cpf || '').replace(/\D/g, '');
-      const attendances = await prisma.attendance.findMany({
-        where: { meetingId: meetingId },
-        orderBy: { createdAt: 'desc' }
-      });
-
-      const target = attendances.find((a) => 
-        a.cpf.replace(/\D/g, '') === cleanCpf ||
-        a.name.toLowerCase().trim() === String(name || '').toLowerCase().trim()
-      );
-
-      if (target) {
-        const updated = await prisma.attendance.update({
-          where: { id: target.id },
-          data: {
-            exitReason: String(exitReason || 'Não informado').trim(),
-            exitSignature: exitSignature || null,
-            leftAt: new Date()
-          }
-        });
-        return NextResponse.json({ success: true, data: updated });
-      }
-
-      return NextResponse.json({ success: false, error: 'Presença não localizada.' }, { status: 404 });
+    if (!name || !cpf) {
+      return NextResponse.json({ success: false, error: 'Nome e CPF são obrigatórios' }, { status: 400 });
     }
 
-    // --- 2. REGISTRO DE PRESENÇA COM VALIDAÇÃO ESTRITA DO LINK ---
-    if (!meetingId || typeof meetingId !== 'string' || meetingId.trim() === '') {
-      return NextResponse.json({ success: false, error: 'ID do DDS obrigatório.' }, { status: 400 });
+    if (!meetingId) {
+      return NextResponse.json({ success: false, error: 'Identificador da reunião não informado' }, { status: 400 });
     }
 
-    // Busca EXATAMENTE a reunião enviada no link (Zero fallback para reuniões alheias)
-    const meeting = await prisma.meeting.findUnique({
-      where: { id: meetingId.trim() },
-      include: {
-        company: true,
-        organizer: {
-          include: { companyRel: true }
-        }
-      }
+    // Busca a reunião específica para vincular com precisão
+    let meeting = await prisma.meeting.findUnique({
+      where: { id: meetingId }
     });
 
     if (!meeting) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Este DDS não foi encontrado no sistema ou o link é inválido.' 
-      }, { status: 404 });
+      return NextResponse.json({ success: false, error: 'Reunião não encontrada ou link expirado' }, { status: 404 });
     }
 
-    if (meeting.status !== 'LIVE') {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Este DDS já foi encerrado pelo organizador.' 
-      }, { status: 400 });
+    // Evita duplicidade de presença para o mesmo CPF na mesma reunião
+    const existing = await prisma.attendance.findFirst({
+      where: {
+        meetingId: meeting.id,
+        cpf: cpf.trim()
+      }
+    });
+
+    if (existing) {
+      // Atualiza os dados biométricos e assinatura
+      const updated = await prisma.attendance.update({
+        where: { id: existing.id },
+        data: {
+          name: name.trim(),
+          selfie: savedSelfie || existing.selfie,
+          signature: savedSignature || existing.signature
+        }
+      });
+      return NextResponse.json({ success: true, data: updated, meetingId: meeting.id });
     }
 
-    // Validação de Empresa Suspensa
-    const companyStatus = meeting.company?.status || meeting.organizer?.companyRel?.status;
-    if (companyStatus === 'SUSPENDED' || companyStatus === 'BLOCKED') {
-      return NextResponse.json({ 
-        success: false, 
-        error: '⛔ Este DDS pertence a uma empresa com acesso suspenso no momento.' 
-      }, { status: 403 });
-    }
-
-    // Cria a presença com status ADMITTED
+    // Salva a presença atrelada estritamente à reunião correta
     const attendance = await prisma.attendance.create({
       data: {
-        name: String(name).trim(),
-        cpf: String(cpf).trim(),
-        selfie: savedSelfie,
-        signature: savedSignature,
-        status: 'ADMITTED',
+        name: name.trim(),
+        cpf: cpf.trim(),
+        selfie: savedSelfie || '',
+        signature: savedSignature || '',
         meetingId: meeting.id
       }
     });
 
-    const safeMeeting = meeting as { type?: string };
-    const resolvedType = safeMeeting.type || 'PRESENTIAL';
-
-    return NextResponse.json({ 
-      success: true, 
-      data: attendance, 
-      attendanceId: attendance.id,
-      status: 'ADMITTED',
-      meetingType: resolvedType
-    });
-
-  } catch (error: any) {
-    const message = error instanceof Error ? error.message : 'Erro no servidor';
-    console.error("Erro na API Central de Presença:", message);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return NextResponse.json({ success: true, data: attendance, meetingId: meeting.id });
+  } catch (error) {
+    console.error("Erro no POST /api/presenca:", error);
+    return NextResponse.json({ success: false, error: 'Erro interno ao salvar presença' }, { status: 500 });
   }
 }

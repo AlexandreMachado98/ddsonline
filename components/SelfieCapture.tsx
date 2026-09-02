@@ -1,8 +1,8 @@
- 'use client';
+'use client';
 
 import React, { useRef, useState, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, RefreshCw, Check, Smartphone, CameraOff } from 'lucide-react';
+import { Camera, RefreshCw, Check, Upload, AlertCircle, SwitchCamera, Image as ImageIcon } from 'lucide-react';
 
 interface SelfieCaptureProps {
   onConfirm: (imageSrc: string | null) => void;
@@ -13,165 +13,141 @@ export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [hasCameraError, setHasCameraError] = useState(false);
+  const [cameraError, setCameraError] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
-  // Configuração simples para garantir que abra em qualquer celular
   const videoConstraints = {
-    facingMode: 'user'
+    width: { ideal: 480 },
+    height: { ideal: 480 },
+    facingMode: facingMode
   };
 
-  // 1. Captura pela Webcam ao vivo
-  const captureFromWebcam = useCallback(() => {
-    if (webcamRef.current) {
-      const imageSrc = webcamRef.current.getScreenshot();
-      if (imageSrc) {
-        setCapturedImage(imageSrc);
-        onConfirm(imageSrc);
-      }
+  // Captura foto da webcam
+  const capture = useCallback(() => {
+    const imageSrc = webcamRef.current?.getScreenshot();
+    if (imageSrc) {
+      setCapturedImage(imageSrc);
+      onConfirm(imageSrc);
     }
   }, [webcamRef, onConfirm]);
 
-  // 2. Captura pela Câmera Nativa do Celular / Galeria
-  const handleNativeCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const rawBase64 = reader.result as string;
-
-      // Comprime a foto no navegador para carregar rápido
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxDimension = 600;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > maxDimension) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          }
-        } else {
-          if (height > maxDimension) {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/jpeg', 0.82);
-          setCapturedImage(compressed);
-          onConfirm(compressed);
-        }
-      };
-      img.src = rawBase64;
-    };
-    reader.readAsDataURL(file);
-  };
-
+  // Recomeça a captura
   const retake = () => {
     setCapturedImage(null);
-    setHasCameraError(false);
     onConfirm(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  };
+
+  // Alterna câmera frontal e traseira
+  const toggleFacingMode = () => {
+    setFacingMode((prev) => (prev === 'user' ? 'environment' : 'user'));
+  };
+
+  // Fallback para envio de foto da galeria ou câmera nativa do celular
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setCapturedImage(result);
+        onConfirm(result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   return (
-    <div className="flex flex-col items-center w-full space-y-4">
-      
-      {/* Quadro de Exibição da Foto / Câmera */}
-      <div className="relative w-full max-w-[260px] overflow-hidden bg-slate-950 rounded-3xl shadow-lg aspect-square flex items-center justify-center border border-slate-700">
-        
+    <div className="flex flex-col items-center w-full space-y-3">
+      {/* Moldura da Câmera / Imagem */}
+      <div className="relative w-full max-w-[280px] overflow-hidden bg-slate-950 rounded-3xl shadow-xl aspect-square flex items-center justify-center border-2 border-slate-700/80 group">
         {!capturedImage ? (
-          <>
-            <Webcam
-              audio={false}
-              ref={webcamRef}
-              screenshotFormat="image/jpeg"
-              videoConstraints={videoConstraints}
-              mirrored={true}
-              onUserMediaError={() => setHasCameraError(true)}
-              className="w-full h-full object-cover"
-            />
+          !cameraError ? (
+            <>
+              <Webcam
+                audio={false}
+                ref={webcamRef}
+                screenshotFormat="image/jpeg"
+                videoConstraints={videoConstraints}
+                mirrored={facingMode === 'user'}
+                onUserMediaError={() => setCameraError(true)}
+                className="w-full h-full object-cover"
+              />
 
-            {/* Aviso visual caso a câmera ao vivo não seja autorizada pelo navegador */}
-            {hasCameraError && (
-              <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center p-4 text-center z-10 space-y-2">
-                <CameraOff size={32} className="text-slate-600" />
-                <p className="text-xs font-bold text-slate-300">Câmera indisponível</p>
-                <p className="text-[10px] text-slate-500">O navegador bloqueou a câmera ao vivo. Use o botão do celular abaixo.</p>
+              {/* Guia Visual Oval de Rosto */}
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div className="w-36 h-48 border-2 border-dashed border-white/40 rounded-full"></div>
               </div>
-            )}
-          </>
+
+              {/* Botão de Alternar Câmera no canto */}
+              <button
+                type="button"
+                onClick={toggleFacingMode}
+                title="Alternar Câmera Frontal / Traseira"
+                className="absolute top-2.5 right-2.5 p-2 bg-slate-900/80 hover:bg-slate-900 text-white rounded-xl backdrop-blur-md transition-all border border-white/10 active:scale-95"
+              >
+                <SwitchCamera size={16} />
+              </button>
+            </>
+          ) : (
+            /* Fallback se a câmera do navegador estiver bloqueada */
+            <div className="flex flex-col items-center justify-center p-4 text-center space-y-2">
+              <AlertCircle size={32} className="text-amber-400" />
+              <p className="text-xs font-bold text-slate-200">Câmera bloqueada</p>
+              <p className="text-[11px] text-slate-400 leading-tight">
+                Use o botão abaixo para enviar uma foto do seu rosto.
+              </p>
+            </div>
+          )
         ) : (
           <img
             src={capturedImage}
-            alt="Biometria Facial"
+            alt="Selfie do colaborador"
             className="w-full h-full object-cover"
           />
         )}
       </div>
 
-      {/* Input invisível que aciona a Câmera Frontal Nativa do Celular */}
+      {/* Input oculto para upload de arquivo fallback */}
       <input
         type="file"
+        ref={fileInputRef}
         accept="image/*"
         capture="user"
-        ref={fileInputRef}
-        onChange={handleNativeCameraCapture}
+        onChange={handleFileUpload}
         className="hidden"
       />
 
       {/* Botões de Ação */}
-      <div className="w-full max-w-[260px] flex flex-col gap-2.5">
+      <div className="w-full max-w-[280px] flex flex-col gap-2">
         {!capturedImage ? (
           <>
-            {/* 1. Botão Câmera Ao Vivo (Fica bloqueado se der erro, mas continua na tela) */}
-            <button
-              type="button"
-              onClick={captureFromWebcam}
-              disabled={hasCameraError}
-              className={`w-full py-3.5 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-md ${
-                hasCameraError 
-                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
-                  : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white active:scale-95'
-              }`}
-            >
-              <Camera size={16} /> Capturar (Ao Vivo)
-            </button>
+            {!cameraError ? (
+              <button
+                type="button"
+                onClick={capture}
+                className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/25 min-h-[44px]"
+              >
+                <Camera size={16} /> Tirar Foto do Rosto
+              </button>
+            ) : null}
 
-            <div className="flex items-center gap-2 w-full">
-              <div className="h-[1px] bg-slate-800 flex-1"></div>
-              <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">OU</span>
-              <div className="h-[1px] bg-slate-800 flex-1"></div>
-            </div>
-
-            {/* 2. Botão Câmera Nativa do Celular (SEMPRE VISÍVEL) */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-green-400 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-700 shadow-sm"
+              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-slate-200 font-semibold text-xs rounded-2xl flex items-center justify-center gap-2 transition-colors border border-slate-700 min-h-[44px]"
             >
-              <Smartphone size={16} /> Abrir Câmera do Aparelho
+              <Upload size={14} className="text-blue-400" /> Escolher Foto do Celular
             </button>
           </>
         ) : (
-          <div className="w-full space-y-3">
-            <div className="text-xs text-green-400 font-bold flex items-center justify-center gap-1 bg-green-500/10 py-2 rounded-xl border border-green-500/20">
-              <Check size={16} /> Biometria Facial Registrada
+          <div className="w-full space-y-2 animate-in fade-in duration-200">
+            <div className="bg-emerald-500/15 border border-emerald-500/30 p-2.5 rounded-2xl text-[11px] text-emerald-300 font-bold flex items-center justify-center gap-1.5 shadow-sm">
+              <Check size={16} className="text-emerald-400" /> Foto Biometria Registrada
             </div>
             <button
               type="button"
               onClick={retake}
-              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
+              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 transition-colors border border-slate-700 min-h-[44px]"
             >
               <RefreshCw size={14} /> Tirar Outra Foto
             </button>

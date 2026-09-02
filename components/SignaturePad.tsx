@@ -1,8 +1,8 @@
- 'use client';
+'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
-import { Check, Trash2 } from 'lucide-react';
+import { Check, Trash2, PenTool } from 'lucide-react';
 
 interface SignaturePadProps {
   onSave: (signatureDataUrl: string | null) => void;
@@ -18,7 +18,7 @@ export default function SignaturePad({ onSave }: SignaturePadProps) {
     onSave(null);
   };
 
-  // Salva automaticamente assim que o usuário termina o traço com o dedo
+  // Salva automaticamente assim que o usuário termina o traço
   const handleStrokeEnd = () => {
     if (!sigCanvas.current?.isEmpty()) {
       const dataUrl = sigCanvas.current?.getTrimmedCanvas().toDataURL('image/png');
@@ -30,31 +30,36 @@ export default function SignaturePad({ onSave }: SignaturePadProps) {
   };
 
   return (
-    <div className="flex flex-col items-center w-full space-y-2">
-      <div className="border-2 border-dashed border-slate-300 rounded-2xl overflow-hidden w-full bg-white shadow-inner touch-none relative">
+    <div className="flex flex-col items-center w-full space-y-2.5">
+      <div className="border-2 border-dashed border-slate-700 hover:border-blue-500/50 rounded-3xl overflow-hidden w-full bg-slate-950 shadow-inner touch-none relative transition-colors">
         <SignatureCanvas
           ref={sigCanvas}
           onEnd={handleStrokeEnd}
-          penColor="black"
+          penColor="#38bdf8" // Azul ciano de alta visibilidade e contraste
           canvasProps={{
-            className: 'w-full h-44 sm:h-52 touch-none cursor-crosshair'
+            className: 'w-full h-40 sm:h-48 touch-none cursor-crosshair'
           }}
         />
+
+        {/* Linha guia de assinatura */}
+        <div className="absolute bottom-6 left-6 right-6 border-b border-slate-800/80 pointer-events-none"></div>
+
         {!hasDrawn && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-400 text-xs font-medium">
-            ✍️ Assine aqui com o dedo ou mouse
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-500 text-xs font-medium gap-1.5 select-none">
+            <PenTool size={14} className="text-blue-400 opacity-60" />
+            <span>Assine aqui com o dedo ou mouse</span>
           </div>
         )}
       </div>
 
       <div className="flex items-center justify-between w-full px-1">
-        <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+        <span className="text-[11px] font-semibold flex items-center gap-1">
           {hasDrawn ? (
-            <>
-              <Check size={14} className="text-emerald-600" /> Assinatura Registrada
-            </>
+            <span className="text-emerald-400 flex items-center gap-1 font-bold">
+              <Check size={14} className="text-emerald-400" /> Assinatura Digital Registrada
+            </span>
           ) : (
-            <span className="text-slate-400 font-normal">Aguardando assinatura...</span>
+            <span className="text-slate-500 font-normal">Aguardando traço...</span>
           )}
         </span>
 
@@ -62,7 +67,7 @@ export default function SignaturePad({ onSave }: SignaturePadProps) {
           <button
             type="button"
             onClick={clearCanvas}
-            className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-1 bg-red-50 px-2.5 py-1 rounded-lg transition-colors"
+            className="text-xs text-red-400 hover:text-red-300 font-bold flex items-center gap-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 px-3 py-1.5 rounded-xl transition-all active:scale-95"
           >
             <Trash2 size={12} /> Limpar
           </button>

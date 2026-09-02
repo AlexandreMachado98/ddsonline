@@ -3,112 +3,77 @@
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-// =========================================================================
-// ENUMS: PERMISSÕES E STATUS DE CONTAS
-// =========================================================================
-
 enum Role {
-  SUPER_ADMIN      // Dono da Plataforma (Acesso ao DDS MASTER)
-  COMPANY_ADMIN    // Gestor da Fazenda / Empresa
-  ORGANIZER        // Técnico em Segurança do Trabalho
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  ORGANIZER
 }
 
 enum Status {
-  ACTIVE           // Conta liberada para criar e gerenciar DDS
-  PENDING_APPROVAL // Conta aguardando aprovação na fila do DDS MASTER
-  SUSPENDED        // Empresa ou técnico suspenso (Kill-switch ativado)
-  BLOCKED          // Acesso recusado / banido
+  ACTIVE
+  PENDING_APPROVAL
+  SUSPENDED
+  BLOCKED
 }
-
-// =========================================================================
-// 1. TABELA DE EMPRESAS / FAZENDAS CLIENTES (Multi-Tenant)
-// =========================================================================
 
 model Company {
   id                 String    @id @default(uuid())
-  name               String    // Nome da Empresa ou Fazenda
-  document           String?   // CNPJ ou CPF do Produtor
-  status             Status    @default(ACTIVE) // Controle de Bloqueio da Empresa
-  secretKey          String?   // Palavra-Chave para cadastro instantâneo de técnicos
+  name               String
+  document           String?
+  status             Status    @default(ACTIVE)
+  secretKey          String?
   autoApproveWithKey Boolean   @default(true)
   createdAt          DateTime  @default(now())
   
-  // Relacionamentos
   users              User[]
   meetings           Meeting[]
 }
 
-// =========================================================================
-// 2. TABELA DE USUÁRIOS / TÉCNICOS / ORGANIZADORES
-// =========================================================================
-
 model User {
   id         String    @id @default(uuid())
-  name       String    // Nome Completo do Técnico/Gestor
+  name       String
   email      String    @unique
-  password   String    // Senha de Acesso
+  password   String
   role       Role      @default(ORGANIZER)
   status     Status    @default(ACTIVE)
   position   String?   @default("Técnico em Segurança do Trabalho")
-  company    String?   // Nome descritivo da empresa/unidade
+  company    String?
   createdAt  DateTime  @default(now())
   
-  // Vinculação com a Empresa
   companyId  String?
   companyRel Company?  @relation(fields: [companyId], references: [id])
-  
-  // DDSs criados por este usuário
   meetings   Meeting[]
 }
 
-// =========================================================================
-// 3. TABELA DE REUNIÕES (DDS Presencial e Remoto)
-// =========================================================================
-
 model Meeting {
   id              String       @id @default(uuid())
-  topic           String       // Tema do Treinamento de Segurança
-  farm            String       // Local / Fazenda / Galpão / Setor
-  type            String       @default("PRESENTIAL") // PRESENTIAL (Presencial no Campo) ou REMOTE (Ao Vivo)
-  objective       String?      // Descrição do Objetivo do Treinamento (Aparece na Ata)
-  teamPhotos      String?      // Fotos da Equipe reunida no campo em JSON (Base64)
-  status          String       @default("LIVE") // LIVE (Em andamento) ou ENDED (Encerrada)
+  topic           String
+  farm            String
+  status          String       @default("LIVE")
   createdAt       DateTime     @default(now())
-  inviteExpiresAt DateTime?    // Expiração opcional de links
-  inviteToken     String?      // Token do link da reunião
-  
-  // Relacionamento com o Organizador e Empresa
+  inviteExpiresAt DateTime?
+  inviteToken     String?
   organizerId     String?
   organizer       User?        @relation(fields: [organizerId], references: [id])
   companyId       String?
   company         Company?     @relation(fields: [companyId], references: [id])
-  
-  // Presenças registradas neste DDS
   attendees       Attendance[]
 }
 
-// =========================================================================
-// 4. TABELA DE PRESENÇAS, BIOMETRIA E REGISTRO DE SAÍDA (Auditoria)
-// =========================================================================
-
 model Attendance {
   id            String    @id @default(uuid())
-  name          String    // Nome Completo do Colaborador
-  cpf           String    // CPF com máscara
-  selfie        String    // Imagem Base64 da Biometria Facial
-  signature     String    // Imagem Base64 da Assinatura Digital Touch
-  status        String    @default("ADMITTED") // ADMITTED (Admitido na sala/presença), PENDING (Lobby de espera), REJECTED
-  exitReason    String?   // Justificativa em caso de Saída Antecipada / Abandono
-  exitSignature String?   // Imagem Base64 da Assinatura Manual de Saída
-  leftAt        DateTime? // Horário exato em que o colaborador saiu
+  name          String
+  cpf           String
+  selfie        String
+  signature     String
+  exitReason    String?
+  exitSignature String?
+  leftAt        DateTime?
   createdAt     DateTime  @default(now())
-  
-  // Vinculação com o DDS
   meetingId     String
   meeting       Meeting   @relation(fields: [meetingId], references: [id])
 }

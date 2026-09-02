@@ -1,28 +1,23 @@
- import type { Metadata, Viewport } from "next";
+import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "@/components/Toast";
+import OfflineBanner from "@/components/OfflineBanner";
+
+const inter = Inter({ subsets: ["latin"] });
 
 export const viewport: Viewport = {
-  themeColor: "#091726",
+  themeColor: "#0f172a",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  userScalable: false,
 };
 
 export const metadata: Metadata = {
-  title: "DDS ON - Diálogo Diário de Segurança Online",
-  description: "Plataforma Digital de Lista de Presença com Biometria Facial, Assinatura Digital e Validade Jurídica.",
+  title: "DDS Online - Segurança do Trabalho & Auditoria Digital",
+  description: "Plataforma profissional de Diálogo Diário de Segurança com transmissão ao vivo, biometria e assinatura digital em conformidade com as NRs.",
   manifest: "/manifest.json",
-  icons: {
-    icon: [
-      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
-      { url: "/favicon.ico", sizes: "any" }
-    ],
-    shortcut: "/icon-192x192.png",
-    apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }
-    ],
-  },
 };
 
 export default function RootLayout({
@@ -31,36 +26,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className="dark">
       <head>
+        <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta httpEquiv="Pragma" content="no-cache" />
+        <meta httpEquiv="Expires" content="0" />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="mobile-web-app-capable" content="yes" />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="DDS ON" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
-        <link rel="shortcut icon" href="/icon-192x192.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js', { scope: '/' })
-                    .then(function(reg) {
-                      console.log('PWA ServiceWorker ativo no escopo:', reg.scope);
-                    })
-                    .catch(function(err) {
-                      console.log('Falha no SW:', err);
-                    });
-                });
-              }
-            `,
-          }}
-        />
       </head>
-      <body className="font-sans antialiased bg-slate-950 text-slate-100 min-h-screen">
-        {children}
+      <body className={`${inter.className} bg-slate-950 text-slate-100 antialiased min-h-screen selection:bg-blue-600 selection:text-white`}>
+        <ToastProvider>
+          <OfflineBanner />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

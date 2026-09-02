@@ -13,7 +13,7 @@ export default function DdsVideoBroadcaster() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [resolution, setResolution] = useState<'480p' | '720p'>('480p');
-  const [isMirrored, setIsMirrored] = useState(true);
+  const [isMirrored, setIsMirrored] = useState(false);
 
   const startCamera = useCallback(async (selectedRes = resolution) => {
     try {
