@@ -224,3 +224,112 @@ export function generateDdsPdf(meeting: MeetingData) {
   const cleanTopic = (meeting.topic || 'DDS').replace(/[^a-zA-Z0-9]/g, '_');
   doc.save(`Relatorio_Auditoria_DDS_ON_${cleanTopic}_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
+
+// 2. RELATÓRIO CONSOLIDADO DO PERÍODO
+interface ConsolidatedReportData {
+  companyName: string;
+  organizerName: string;
+  startDate?: string;
+  endDate?: string;
+  meetings: any[];
+}
+
+export function generateConsolidatedDdsPdf(report: ConsolidatedReportData) {
+  const doc = new jsPDF();
+
+  // Topo do Relatório Consolidado
+  doc.setFillColor(5, 150, 105); // Verde Esmeralda (Emerald 600)
+  doc.rect(0, 0, 210, 26, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text('DDS ON - DOSSIÊ CONSOLIDADO DE AUDITORIA E NRs', 14, 17);
+
+  // Metadados do Dossiê
+  doc.setTextColor(31, 41, 55);
+  doc.setFontSize(9.5);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.text('Empresa / Unidade:', 14, 35);
+  doc.setFont('helvetica', 'normal');
+  doc.text(report.companyName || 'Não informada', 50, 35);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Técnico / Responsável:', 14, 42);
+  doc.setFont('helvetica', 'normal');
+  doc.text(report.organizerName || 'Não informado', 56, 42);
+
+  let periodText = 'Todo o Histórico';
+  if (report.startDate && report.endDate) {
+    periodText = `De ${new Date(report.startDate).toLocaleDateString('pt-BR')} até ${new Date(report.endDate).toLocaleDateString('pt-BR')}`;
+  } else if (report.startDate) {
+    periodText = `A partir de ${new Date(report.startDate).toLocaleDateString('pt-BR')}`;
+  } else if (report.endDate) {
+    periodText = `Até ${new Date(report.endDate).toLocaleDateString('pt-BR')}`;
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Período Selecionado:', 14, 49);
+  doc.setFont('helvetica', 'normal');
+  doc.text(periodText, 52, 49);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Total de Reuniões:', 14, 56);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${report.meetings.length} DDS realizados`, 50, 56);
+
+  doc.setDrawColor(229, 231, 235);
+  doc.line(14, 60, 196, 60);
+
+  const tableData = report.meetings.map(m => [
+    new Date(m.createdAt || Date.now()).toLocaleDateString('pt-BR'),
+    new Date(m.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    m.topic,
+    m.farm,
+    m.type === 'PRESENTIAL' ? '👥 Presencial' : '🎙️ Remoto',
+    `${m.attendees?.length || 0} pessoas`,
+    'CONCLUÍDO'
+  ]);
+
+  autoTable(doc, {
+    startY: 64,
+    head: [['Data', 'Hora', 'Tema do Treinamento', 'Local / Fazenda', 'Modalidade', 'Presentes', 'Status']],
+    body: tableData.length > 0 ? tableData : [['Nenhum DDS encontrado', '-', '-', '-', '-', '-', '-']],
+    theme: 'striped',
+    headStyles: {
+      fillColor: [5, 150, 105],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      halign: 'center',
+      fontSize: 8.5
+    },
+    styles: {
+      fontSize: 8,
+      cellPadding: 2.5
+    },
+    columnStyles: {
+      0: { cellWidth: 20, halign: 'center' },
+      1: { cellWidth: 15, halign: 'center' },
+      2: { cellWidth: 62 },
+      3: { cellWidth: 35 },
+      4: { cellWidth: 22, halign: 'center' },
+      5: { cellWidth: 18, halign: 'center' },
+      6: { cellWidth: 18, halign: 'center' }
+    }
+  });
+
+  const pageCount = (doc as any).internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7.5);
+    doc.setTextColor(156, 163, 175);
+    doc.text(
+      `Dossiê consolidado emitido pelo DDS ON • Desenvolvido e Auditado por AM TST - Página ${i} de ${pageCount}`,
+      14,
+      doc.internal.pageSize.height - 8
+    );
+  }
+
+  doc.save(`Dossie_Consolidado_DDS_ON_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
