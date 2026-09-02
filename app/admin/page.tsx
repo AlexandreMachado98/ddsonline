@@ -326,19 +326,7 @@ export default function AdminPanel() {
 
     return (
       <main className="min-h-screen bg-slate-950 p-3 sm:p-6 font-sans text-white flex flex-col justify-between">
-        {toast.show && (
-          <div className={`fixed top-5 right-5 z-[99999] px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-2.5 animate-in slide-in-from-top-4 duration-300 ${
-            toast.type === 'success' ? 'bg-emerald-950/95 border-emerald-500/50 text-emerald-100' :
-            toast.type === 'error' ? 'bg-red-950/95 border-red-500/50 text-red-100' :
-            'bg-slate-900 border-slate-700 text-slate-100'
-          }`}>
-            {toast.type === 'success' && <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />}
-            {toast.type === 'error' && <AlertTriangle size={18} className="text-red-400 shrink-0" />}
-            {toast.type === 'info' && <Info size={18} className="text-sky-400 shrink-0" />}
-            <p className="text-xs sm:text-sm font-bold">{toast.message}</p>
-          </div>
-        )}
-
+        {/* Toast rendering removed as requested */}
         {confirmDialog && (
           <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
@@ -577,18 +565,6 @@ export default function AdminPanel() {
   // =========================================================================
   return (
     <main className="min-h-screen bg-slate-950 p-3 sm:p-6 font-sans text-slate-100">
-      {toast.show && (
-        <div className={`fixed top-5 right-5 z-[99999] px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-2.5 animate-in slide-in-from-top-4 duration-300 ${
-          toast.type === 'success' ? 'bg-emerald-950/95 border-emerald-500/50 text-emerald-100' :
-          toast.type === 'error' ? 'bg-red-950/95 border-red-500/50 text-red-100' :
-          'bg-slate-900 border-slate-700 text-slate-100'
-        }`}>
-          {toast.type === 'success' && <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />}
-          {toast.type === 'error' && <AlertTriangle size={18} className="text-red-400 shrink-0" />}
-          {toast.type === 'info' && <Info size={18} className="text-sky-400 shrink-0" />}
-          <p className="text-xs sm:text-sm font-bold">{toast.message}</p>
-        </div>
-      )}
 
       {confirmDialog && (
         <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
