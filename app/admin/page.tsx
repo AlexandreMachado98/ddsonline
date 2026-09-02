@@ -209,7 +209,10 @@ export default function AdminPanel() {
   // Copia o link de convite
   const handleCopyInviteLink = () => {
     if (!activeMeeting) return;
-    const inviteUrl = `${window.location.origin}/reuniao/${activeMeeting.id}`;
+    const invitePath = activeMeeting.type === 'PRESENTIAL' 
+      ? `/presencial?id=${activeMeeting.id}` 
+      : `/reuniao/${activeMeeting.id}`;
+    const inviteUrl = `${window.location.origin}${invitePath}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
     toast.success('Link Copiado!', 'Envie o link para a equipe acessar no celular.');

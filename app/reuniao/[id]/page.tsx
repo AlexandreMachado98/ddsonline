@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, CheckCircle2, ShieldAlert, Sparkles, LogOut, 
   Building2, Calendar, AlertTriangle, ArrowRight, User, 
-  Camera, PenTool, Radio, Check, Smartphone, Loader2, ExternalLink 
+  Camera, PenTool, Radio, Check, Smartphone, Loader2, ExternalLink, RefreshCw, QrCode
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -43,33 +43,46 @@ export default function MeetingRoom() {
   const [isSubmittingExit, setIsSubmittingExit] = useState(false);
   const [hasExitedSuccessfully, setHasExitedSuccessfully] = useState(false);
 
-  // 1. Carrega os dados reais da Reunião pelo ID
+  // 1. Polling contínuo (a cada 2.5s) para carregar dados e detectar encerramento em tempo real para todos os membros
   useEffect(() => {
     if (!roomId) return;
+    let isMounted = true;
 
     const fetchMeeting = async () => {
       try {
         const res = await fetch(`/api/reuniao?id=${encodeURIComponent(roomId)}`);
         const data = await res.json();
+        if (!isMounted) return;
 
         if (data.success && data.meeting) {
           setTopic(data.meeting.topic || 'DDS de Segurança');
           setFarm(data.meeting.farm || '');
-          setMeetingStatus(data.meeting.status === 'ENDED' ? 'ENDED' : 'LIVE');
           if (data.meeting.type) setMeetingType(data.meeting.type);
           if (data.meeting.organizer) setOrganizerInfo(data.meeting.organizer);
+
+          if (data.meeting.status === 'ENDED') {
+            setMeetingStatus('ENDED');
+          } else {
+            setMeetingStatus('LIVE');
+          }
           setMeetingNotFound(false);
         } else {
           setMeetingNotFound(true);
         }
       } catch (err) {
-        console.error("Erro ao buscar reunião:", err);
+        console.error("Erro ao sincronizar status da reunião:", err);
       } finally {
-        setIsLoadingMeeting(false);
+        if (isMounted) setIsLoadingMeeting(false);
       }
     };
 
     fetchMeeting();
+    const interval = setInterval(fetchMeeting, 2500); // Polling a cada 2.5s para desconexão imediata quando o organizador encerra
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [roomId]);
 
   // Formatação automática de CPF (000.000.000-00)
@@ -203,26 +216,48 @@ export default function MeetingRoom() {
   }
 
   // =========================================================================
-  // CENÁRIO 2: SALA NÃO ENCONTRADA OU ENCERRADA
+  // CENÁRIO 2: SALA ENCERRADA PELO ORGANIZADOR (DESCONEXÃO EM TEMPO REAL)
   // =========================================================================
-  if (meetingNotFound || meetingStatus === 'ENDED') {
+  if (meetingStatus === 'ENDED') {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-600/10 blur-[140px] rounded-full pointer-events-none"></div>
 
+        <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-4 relative z-10 backdrop-blur-md animate-in fade-in zoom-in duration-200">
+          <div className="inline-flex p-3.5 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20">
+            <CheckCircle2 size={36} />
+          </div>
+          <h1 className="text-xl sm:text-2xl font-black text-white">
+            DDS Encerrado pelo Organizador
+          </h1>
+          <p className="text-xs text-slate-300 leading-relaxed max-w-xs mx-auto">
+            Este Diálogo Diário de Segurança foi concluído pelo técnico de segurança. As presenças e biometrias coletadas foram arquivadas na ata oficial.
+          </p>
+
+          <Link href="/">
+            <button className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-slate-950 font-black text-xs rounded-2xl transition-all shadow-lg min-h-[44px]">
+              Voltar à Página Inicial
+            </button>
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  // =========================================================================
+  // CENÁRIO 3: SALA NÃO ENCONTRADA
+  // =========================================================================
+  if (meetingNotFound) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
         <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-4 relative z-10 backdrop-blur-md">
           <div className="inline-flex p-3.5 bg-amber-500/10 text-amber-400 rounded-2xl border border-amber-500/20">
             <AlertTriangle size={32} />
           </div>
-          <h1 className="text-xl font-black text-white">
-            {meetingNotFound ? 'Sala Não Encontrada' : 'DDS Já Finalizado'}
-          </h1>
+          <h1 className="text-xl font-black text-white">Sala Não Encontrada</h1>
           <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
-            {meetingNotFound
-              ? 'O link ou código desta reunião não foi localizado. Solicite um novo link ao técnico de segurança.'
-              : 'Este Diálogo Diário de Segurança foi encerrado pelo organizador e o relatório oficial de presenças foi emitido.'}
+            O link desta reunião não foi localizado. Solicite um novo link ao técnico de segurança.
           </p>
-
           <Link href="/">
             <button className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-2xl transition-all border border-slate-700 min-h-[44px]">
               Ir para a Página Inicial
@@ -234,7 +269,7 @@ export default function MeetingRoom() {
   }
 
   // =========================================================================
-  // CENÁRIO 3: SAÍDA JUSTIFICADA CONCLUÍDA
+  // CENÁRIO 4: SAÍDA JUSTIFICADA CONCLUÍDA
   // =========================================================================
   if (hasExitedSuccessfully) {
     return (
@@ -258,7 +293,7 @@ export default function MeetingRoom() {
   }
 
   // =========================================================================
-  // CENÁRIO 4: PARTICIPANTE ADMITIDO (SALA AO VIVO OU CONFIRMAÇÃO PRESENCIAL)
+  // CENÁRIO 5: PARTICIPANTE ADMITIDO (SALA AO VIVO OU CONFIRMAÇÃO PRESENCIAL)
   // =========================================================================
   if (hasAdmitted) {
     return (
@@ -297,7 +332,7 @@ export default function MeetingRoom() {
               </div>
               
               <div className="space-y-1">
-                <h2 className="text-xl font-black text-white">Presença Registrada com Sucesso!</h2>
+                <h2 className="text-xl sm:text-2xl font-black text-white">Presença Registrada com Sucesso!</h2>
                 <p className="text-xs text-emerald-400 font-bold">DDS Presencial no Canteiro / Fazenda</p>
               </div>
 
@@ -308,9 +343,21 @@ export default function MeetingRoom() {
                 <p className="text-slate-400">Status: <strong className="text-emerald-400">Biometria e Assinatura Auditadas (NRs)</strong></p>
               </div>
 
-              <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                Sua presença foi confirmada e inserida na lista oficial do técnico de segurança. Você pode acompanhar o diálogo no local.
-              </p>
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2 max-w-md mx-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setName('');
+                    setCpf('');
+                    setSavedSelfie(null);
+                    setSavedSignature(null);
+                    setHasAdmitted(false);
+                  }}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-slate-950 font-black text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-1.5 min-h-[44px]"
+                >
+                  <RefreshCw size={14} /> Registrar Outro Colaborador
+                </button>
+              </div>
             </div>
           ) : (
             /* --- SALA DE VÍDEO DO DDS REMOTO --- */
@@ -391,16 +438,16 @@ export default function MeetingRoom() {
   }
 
   // =========================================================================
-  // CENÁRIO 5: FORMULÁRIO DE ENTRADA DO COLABORADOR (3 PASSOS GUIADOS)
+  // CENÁRIO 6: FORMULÁRIO DE ENTRADA DO COLABORADOR (3 PASSOS GUIADOS)
   // =========================================================================
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center py-6 px-4 font-sans relative overflow-x-hidden">
+    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center py-6 px-3.5 sm:px-6 font-sans relative overflow-x-hidden">
       
       {/* Luz de fundo decorativa */}
       <div className="absolute top-10 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-600/15 blur-[130px] rounded-full pointer-events-none"></div>
 
       {/* Topo com Título do DDS ON */}
-      <header className="w-full max-w-md bg-gradient-to-r from-emerald-600 to-teal-600 text-slate-950 p-5 rounded-3xl shadow-2xl mb-6 text-center relative z-10 border border-emerald-400/30">
+      <header className="w-full max-w-md bg-gradient-to-r from-emerald-600 to-teal-600 text-slate-950 p-5 rounded-3xl shadow-2xl mb-5 text-center relative z-10 border border-emerald-400/30">
         <span className="text-[10px] font-black uppercase tracking-widest bg-white/40 px-3 py-1 rounded-full inline-block mb-1">
           {meetingType === 'PRESENTIAL' ? 'DDS Presencial' : 'DDS Remoto / Ao Vivo'}
         </span>
@@ -413,11 +460,11 @@ export default function MeetingRoom() {
       </header>
 
       {/* Formulário com Passos em Cards Coesos */}
-      <div className="w-full max-w-md space-y-5 pb-16 relative z-10">
+      <div className="w-full max-w-md space-y-4 pb-16 relative z-10">
         
         {/* Aviso de Orientação */}
-        <div className="bg-slate-900/80 border border-slate-800 text-slate-300 text-xs p-4 rounded-3xl flex items-center gap-3 backdrop-blur-md shadow-sm">
-          <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-2xl shrink-0">
+        <div className="bg-slate-900/80 border border-slate-800 text-slate-300 text-xs p-3.5 rounded-2xl flex items-center gap-3 backdrop-blur-md shadow-sm">
+          <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl shrink-0">
             <Radio size={18} className="animate-pulse" />
           </div>
           <p className="leading-relaxed text-[11px]">
@@ -426,8 +473,8 @@ export default function MeetingRoom() {
         </div>
 
         {/* PASSO 1: DADOS PESSOAIS */}
-        <section className="bg-slate-900/90 backdrop-blur-md p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <section className="bg-slate-900/90 backdrop-blur-md p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-xl space-y-3.5">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <User size={16} className="text-emerald-400" /> 1. Seus Dados
             </h2>
@@ -438,18 +485,18 @@ export default function MeetingRoom() {
 
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Nome Completo</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
               <input 
                 type="text" 
                 value={name} 
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ex: João da Silva"
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[44px]"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Número do CPF</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Número do CPF</label>
               <div className="relative flex items-center">
                 <input 
                   type="tel" 
@@ -457,7 +504,7 @@ export default function MeetingRoom() {
                   onChange={handleCpfChange}
                   placeholder="000.000.000-00"
                   maxLength={14}
-                  className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
+                  className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono min-h-[44px]"
                 />
                 {cpf.replace(/\D/g, '').length === 11 && (
                   <Check size={18} className="absolute right-3.5 text-emerald-400" />
@@ -468,8 +515,8 @@ export default function MeetingRoom() {
         </section>
 
         {/* PASSO 2: BIOMETRIA FACIAL */}
-        <section className="bg-slate-900/90 backdrop-blur-md p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <section className="bg-slate-900/90 backdrop-blur-md p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-xl space-y-3.5">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <Camera size={16} className="text-emerald-400" /> 2. Validação Facial (Foto)
             </h2>
@@ -488,8 +535,8 @@ export default function MeetingRoom() {
         </section>
 
         {/* PASSO 3: ASSINATURA DIGITAL TOUCH */}
-        <section className="bg-slate-900/90 backdrop-blur-md p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <section className="bg-slate-900/90 backdrop-blur-md p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-xl space-y-3.5">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <PenTool size={16} className="text-emerald-400" /> 3. Assinatura Digital
             </h2>
