@@ -132,6 +132,7 @@ export default function AdminPanel() {
           type: meetingType,
           objective: objective.trim(),
           organizerId: currentUser?.id,
+          email: currentUser?.email,
           groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : null
         })
       });

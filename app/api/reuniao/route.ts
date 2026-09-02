@@ -125,7 +125,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, meeting: newMeeting });
   } catch (error) {
     console.error("Erro no POST /api/reuniao:", error);
-    return NextResponse.json({ success: false, error: 'Erro ao criar nova reunião' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Erro ao criar nova reunião: ' + (error.message || error) }, { status: 500 });
   }
 }
 
