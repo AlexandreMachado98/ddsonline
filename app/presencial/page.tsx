@@ -10,6 +10,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SelfieCapture from '@/components/SelfieCapture';
 import SignaturePad from '@/components/SignaturePad';
+import DdsLogo from '@/components/DdsLogo';
 import { useToast } from '@/components/Toast';
 
 function PresencialContent() {
@@ -292,12 +293,14 @@ function PresencialContent() {
       <div className="absolute top-10 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-600/15 blur-[130px] rounded-full pointer-events-none"></div>
 
       {/* Topo com Identificação do DDS ON Presencial */}
+      <div className="w-full max-w-md flex items-center justify-between py-2 mb-3 relative z-10">
+        <DdsLogo size="sm" showSubtitle={true} />
+        <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full inline-flex items-center gap-1">
+          <QrCode size={12} /> Presencial
+        </span>
+      </div>
+
       <header className="w-full max-w-md bg-gradient-to-r from-emerald-600 to-teal-600 text-slate-950 p-5 rounded-3xl shadow-2xl mb-5 text-center relative z-10 border border-emerald-400/30">
-        <div className="flex items-center justify-center gap-1.5 mb-1">
-          <span className="text-[10px] font-black uppercase tracking-widest bg-white/40 px-3 py-0.5 rounded-full inline-flex items-center gap-1">
-            <QrCode size={12} /> DDS Presencial
-          </span>
-        </div>
         <h1 className="text-lg sm:text-xl font-black mt-1 tracking-tight text-white leading-snug">{topic}</h1>
         {farm && (
           <p className="text-xs text-slate-950 font-bold mt-1 flex items-center justify-center gap-1">

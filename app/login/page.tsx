@@ -2,11 +2,12 @@
 
 import React, { useState } from 'react';
 import { 
-  ShieldAlert, Lock, Mail, ArrowRight, CheckCircle2, 
-  KeyRound, Sparkles, Building2, User, ArrowLeft, Loader2 
+  Lock, Mail, ArrowRight, CheckCircle2, 
+  KeyRound, Sparkles, Building2, User, ArrowLeft, Loader2, ExternalLink 
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import DdsLogo from '@/components/DdsLogo';
 import { useToast } from '@/components/Toast';
 
 export default function LoginPage() {
@@ -35,10 +36,11 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email,
-          password,
-          name: isRegisterMode ? name : undefined,
-          companyName: isRegisterMode ? companyName : undefined
+          action: isRegisterMode ? 'register' : 'login',
+          email: email.trim().toLowerCase(),
+          password: password.trim(),
+          name: isRegisterMode ? name.trim() : undefined,
+          company: isRegisterMode ? companyName.trim() : undefined
         })
       });
 
@@ -58,7 +60,7 @@ export default function LoginPage() {
         setError(errorMsg);
         toast.error('Erro de Acesso', errorMsg);
       }
-    } catch (err) {
+    } catch {
       const connErr = 'Erro de conexão ao autenticar. Tente novamente.';
       setError(connErr);
       toast.error('Erro de Rede', connErr);
@@ -77,7 +79,7 @@ export default function LoginPage() {
     <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-x-hidden">
       
       {/* Luz de fundo decorativa */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-600/20 blur-[130px] rounded-full pointer-events-none"></div>
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-600/15 blur-[130px] rounded-full pointer-events-none"></div>
 
       <div className="w-full max-w-md bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative z-10 space-y-6">
         
@@ -89,36 +91,36 @@ export default function LoginPage() {
           >
             <ArrowLeft size={16} /> Voltar ao Início
           </Link>
-          <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20">
+          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
             Acesso Seguro
           </span>
         </div>
 
-        <div className="text-center space-y-1.5">
-          <div className="inline-flex p-3 bg-blue-600/10 rounded-2xl border border-blue-500/20 text-blue-400 mb-1">
-            <ShieldAlert size={32} />
+        {/* Logo DDS ON */}
+        <div className="text-center space-y-2">
+          <div className="flex justify-center">
+            <DdsLogo size="lg" showSubtitle={true} />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Portal do Organizador</h1>
-          <p className="text-slate-400 text-xs">Acesso exclusivo por empresa e técnico de segurança</p>
+          <p className="text-slate-400 text-xs">Portal do Técnico de Segurança e Gestor</p>
         </div>
 
         {/* Card Informativo com Credenciais de Demonstração */}
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 space-y-2">
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold text-blue-400 uppercase tracking-widest flex items-center gap-1">
+            <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1">
               <KeyRound size={12} /> Acesso de Teste / Demo
             </span>
             <button
               type="button"
               onClick={handleQuickDemo}
-              className="text-[11px] text-blue-300 hover:text-white font-bold bg-blue-600/30 hover:bg-blue-600/50 px-2.5 py-1 rounded-xl transition-colors flex items-center gap-1 border border-blue-400/20 min-h-[32px]"
+              className="text-[11px] text-emerald-300 hover:text-white font-bold bg-emerald-600/30 hover:bg-emerald-600/50 px-2.5 py-1 rounded-xl transition-colors flex items-center gap-1 border border-emerald-400/20 min-h-[32px]"
             >
               <Sparkles size={11} /> Preencher
             </button>
           </div>
-          <div className="text-xs text-slate-300 space-y-0.5">
-            <p><strong>E-mail:</strong> <code className="text-blue-300">admin@dds.com.br</code></p>
-            <p><strong>Senha:</strong> <code className="text-blue-300">123456</code></p>
+          <div className="text-xs text-slate-300 space-y-0.5 font-mono">
+            <p><strong>E-mail:</strong> <code className="text-emerald-300">admin@dds.com.br</code></p>
+            <p><strong>Senha:</strong> <code className="text-emerald-300">123456</code></p>
           </div>
         </div>
 
@@ -141,7 +143,7 @@ export default function LoginPage() {
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Ex: Carlos Silva"
                     required
-                    className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-10 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-10 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                   />
                 </div>
               </div>
@@ -156,7 +158,7 @@ export default function LoginPage() {
                     onChange={(e) => setCompanyName(e.target.value)}
                     placeholder="Ex: Fazenda Santa Maria Agro"
                     required
-                    className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-10 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-10 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                   />
                 </div>
               </div>
@@ -173,7 +175,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@dds.com.br"
                 required
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-10 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-10 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
               />
             </div>
           </div>
@@ -188,7 +190,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-10 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-10 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
               />
             </div>
           </div>
@@ -196,7 +198,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.99] text-white font-bold rounded-2xl text-sm flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-600/30 min-h-[48px]"
+            className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.99] text-slate-950 font-black rounded-2xl text-sm flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-950/60 min-h-[48px]"
           >
             {loading ? (
               <>
@@ -208,7 +210,7 @@ export default function LoginPage() {
               </>
             ) : (
               <>
-                Entrar no Sistema <ArrowRight size={18} />
+                Entrar no Painel DDS ON <ArrowRight size={18} />
               </>
             )}
           </button>
@@ -221,18 +223,29 @@ export default function LoginPage() {
               setIsRegisterMode(!isRegisterMode);
               setError('');
             }}
-            className="text-blue-400 hover:text-blue-300 font-semibold transition-colors underline min-h-[36px]"
+            className="text-emerald-400 hover:text-emerald-300 font-bold transition-colors underline min-h-[36px]"
           >
-            {isRegisterMode ? 'Já tem uma conta? Fazer Login' : 'Criar nova empresa / técnico'}
+            {isRegisterMode ? 'Já tem uma conta? Fazer Login' : 'Cadastrar novo técnico / organizador'}
           </button>
         </div>
 
-        <div className="pt-4 border-t border-slate-800/80 text-center">
-          <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
-            <CheckCircle2 size={13} className="text-emerald-500" />
-            Ecossistema Privado e Conexão Criptografada (LGPD)
+        {/* Rodapé Oficial DDS ON */}
+        <footer className="pt-4 border-t border-slate-800/80 text-center space-y-1">
+          <p className="text-[10px] text-slate-400">
+            © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
           </p>
-        </div>
+          <div className="flex items-center justify-center gap-1 text-[10px] text-slate-500">
+            <span>Desenvolvido e Auditado por</span>
+            <a 
+              href="https://amtst.vercel.app" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2"
+            >
+              AM TST <ExternalLink size={9} />
+            </a>
+          </div>
+        </footer>
 
       </div>
     </main>

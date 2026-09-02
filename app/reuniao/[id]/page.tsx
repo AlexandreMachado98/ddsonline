@@ -11,6 +11,7 @@ import Link from 'next/link';
 import SelfieCapture from '@/components/SelfieCapture';
 import SignaturePad from '@/components/SignaturePad';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
+import DdsLogo from '@/components/DdsLogo';
 import { useToast } from '@/components/Toast';
 
 export default function MeetingRoom() {
@@ -303,16 +304,10 @@ export default function MeetingRoom() {
           {/* Topo do DDS ON */}
           <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/90 backdrop-blur-md p-4 sm:p-5 rounded-3xl border border-slate-800 shadow-xl">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20">
-                <CheckCircle2 size={24} />
-              </div>
-              <div>
-                <h1 className="text-base sm:text-lg font-black text-white tracking-tight">
-                  DDS <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
-                </h1>
-                <p className="text-xs text-slate-400">
-                  Participante: <strong className="text-white">{name}</strong>
-                </p>
+              <DdsLogo size="sm" showSubtitle={false} />
+              <div className="border-l border-slate-800 pl-3">
+                <p className="text-white text-xs font-bold">{name}</p>
+                <p className="text-slate-400 text-[11px]">Participante Auditado</p>
               </div>
             </div>
 

@@ -15,6 +15,7 @@ import { generateDdsPdf } from '@/lib/pdfGenerator';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
 import CacheBusterButton from '@/components/CacheBuster';
 import GroupPhotoCapture from '@/components/GroupPhotoCapture';
+import DdsLogo from '@/components/DdsLogo';
 import { useToast } from '@/components/Toast';
 
 export default function AdminPanel() {
@@ -302,17 +303,11 @@ export default function AdminPanel() {
           
           {/* Cabeçalho Oficial DDS ON */}
           <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/90 backdrop-blur-md p-4 sm:p-5 rounded-3xl border border-slate-800 shadow-xl">
-            <div className="flex items-center gap-3.5">
-              <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20">
-                <ShieldAlert size={28} />
-              </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  DDS <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
-                </h1>
-                <p className="text-slate-400 text-xs">
-                  Organizador: <strong className="text-white">{organizerName || 'Técnico de Segurança'}</strong> • {companyName || 'Unidade Rural'}
-                </p>
+            <div className="flex items-center gap-3">
+              <DdsLogo size="md" showSubtitle={false} />
+              <div className="border-l border-slate-800 pl-3">
+                <p className="text-white text-xs font-bold">{organizerName || 'Técnico de Segurança'}</p>
+                <p className="text-slate-400 text-[11px]">{companyName || 'Unidade Rural'}</p>
               </div>
             </div>
 
@@ -563,17 +558,7 @@ export default function AdminPanel() {
         
         {/* Topo do Portal DDS ON */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/90 backdrop-blur-md p-6 rounded-3xl border border-slate-800 shadow-xl">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20">
-              <ShieldAlert size={32} />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                DDS <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
-              </h1>
-              <p className="text-slate-400 text-xs">Painel do Técnico de Segurança (TST) • Gestão Diária de NRs</p>
-            </div>
-          </div>
+          <DdsLogo size="lg" showSubtitle={true} />
 
           <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
             <CacheBusterButton />

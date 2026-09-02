@@ -6,6 +6,7 @@ import {
   ExternalLink, Eye, EyeOff, CheckCircle2, Loader2, KeyRound 
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import DdsLogo from '@/components/DdsLogo';
 import { useToast } from '@/components/Toast';
 
 export default function HomePage() {
@@ -134,14 +135,14 @@ export default function HomePage() {
       <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative z-10 space-y-5 backdrop-blur-md">
         
         {/* LOGO OFICIAL: DDS ON */}
-        <div className="text-center space-y-1.5">
+        <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-[11px] font-bold tracking-wide mb-1">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
             Plataforma Digital de SST & NR
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-            DDS <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
-          </h1>
+          <div className="flex justify-center">
+            <DdsLogo size="xl" showSubtitle={false} />
+          </div>
           <p className="text-xs text-slate-300 font-medium max-w-xs mx-auto leading-relaxed">
             {isRegisterMode 
               ? 'Insira a Palavra-Chave da sua empresa para acesso instantâneo.' 
