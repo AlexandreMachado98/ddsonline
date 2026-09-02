@@ -282,7 +282,6 @@ export default function AdminPanel() {
     showToast('Gerando Dossiê Consolidado...', 'info');
     generateConsolidatedDdsPdf({
       organizerName: currentUser?.name || 'Técnico de Segurança',
-      organizerRole: currentUser?.position || currentUser?.role || 'Técnico em Segurança do Trabalho',
       companyName: currentUser?.company || 'Unidade Rural',
       startDate: startDate || undefined,
       endDate: endDate || undefined,
