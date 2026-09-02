@@ -439,7 +439,7 @@ export default function AdminPanel() {
                       <p className="text-[11px] text-slate-400 mt-0.5">Passe o celular para os colaboradores assinarem com biometria facial.</p>
                     </div>
 
-                    <Link href={`/reuniao/${activeMeeting.id}`}>
+                    <Link href={`/presencial?id=${activeMeeting.id}`}>
                       <button className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer">
                         <Smartphone size={14} /> Abrir Coleta
                       </button>
