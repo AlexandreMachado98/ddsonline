@@ -5,17 +5,22 @@ import SignatureCanvas from 'react-signature-canvas';
 import { Check, Trash2, PenTool } from 'lucide-react';
 
 interface SignaturePadProps {
-  onSave: (signatureDataUrl: string | null) => void;
+  onSave?: (signatureDataUrl: string | null) => void;
+  onConfirm?: (signatureDataUrl: string | null) => void;
 }
 
-export default function SignaturePad({ onSave }: SignaturePadProps) {
+export default function SignaturePad({ onSave, onConfirm }: SignaturePadProps) {
+  const notifyChange = (dataUrl: string | null) => {
+    if (onSave) onSave(dataUrl);
+    if (onConfirm) onConfirm(dataUrl);
+  };
   const sigCanvas = useRef<SignatureCanvas>(null);
   const [hasDrawn, setHasDrawn] = useState(false);
 
   const clearCanvas = () => {
     sigCanvas.current?.clear();
     setHasDrawn(false);
-    onSave(null);
+    notifyChange(null);
   };
 
   // Salva automaticamente assim que o usuário termina o traço
@@ -24,7 +29,7 @@ export default function SignaturePad({ onSave }: SignaturePadProps) {
       const dataUrl = sigCanvas.current?.getTrimmedCanvas().toDataURL('image/png');
       if (dataUrl) {
         setHasDrawn(true);
-        onSave(dataUrl);
+        notifyChange(dataUrl);
       }
     }
   };

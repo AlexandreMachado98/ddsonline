@@ -1,181 +1,306 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { ShieldCheck, Video, ArrowRight, Smartphone, LogIn, Lock, Users, Search, Loader2 } from 'lucide-react';
-import Link from 'next/link';
+import React, { useState, useEffect } from 'react';
+import { 
+  Lock, Mail, ArrowRight, User, Building, Briefcase, 
+  ExternalLink, Eye, EyeOff, CheckCircle2, Loader2, KeyRound 
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Toast';
 
-function HomeContent() {
+export default function HomePage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const queryId = searchParams.get('id');
   const toast = useToast();
 
-  const [roomCode, setRoomCode] = useState('');
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [isRegisteredSuccess, setIsRegisteredSuccess] = useState(false);
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('Técnico em Segurança do Trabalho');
+  const [company, setCompany] = useState('');
+  const [secretKey, setSecretKey] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Se veio com ?id= na URL, redireciona direto para a sala
   useEffect(() => {
-    if (queryId) {
-      router.push(`/reuniao/${encodeURIComponent(queryId)}`);
-    }
-  }, [queryId, router]);
+    try {
+      const auth = localStorage.getItem('dds_admin_auth');
+      if (auth) {
+        const user = JSON.parse(auth);
+        if (user && user.id) {
+          router.replace('/admin');
+        }
+      }
+    } catch {}
+  }, [router]);
 
-  const handleJoinMeeting = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!roomCode.trim()) {
-      setError('Por favor, digite o código ou cole o link da reunião.');
-      toast.warning('Campo Vazio', 'Digite o código ou cole o link do DDS para entrar.');
+    setLoading(true);
+    setError('');
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail || !cleanPassword) {
+      setError('Preencha seu e-mail corporativo e senha.');
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
-    let cleanCode = roomCode.trim();
-
-    // Se o usuário colou o link completo (ex: https://.../reuniao/1234), extrai só o ID
-    if (cleanCode.includes('/reuniao/')) {
-      cleanCode = cleanCode.split('/reuniao/')[1].split('?')[0];
+    if (isRegisterMode && !name.trim()) {
+      setError('Preencha seu nome completo.');
+      setLoading(false);
+      return;
     }
 
-    router.push(`/reuniao/${encodeURIComponent(cleanCode)}`);
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: isRegisterMode ? 'register' : 'login',
+          email: cleanEmail,
+          password: cleanPassword,
+          name: isRegisterMode ? name.trim() : undefined,
+          role: isRegisterMode ? role.trim() : undefined,
+          company: isRegisterMode ? company.trim() : undefined,
+          secretKey: isRegisterMode && secretKey.trim() ? secretKey.trim() : undefined
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        if (isRegisterMode) {
+          if (data.autoApproved) {
+            localStorage.setItem('dds_admin_auth', JSON.stringify(data.user));
+            toast.success('Conta Aprovada!', 'Seu acesso foi liberado com sucesso.');
+            router.push('/admin');
+          } else {
+            setIsRegisteredSuccess(true);
+          }
+        } else {
+          localStorage.setItem('dds_admin_auth', JSON.stringify(data.user));
+          toast.success('Acesso Autorizado!', `Bem-vindo ao DDS ON, ${data.user.name}.`);
+          router.push('/admin');
+        }
+      } else {
+        setError(data.error || 'Credenciais inválidas.');
+      }
+    } catch {
+      setError('Falha de conexão com o servidor. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-between p-4 sm:p-8 font-sans relative overflow-x-hidden">
-      
-      {/* Efeito de luz de fundo */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-600/15 blur-[140px] rounded-full pointer-events-none"></div>
-
-      {/* Topo / Navbar */}
-      <header className="w-full max-w-4xl flex items-center justify-between py-2 relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-600/20 text-blue-400 rounded-2xl border border-blue-500/30">
-            <ShieldCheck size={26} />
+  if (isRegisteredSuccess) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
+        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-4">
+          <div className="inline-flex p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 text-emerald-400">
+            <CheckCircle2 size={36} />
           </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-black text-white tracking-tight">DDS Online</h1>
-            <p className="text-[11px] text-slate-400">Segurança do Trabalho & Auditoria Digital</p>
-          </div>
-        </div>
-
-        <Link href="/login">
-          <button className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm min-h-[44px]">
-            <LogIn size={15} className="text-blue-400" />
-            <span className="hidden sm:inline">Portal do Organizador</span>
-            <span className="sm:hidden">Entrar</span>
+          <h2 className="text-xl font-black text-white">Cadastro Solicitado com Sucesso!</h2>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Seu cadastro como Organizador foi enviado. Assim que aprovado pelo administrador, você terá acesso total ao painel do DDS ON.
+          </p>
+          <button
+            onClick={() => {
+              setIsRegisteredSuccess(false);
+              setIsRegisterMode(false);
+              setName(''); setEmail(''); setPassword(''); setError(''); setSecretKey('');
+            }}
+            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-all border border-slate-700 min-h-[44px]"
+          >
+            Voltar para a Tela de Login
           </button>
-        </Link>
-      </header>
+        </div>
+      </main>
+    );
+  }
 
-      {/* Bloco Central */}
-      <div className="w-full max-w-md my-auto py-8 relative z-10 space-y-6">
+  return (
+    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-3.5 sm:p-6 font-sans relative overflow-hidden">
+      
+      {/* Luz de fundo decorativa */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-96 h-80 sm:h-96 bg-emerald-600/15 blur-[130px] rounded-full pointer-events-none"></div>
+
+      <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative z-10 space-y-5 backdrop-blur-md">
         
-        <div className="text-center space-y-2">
-          <div className="inline-flex p-4 bg-blue-600/10 rounded-3xl border border-blue-500/20 text-blue-400 mb-2">
-            <Video size={36} />
+        {/* LOGO OFICIAL: DDS ON */}
+        <div className="text-center space-y-1.5">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-[11px] font-bold tracking-wide mb-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            Plataforma Digital de SST & NR
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Acessar Diálogo Diário
-          </h2>
-          <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-sm mx-auto">
-            Digite o código ou cole o link enviado pelo seu técnico de segurança para entrar na sala.
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
+            DDS <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
+          </h1>
+          <p className="text-xs text-slate-300 font-medium max-w-xs mx-auto leading-relaxed">
+            {isRegisterMode 
+              ? 'Insira a Palavra-Chave da sua empresa para acesso instantâneo.' 
+              : 'Diálogo Diário de Segurança com Biometria Facial e Videoconferência.'}
           </p>
         </div>
 
-        {/* Formulário de Acesso à Sala */}
-        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-6 sm:p-7 rounded-3xl shadow-2xl space-y-4">
-          <form onSubmit={handleJoinMeeting} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Código ou Link da Sala
-              </label>
-              <div className="relative flex items-center">
-                <Search className="absolute left-3.5 text-slate-500" size={18} />
-                <input
-                  type="text"
-                  value={roomCode}
-                  onChange={(e) => {
-                    setRoomCode(e.target.value);
-                    setError('');
-                  }}
-                  placeholder="Ex: 8a5f-42b1 ou cole o link"
-                  className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-10 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl text-center font-medium leading-relaxed">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {isRegisterMode && (
+            <>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">Nome Completo</label>
+                <div className="relative flex items-center">
+                  <User className="absolute left-3.5 text-slate-500" size={16} />
+                  <input 
+                    type="text" 
+                    required 
+                    value={name} 
+                    onChange={(e) => setName(e.target.value)} 
+                    placeholder="Digite seu nome completo" 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" 
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">Cargo / Função</label>
+                <div className="relative flex items-center">
+                  <Briefcase className="absolute left-3.5 text-slate-500" size={16} />
+                  <input 
+                    type="text" 
+                    value={role} 
+                    onChange={(e) => setRole(e.target.value)} 
+                    placeholder="Ex: Técnico de Segurança" 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" 
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">Empresa / Unidade</label>
+                <div className="relative flex items-center">
+                  <Building className="absolute left-3.5 text-slate-500" size={16} />
+                  <input 
+                    type="text" 
+                    value={company} 
+                    onChange={(e) => setCompany(e.target.value)} 
+                    placeholder="Ex: Fazenda Ouro Verde" 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" 
+                  />
+                </div>
+              </div>
+
+              <div className="bg-emerald-500/10 p-3 rounded-2xl border border-emerald-500/20">
+                <label className="block text-[11px] font-bold text-emerald-400 mb-0.5 flex items-center gap-1.5">
+                  <KeyRound size={12} /> Palavra-Chave da Empresa (Opcional)
+                </label>
+                <p className="text-[10px] text-slate-400 mb-1.5">Digite o código da sua empresa para aprovação imediata.</p>
+                <input 
+                  type="text" 
+                  value={secretKey} 
+                  onChange={(e) => setSecretKey(e.target.value)} 
+                  placeholder="Código da Empresa" 
+                  className="w-full bg-slate-950 border border-emerald-500/30 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none uppercase font-mono" 
                 />
               </div>
-            </div>
+            </>
+          )}
 
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-2xl text-center">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.99] text-white font-bold rounded-2xl text-sm flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-600/25 min-h-[48px]"
-            >
-              {loading ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" /> Entrando na Sala...
-                </>
-              ) : (
-                <>
-                  Entrar no DDS Ao Vivo <ArrowRight size={18} />
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-            <span className="flex items-center gap-1.5">
-              <Lock size={12} className="text-emerald-400" />
-              Sala 100% Privada e Isolada
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Smartphone size={12} className="text-blue-400" />
-              Otimizado p/ Celular
-            </span>
-          </div>
-        </div>
-
-        {/* Card do Organizador */}
-        <div className="bg-slate-900/50 border border-slate-800/70 rounded-3xl p-4 flex items-center justify-between gap-3 text-xs">
           <div>
-            <p className="font-bold text-slate-200">Você é Técnico ou Gestor?</p>
-            <p className="text-slate-500 text-[11px]">Inicie uma reunião e baixe listas em PDF</p>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">E-mail Corporativo</label>
+            <div className="relative flex items-center">
+              <Mail className="absolute left-3.5 text-slate-500" size={16} />
+              <input 
+                type="email" 
+                required 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                placeholder="Digite seu e-mail" 
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" 
+              />
+            </div>
           </div>
-          <Link href="/login">
-            <button className="px-4 py-2.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 font-bold rounded-2xl border border-blue-500/30 transition-colors shrink-0 min-h-[44px]">
-              Abrir Painel
-            </button>
-          </Link>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">Senha de Acesso</label>
+            <div className="relative flex items-center">
+              <Lock className="absolute left-3.5 text-slate-500" size={16} />
+              <input 
+                type={showPassword ? 'text' : 'password'} 
+                required 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                placeholder="Digite sua senha" 
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-11 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" 
+              />
+              <button 
+                type="button" 
+                onClick={() => setShowPassword(!showPassword)} 
+                className="absolute right-3.5 text-slate-500 hover:text-slate-300 p-1" 
+                title={showPassword ? "Ocultar senha" : "Ver senha"}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            disabled={loading} 
+            className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-slate-950 font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-950/60 active:scale-[0.98] mt-1 min-h-[48px]"
+          >
+            {loading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" /> Processando...
+              </>
+            ) : (
+              <>
+                {isRegisterMode ? 'Cadastrar Minha Conta' : 'Acessar o Painel TST'} <ArrowRight size={15} />
+              </>
+            )}
+          </button>
+        </form>
+
+        <div className="pt-1 text-center">
+          <button 
+            type="button" 
+            onClick={() => { setIsRegisterMode(!isRegisterMode); setError(''); }} 
+            className="text-xs text-emerald-400 hover:text-emerald-300 font-bold transition-colors min-h-[36px]"
+          >
+            {isRegisterMode ? 'Já possui conta? Fazer login' : 'Primeiro acesso? Cadastre-se como organizador'}
+          </button>
         </div>
 
+        {/* Rodapé Oficial com Direitos Autorais e Link AM TST */}
+        <footer className="pt-4 border-t border-slate-800/80 text-center space-y-1">
+          <p className="text-[10px] text-slate-400">
+            © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
+          </p>
+          <div className="flex items-center justify-center gap-1 text-[10px] text-slate-500">
+            <span>Desenvolvido e Auditado por</span>
+            <a 
+              href="https://amtst.vercel.app" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2"
+            >
+              AM TST <ExternalLink size={9} />
+            </a>
+          </div>
+        </footer>
+
       </div>
-
-      {/* Rodapé */}
-      <footer className="w-full max-w-4xl text-center py-4 text-[11px] text-slate-500 border-t border-slate-800/60 relative z-10">
-        DDS Online • Plataforma em Conformidade com as Normas Regulamentadoras (NRs) • Proteção de Dados LGPD
-      </footer>
-
     </main>
-  );
-}
-
-export default function HomePage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-sans">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 size={32} className="animate-spin text-blue-500" />
-          <span className="text-xs text-slate-400">Carregando DDS Online...</span>
-        </div>
-      </div>
-    }>
-      <HomeContent />
-    </Suspense>
   );
 }

@@ -72,7 +72,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { topic, farm, organizerId, email, groupPhoto } = body;
+    const { topic, farm, organizerId, email, groupPhoto, type } = body;
 
     let user = null;
 
@@ -106,11 +106,12 @@ export async function POST(req: Request) {
       });
     }
 
-    // Cria a nova sala com identificação, isolamento e foto em grupo
+    // Cria a nova sala com identificação, tipo, isolamento e foto em grupo
     const newMeeting = await prisma.meeting.create({
       data: {
         topic: topic || 'DDS de Segurança',
         farm: farm || 'Unidade Rural',
+        type: type || 'REMOTE',
         status: 'LIVE',
         organizerId: user ? user.id : null,
         companyId: user?.companyId || null,

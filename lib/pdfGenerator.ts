@@ -16,6 +16,7 @@ interface Attendee {
 interface MeetingData {
   topic: string;
   farm: string;
+  type?: string;
   createdAt?: string;
   groupPhoto?: string | null;
   attendees: Attendee[];
@@ -24,14 +25,14 @@ interface MeetingData {
 export function generateDdsPdf(meeting: MeetingData) {
   const doc = new jsPDF();
 
-  // 1. Cabeçalho Corporativo
-  doc.setFillColor(37, 99, 235); // Azul Primário
+  // 1. Cabeçalho Corporativo DDS ON
+  doc.setFillColor(5, 150, 105); // Verde Esmeralda (Emerald 600)
   doc.rect(0, 0, 210, 26, 'F');
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(12.5);
+  doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.text('DDS ONLINE - REGISTRO DE CONFORMIDADE, PRESENÇA E AUDITORIA', 14, 17);
+  doc.text('DDS ON - REGISTRO DE CONFORMIDADE, PRESENÇA E AUDITORIA', 14, 17);
 
   // 2. Metadados do DDS
   doc.setTextColor(31, 41, 55);
@@ -46,6 +47,11 @@ export function generateDdsPdf(meeting: MeetingData) {
   doc.text('Local / Fazenda:', 14, 42);
   doc.setFont('helvetica', 'normal');
   doc.text(meeting.farm || 'Não informado', 46, 42);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Modalidade:', 120, 35);
+  doc.setFont('helvetica', 'normal');
+  doc.text(meeting.type === 'PRESENTIAL' ? 'Presencial (Canteiro/Galpão)' : 'Remoto / Ao Vivo', 145, 35);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Data e Horário:', 14, 49);
@@ -82,7 +88,7 @@ export function generateDdsPdf(meeting: MeetingData) {
     body: tableRows.length > 0 ? tableRows : [['Nenhum participante registrado', '-', '-', '-', '-', '-']],
     theme: 'grid',
     headStyles: {
-      fillColor: [37, 99, 235],
+      fillColor: [5, 150, 105],
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       halign: 'center',
@@ -166,13 +172,13 @@ export function generateDdsPdf(meeting: MeetingData) {
         sectionY = 20;
       }
 
-      // Faixa de Título da Seção
-      doc.setFillColor(37, 99, 235);
+      // Faixa de Título da Seção (Emerald)
+      doc.setFillColor(5, 150, 105);
       doc.roundedRect(14, sectionY, 182, 7, 1.5, 1.5, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'bold');
-      doc.text('REGISTRO FOTOGRÁFICO COLETIVO (EVIDÊNCIA DE SEGURANÇA DDS)', 18, sectionY + 4.8);
+      doc.text('REGISTRO FOTOGRÁFICO COLETIVO (EVIDÊNCIA DE SEGURANÇA DDS ON)', 18, sectionY + 4.8);
 
       // Moldura e Imagem Centralizada
       const posX = (210 - imgWidth) / 2;
@@ -202,19 +208,19 @@ export function generateDdsPdf(meeting: MeetingData) {
     }
   }
 
-  // 5. Rodapé com Numeração em Todas as Páginas
+  // 5. Rodapé Oficial DDS ON com Numeração em Todas as Páginas
   const pageCount = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(7.5);
     doc.setTextColor(156, 163, 175);
     doc.text(
-      `Documento oficial de auditoria emitido digitalmente pelo DDS Online - Página ${i} de ${pageCount}`,
+      `Documento oficial de auditoria emitido digitalmente pelo DDS ON • Desenvolvido e Auditado por AM TST - Página ${i} de ${pageCount}`,
       14,
       doc.internal.pageSize.height - 8
     );
   }
 
   const cleanTopic = (meeting.topic || 'DDS').replace(/[^a-zA-Z0-9]/g, '_');
-  doc.save(`Relatorio_Auditoria_DDS_${cleanTopic}_${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`Relatorio_Auditoria_DDS_ON_${cleanTopic}_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
