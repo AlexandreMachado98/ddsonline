@@ -94,14 +94,13 @@ export async function POST(req: Request) {
       });
     }
 
-    // Cria a presença com status ADMITTED
+    // Cria a presença
     const attendance = await prisma.attendance.create({
       data: {
         name: String(name).trim(),
         cpf: String(cpf).trim(),
-        selfie: savedSelfie,
-        signature: savedSignature,
-        status: 'ADMITTED',
+        selfie: savedSelfie || '',
+        signature: savedSignature || '',
         meetingId: meeting.id
       }
     });

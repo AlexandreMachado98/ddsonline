@@ -1,4 +1,4 @@
- import jsPDF from 'jspdf';
+import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 interface Attendee {
@@ -17,6 +17,7 @@ interface MeetingData {
   topic: string;
   farm: string;
   createdAt?: string;
+  groupPhoto?: string | null;
   attendees: Attendee[];
 }
 
@@ -24,15 +25,15 @@ export function generateDdsPdf(meeting: MeetingData) {
   const doc = new jsPDF();
 
   // 1. Cabeçalho Corporativo
-  doc.setFillColor(37, 99, 235); // Azul
+  doc.setFillColor(37, 99, 235); // Azul Primário
   doc.rect(0, 0, 210, 26, 'F');
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(13);
+  doc.setFontSize(12.5);
   doc.setFont('helvetica', 'bold');
   doc.text('DDS ONLINE - REGISTRO DE CONFORMIDADE, PRESENÇA E AUDITORIA', 14, 17);
 
-  // 2. Metadados
+  // 2. Metadados do DDS
   doc.setTextColor(31, 41, 55);
   doc.setFontSize(9.5);
   
@@ -54,18 +55,19 @@ export function generateDdsPdf(meeting: MeetingData) {
   doc.setFont('helvetica', 'bold');
   doc.text('Total Registrado:', 14, 56);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${meeting.attendees.length} colaborador(es)`, 47, 56);
+  doc.text(`${meeting.attendees?.length || 0} colaborador(es)`, 47, 56);
 
   doc.setDrawColor(229, 231, 235);
   doc.line(14, 60, 196, 60);
 
   // 3. Tabela de Presença e Registro de Saídas
-  const tableRows = meeting.attendees.map(a => {
+  const attendeesList = meeting.attendees || [];
+  const tableRows = attendeesList.map(a => {
     const isEarlyExit = a.name.includes('(Saída:') || a.exitReason;
     const statusText = isEarlyExit ? `SAÍDA ANTECIPADA\n${a.exitReason || 'Justificada'}` : 'PRESENTE ATÉ O FIM';
 
     return [
-      a.name.replace(/\(Saída:.*\)/, ''),
+      a.name.replace(/\(Saída:.*\)/, '').trim(),
       a.cpf,
       new Date(a.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       statusText,
@@ -77,7 +79,7 @@ export function generateDdsPdf(meeting: MeetingData) {
   autoTable(doc, {
     startY: 64,
     head: [['Nome Completo', 'CPF', 'Entrada', 'Status / Saída', 'Biometria', 'Assinatura Digital']],
-    body: tableRows,
+    body: tableRows.length > 0 ? tableRows : [['Nenhum participante registrado', '-', '-', '-', '-', '-']],
     theme: 'grid',
     headStyles: {
       fillColor: [37, 99, 235],
@@ -101,8 +103,8 @@ export function generateDdsPdf(meeting: MeetingData) {
       5: { cellWidth: 38, halign: 'center' }
     },
     didDrawCell: (data) => {
-      if (data.section === 'body') {
-        const attendee = meeting.attendees[data.row.index];
+      if (data.section === 'body' && attendeesList.length > 0) {
+        const attendee = attendeesList[data.row.index];
         if (!attendee) return;
 
         // Selfie na coluna 4
@@ -122,11 +124,89 @@ export function generateDdsPdf(meeting: MeetingData) {
     }
   });
 
-  // Rodapé
+  // 4. RENDERIZAÇÃO DA FOTO EM GRUPO (EVIDÊNCIA COLETIVA)
+  if (meeting.groupPhoto && typeof meeting.groupPhoto === 'string' && meeting.groupPhoto.length > 50) {
+    try {
+      const finalTableY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY : 80;
+      
+      // Cálculo proporcional e seguro das dimensões da foto
+      let imgWidth = 170;
+      let imgHeight = 85;
+
+      try {
+        const imgProps = doc.getImageProperties(meeting.groupPhoto);
+        if (imgProps && imgProps.width && imgProps.height) {
+          const aspectRatio = imgProps.width / imgProps.height;
+          const maxAllowedWidth = 170;
+          const maxAllowedHeight = 95;
+
+          if (aspectRatio >= (maxAllowedWidth / maxAllowedHeight)) {
+            // Imagem horizontal (landscape)
+            imgWidth = maxAllowedWidth;
+            imgHeight = Math.round(maxAllowedWidth / aspectRatio);
+          } else {
+            // Imagem vertical (portrait) ou quadrada
+            imgHeight = maxAllowedHeight;
+            imgWidth = Math.round(maxAllowedHeight * aspectRatio);
+          }
+        }
+      } catch (propErr) {
+        console.warn('[PDF] Usando dimensões padrão para a foto em grupo:', propErr);
+      }
+
+      const totalSectionHeight = imgHeight + 24; // Barra de título + imagem + legenda
+      const pageHeight = doc.internal.pageSize.height;
+      const bottomLimit = pageHeight - 18;
+
+      let sectionY = finalTableY + 10;
+
+      // Se a tabela ocupou quase a página inteira, cria uma nova página dedicada para a foto
+      if (sectionY + totalSectionHeight > bottomLimit) {
+        doc.addPage();
+        sectionY = 20;
+      }
+
+      // Faixa de Título da Seção
+      doc.setFillColor(37, 99, 235);
+      doc.roundedRect(14, sectionY, 182, 7, 1.5, 1.5, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text('REGISTRO FOTOGRÁFICO COLETIVO (EVIDÊNCIA DE SEGURANÇA DDS)', 18, sectionY + 4.8);
+
+      // Moldura e Imagem Centralizada
+      const posX = (210 - imgWidth) / 2;
+      const posY = sectionY + 10;
+
+      doc.setDrawColor(203, 213, 225);
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(posX - 1.5, posY - 1.5, imgWidth + 3, imgHeight + 3, 2, 2, 'FD');
+
+      // Inserção da Imagem no PDF
+      const format = meeting.groupPhoto.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(meeting.groupPhoto, format, posX, posY, imgWidth, imgHeight);
+
+      // Legenda de Conformidade
+      doc.setTextColor(100, 116, 139);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(
+        'Evidência fotográfica coletiva registrada durante a realização do DDS - Conformidade com as Normas Regulamentadoras (NRs)',
+        105,
+        posY + imgHeight + 5.5,
+        { align: 'center' }
+      );
+
+    } catch (photoErr) {
+      console.error('[PDF] Erro ao renderizar a foto em grupo no PDF:', photoErr);
+    }
+  }
+
+  // 5. Rodapé com Numeração em Todas as Páginas
   const pageCount = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(156, 163, 175);
     doc.text(
       `Documento oficial de auditoria emitido digitalmente pelo DDS Online - Página ${i} de ${pageCount}`,

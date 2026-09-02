@@ -61,6 +61,7 @@ model Meeting {
   organizer       User?        @relation(fields: [organizerId], references: [id])
   companyId       String?
   company         Company?     @relation(fields: [companyId], references: [id])
+  groupPhoto      String?
   attendees       Attendance[]
 }
 

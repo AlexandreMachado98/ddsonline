@@ -5,13 +5,14 @@ import {
   Play, Users, Link as LinkIcon, FileText, CheckCircle2, 
   ShieldAlert, Smartphone, Download, Copy, Check, LogOut, 
   History, PlusCircle, UserCheck, Building2, Calendar, AlertTriangle, X, Radio,
-  Sparkles, ExternalLink, RefreshCw, Eye, Trash2
+  Sparkles, ExternalLink, RefreshCw, Eye, Trash2, Camera, Image as ImageIcon
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { generateDdsPdf } from '@/lib/pdfGenerator';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
 import CacheBusterButton from '@/components/CacheBuster';
+import GroupPhotoCapture from '@/components/GroupPhotoCapture';
 import { useToast } from '@/components/Toast';
 
 export default function AdminPanel() {
@@ -32,6 +33,7 @@ export default function AdminPanel() {
   // --- DADOS DO NOVO DDS ---
   const [topic, setTopic] = useState('');
   const [farm, setFarm] = useState('');
+  const [newDdsGroupPhoto, setNewDdsGroupPhoto] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
   // --- DADOS DA REUNIÃO EM ANDAMENTO ---
@@ -45,7 +47,6 @@ export default function AdminPanel() {
 
   // --- HISTÓRICO DE REUNIÕES ---
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(false);
 
   // 1. Carrega o perfil salvo do Organizador e verifica Login
   useEffect(() => {
@@ -156,7 +157,8 @@ export default function AdminPanel() {
           topic: topic.trim(),
           farm: farm.trim(),
           organizerId,
-          email
+          email,
+          groupPhoto: newDdsGroupPhoto
         })
       });
       
@@ -165,6 +167,7 @@ export default function AdminPanel() {
         setActiveMeeting(data.meeting);
         setIsLiveMode(true);
         setTopic('');
+        setNewDdsGroupPhoto(null);
         fetchAllData();
         toast.success('DDS Iniciado!', 'A sala ao vivo e o canal de transmissão foram abertos.');
       } else {
@@ -174,6 +177,27 @@ export default function AdminPanel() {
       toast.error('Erro de Conexão', 'Verifique sua conexão e tente novamente.');
     } finally {
       setIsStarting(false);
+    }
+  };
+
+  // Atualiza foto em grupo durante a reunião ao vivo
+  const handleUpdateLiveGroupPhoto = async (photo: string | null) => {
+    if (!activeMeeting) return;
+    setActiveMeeting((prev: any) => ({ ...prev, groupPhoto: photo }));
+    try {
+      await fetch('/api/reuniao', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingId: activeMeeting.id, groupPhoto: photo })
+      });
+      if (photo) {
+        toast.success('Foto em Grupo Vinculada!', 'A evidência fotográfica foi salva no DDS e será incluída no PDF.');
+      } else {
+        toast.info('Foto Removida', 'A foto em grupo foi desvinculada do DDS.');
+      }
+      fetchAllData();
+    } catch {
+      toast.error('Erro ao Salvar Imagem', 'Verifique sua conexão e tente novamente.');
     }
   };
 
@@ -194,45 +218,40 @@ export default function AdminPanel() {
 
   // Baixa o PDF da reunião ativa
   const handleDownloadActivePdf = () => {
-    if (!activeMeeting || !activeMeeting.attendees || activeMeeting.attendees.length === 0) {
-      toast.info('Lista Vazia', 'Ainda não há presenças registradas nesta reunião.');
-      return;
-    }
+    if (!activeMeeting) return;
     generateDdsPdf({
       topic: activeMeeting.topic,
       farm: activeMeeting.farm,
       createdAt: activeMeeting.createdAt,
-      attendees: activeMeeting.attendees
+      groupPhoto: activeMeeting.groupPhoto,
+      attendees: activeMeeting.attendees || []
     });
-    toast.success('PDF Gerado com Sucesso!', 'O relatório de auditoria foi baixado no seu aparelho.');
+    toast.success('PDF Gerado com Sucesso!', 'O relatório de auditoria com a foto em grupo foi baixado.');
   };
 
   // Baixa o PDF de uma reunião do HISTÓRICO
   const handleDownloadHistoryPdf = (meeting: any) => {
-    if (!meeting.attendees || meeting.attendees.length === 0) {
-      toast.info('Sem Registros', 'Esta reunião foi arquivada sem presenças registradas.');
-      return;
-    }
     generateDdsPdf({
       topic: meeting.topic,
       farm: meeting.farm,
       createdAt: meeting.createdAt,
-      attendees: meeting.attendees
+      groupPhoto: meeting.groupPhoto,
+      attendees: meeting.attendees || []
     });
-    toast.success('Download Concluído', 'Relatório de auditoria baixado.');
+    toast.success('Download Concluído', 'Relatório de auditoria com evidência fotográfica baixado.');
   };
 
   // Encerra a reunião ativa
   const handleConfirmEndMeeting = async () => {
     setIsEndingMeeting(true);
     try {
-      if (activeMeeting && activeMeeting.attendees && activeMeeting.attendees.length > 0) {
+      if (activeMeeting) {
         handleDownloadActivePdf();
       }
       await fetch('/api/reuniao', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meetingId: activeMeeting?.id })
+        body: JSON.stringify({ meetingId: activeMeeting?.id, status: 'ENDED' })
       });
       setIsLiveMode(false);
       setShowEndConfirmModal(false);
@@ -253,7 +272,7 @@ export default function AdminPanel() {
   };
 
   // =========================================================================
-  // CENÁRIO 2: SALA DO DDS AO VIVO (TRANSMISSÃO + LISTA EM TEMPO REAL)
+  // CENÁRIO 2: SALA DO DDS AO VIVO (TRANSMISSÃO + FOTO EM GRUPO + LISTA)
   // =========================================================================
   if (isLiveMode && activeMeeting) {
     return (
@@ -316,7 +335,7 @@ export default function AdminPanel() {
                 onClick={handleDownloadActivePdf}
                 className="px-4 py-3 bg-white text-blue-700 hover:bg-blue-50 rounded-2xl font-bold transition-all flex items-center gap-2 shadow-lg text-xs min-h-[44px]"
               >
-                <Download size={16} /> Baixar PDF
+                <Download size={16} /> Baixar Relatório PDF
               </button>
 
               <button 
@@ -328,14 +347,37 @@ export default function AdminPanel() {
             </div>
           </div>
 
-          {/* Grid Principal: Mosaico de Vídeo + Lista de Presença */}
+          {/* Grid Principal: Vídeo + Foto em Grupo + Lista de Presença */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-7 space-y-4">
+            <div className="lg:col-span-7 space-y-5">
               <DdsConferenceRoom
                 roomName={activeMeeting.id}
                 userName={`${organizerName || 'Técnico'} (Organizador)`}
                 isAdmin={true}
               />
+
+              {/* CARD DE FOTO EM GRUPO NA REUNIÃO AO VIVO */}
+              <div className="bg-slate-900/90 p-5 sm:p-6 rounded-3xl shadow-xl border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="font-bold text-white text-xs sm:text-sm flex items-center gap-2">
+                    <Camera size={18} className="text-blue-400" /> Foto em Grupo da Equipe (Evidência no PDF)
+                  </h3>
+                  {activeMeeting.groupPhoto ? (
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 flex items-center gap-1">
+                      <Check size={12} /> Foto Anexada
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                      Opcional
+                    </span>
+                  )}
+                </div>
+
+                <GroupPhotoCapture
+                  initialPhoto={activeMeeting.groupPhoto}
+                  onPhotoChange={handleUpdateLiveGroupPhoto}
+                />
+              </div>
 
               <div className="bg-slate-900/90 p-4 rounded-3xl shadow-md border border-slate-800 flex items-center justify-between">
                 <span className="text-xs text-slate-400">Coletar assinatura neste aparelho:</span>
@@ -419,7 +461,7 @@ export default function AdminPanel() {
               </div>
               <h3 className="text-base font-bold text-white">Encerrar este DDS?</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                A sala de transmissão será fechada, as presenças serão consolidadas e o relatório oficial de auditoria será gerado em PDF e arquivado no seu histórico.
+                A sala de transmissão será fechada, as presenças serão consolidadas e o relatório oficial com a foto em grupo será arquivado no seu histórico.
               </p>
               <div className="flex gap-2 pt-2">
                 <button
@@ -529,7 +571,7 @@ export default function AdminPanel() {
         </div>
 
         {/* ========================================================================= */}
-        {/* ABA 1: NOVO DDS + PERFIL DO ORGANIZADOR                                   */}
+        {/* ABA 1: NOVO DDS + FOTO EM GRUPO + PERFIL DO ORGANIZADOR                   */}
         {/* ========================================================================= */}
         {activeTab === 'NEW_DDS' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -538,7 +580,7 @@ export default function AdminPanel() {
             <div className="lg:col-span-7 bg-slate-900/90 backdrop-blur-md p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-800 space-y-6">
               <div>
                 <h2 className="text-lg font-bold text-white">Configurar Nova Reunião</h2>
-                <p className="text-slate-400 text-xs">Preencha o tema e local para gerar a sala do DDS</p>
+                <p className="text-slate-400 text-xs">Preencha o tema, local e anexe a foto da equipe para o relatório</p>
               </div>
 
               <form onSubmit={handleStartNewMeeting} className="space-y-4">
@@ -561,6 +603,17 @@ export default function AdminPanel() {
                     onChange={(e) => setFarm(e.target.value)}
                     placeholder="Ex: Fazenda Santa Maria - Setor Mecanizado"
                     className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  />
+                </div>
+
+                {/* CAMPO DE FOTO EM GRUPO NO CADASTRO */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Foto da Equipe Reunida (Opcional)
+                  </label>
+                  <GroupPhotoCapture
+                    initialPhoto={newDdsGroupPhoto}
+                    onPhotoChange={setNewDdsGroupPhoto}
                   />
                 </div>
 
@@ -659,11 +712,16 @@ export default function AdminPanel() {
                     key={meeting.id} 
                     className="p-5 rounded-3xl border border-slate-800 bg-slate-950/70 hover:bg-slate-950 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm"
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2.5 py-0.5 rounded-md border border-blue-500/20">
                           {meeting.farm || 'Fazenda'}
                         </span>
+                        {meeting.groupPhoto && (
+                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 flex items-center gap-1">
+                            <Camera size={11} /> Foto em Grupo Anexada
+                          </span>
+                        )}
                         <span className="text-xs text-slate-400 flex items-center gap-1">
                           <Calendar size={13} />
                           {new Date(meeting.createdAt).toLocaleDateString('pt-BR')} às {new Date(meeting.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

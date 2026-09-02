@@ -72,7 +72,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { topic, farm, organizerId, email } = body;
+    const { topic, farm, organizerId, email, groupPhoto } = body;
 
     let user = null;
 
@@ -95,8 +95,6 @@ export async function POST(req: Request) {
       });
     }
 
-    const organizerFilter = user ? { organizerId: user.id } : {};
-
     // Encerra apenas as reuniões antigas DESTE organizador específico
     if (user) {
       await prisma.meeting.updateMany({
@@ -108,14 +106,15 @@ export async function POST(req: Request) {
       });
     }
 
-    // Cria a nova sala com identificação e isolamento
+    // Cria a nova sala com identificação, isolamento e foto em grupo
     const newMeeting = await prisma.meeting.create({
       data: {
         topic: topic || 'DDS de Segurança',
         farm: farm || 'Unidade Rural',
         status: 'LIVE',
         organizerId: user ? user.id : null,
-        companyId: user?.companyId || null
+        companyId: user?.companyId || null,
+        groupPhoto: groupPhoto || null
       },
       include: {
         attendees: true
@@ -129,17 +128,28 @@ export async function POST(req: Request) {
   }
 }
 
-// 3. PUT: Encerra a reunião específica
+// 3. PUT: Atualiza a reunião (anexa foto em grupo ou encerra a reunião)
 export async function PUT(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { meetingId, organizerId } = body;
+    const { meetingId, organizerId, groupPhoto, status } = body;
 
     if (meetingId) {
-      await prisma.meeting.update({
+      const updateData: any = {};
+      if (status) updateData.status = status;
+      if (groupPhoto !== undefined) updateData.groupPhoto = groupPhoto;
+
+      // Se nenhum status específico foi passado e não é apenas foto, o padrão é encerrar (ENDED)
+      if (!status && groupPhoto === undefined) {
+        updateData.status = 'ENDED';
+      }
+
+      const updated = await prisma.meeting.update({
         where: { id: meetingId },
-        data: { status: 'ENDED' }
+        data: updateData
       });
+
+      return NextResponse.json({ success: true, meeting: updated, message: 'DDS atualizado com sucesso' });
     } else if (organizerId) {
       await prisma.meeting.updateMany({
         where: { status: 'LIVE', organizerId },
@@ -155,6 +165,6 @@ export async function PUT(req: Request) {
     return NextResponse.json({ success: true, message: 'DDS encerrado com sucesso' });
   } catch (error) {
     console.error("Erro no PUT /api/reuniao:", error);
-    return NextResponse.json({ success: false, error: 'Erro ao encerrar reunião' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Erro ao atualizar reunião' }, { status: 500 });
   }
 }
