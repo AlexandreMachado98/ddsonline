@@ -487,7 +487,6 @@ export default function AdminPanel() {
                   roomName={activeMeeting.id}
                   userName={`${currentUser?.name || 'Técnico'} (DDS ON)`}
                   isAdmin={true}
-                  attendees={activeMeeting.attendees || []}
                 />
               )}
             </div>
