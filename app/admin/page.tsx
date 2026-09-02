@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
+import GroupPhotoCapture from '@/components/GroupPhotoCapture';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
 
 export default function AdminPanel() {
@@ -435,40 +436,30 @@ export default function AdminPanel() {
                   </div>
 
                   <div className="space-y-3 pt-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-                          <Camera size={15} className="text-emerald-400" /> Registro Fotográfico ({teamPhotos.length})
-                        </h4>
-                        <p className="text-[10px] text-slate-400">Fotos anexadas automaticamente na ata oficial em PDF.</p>
-                      </div>
-                      <button 
-                        onClick={() => fileInputRef.current?.click()} 
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
-                      >
-                        <Camera size={13} className="text-emerald-400" /> + Foto
-                      </button>
-                      <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleAddTeamPhoto} className="hidden" />
-                    </div>
-
-                    {teamPhotos.length === 0 ? (
-                      <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-slate-800 hover:border-emerald-500/50 bg-slate-950/50 rounded-2xl p-6 text-center space-y-1.5 cursor-pointer transition-colors">
-                        <ImageIcon size={28} className="mx-auto text-slate-600" />
-                        <p className="text-xs font-semibold text-slate-400">Nenhuma foto da equipe anexada ainda.</p>
-                        <p className="text-[10px] text-slate-500">Toque aqui para tirar uma foto da equipe reunida.</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                        {teamPhotos.map((photo, index) => (
-                          <div key={index} className="relative aspect-video bg-slate-950 rounded-xl overflow-hidden border border-slate-800 group shadow-md">
-                            <img src={photo} alt={`Foto Equipe ${index + 1}`} className="w-full h-full object-cover" />
-                            <button onClick={() => handleRemovePhoto(index)} className="absolute top-1.5 right-1.5 p-1 bg-red-600 text-white rounded-lg opacity-90 hover:opacity-100 transition-opacity cursor-pointer">
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <GroupPhotoCapture 
+                      initialPhoto={teamPhotos.length > 0 ? teamPhotos[0] : null}
+                      onPhotoChange={(photoDataUrl) => {
+                        if (photoDataUrl) {
+                          setTeamPhotos([photoDataUrl]);
+                          if (activeMeeting) {
+                            fetch('/api/reuniao', {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ meetingId: activeMeeting.id, groupPhoto: photoDataUrl })
+                            }).catch(console.error);
+                          }
+                        } else {
+                          setTeamPhotos([]);
+                          if (activeMeeting) {
+                            fetch('/api/reuniao', {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ meetingId: activeMeeting.id, groupPhoto: null })
+                            }).catch(console.error);
+                          }
+                        }
+                      }}
+                    />
                   </div>
                 </div>
               ) : (
