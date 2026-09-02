@@ -156,6 +156,7 @@ export default function GroupPhotoCapture({ initialPhoto, onPhotoChange }: Group
                   ref={webcamRef}
                   screenshotFormat="image/jpeg"
                   videoConstraints={videoConstraints}
+                  mirrored={facingMode === 'user'}
                   onUserMediaError={() => setCameraError(true)}
                   className="w-full h-full object-cover"
                 />
