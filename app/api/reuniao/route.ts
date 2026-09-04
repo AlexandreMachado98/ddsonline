@@ -138,7 +138,7 @@ export async function POST(req: Request) {
         type: type || 'REMOTE',
         classification: classification || 'DDS',
         objective: objective ? objective.trim() : null,
-        programmaticContent: classification === 'Treinamento' && programmaticContent ? programmaticContent.trim() : null,
+        programmaticContent: programmaticContent ? programmaticContent.trim() : null,
         status: 'LIVE',
         organizerId: user ? user.id : null,
         companyId: user?.companyId || null,

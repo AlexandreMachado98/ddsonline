@@ -432,18 +432,19 @@ export default function AdminPanel() {
                   />
                 </div>
 
-                {editForm.classification === 'Treinamento' && (
-                  <div className="animate-in fade-in duration-200">
-                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Conteúdo Programático</label>
+                <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+                      <span>Conteúdo Programático (Treinamento)</span>
+                      <span className="text-[10px] text-emerald-400 font-normal lowercase">sai na ata em pdf</span>
+                    </label>
                     <textarea
                       rows={3}
                       value={editForm.programmaticContent}
                       onChange={(e) => setEditForm({...editForm, programmaticContent: e.target.value})}
-                      placeholder="Módulos, tópicos ou NRs ensinadas no treinamento..."
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed"
+                      placeholder="Ex: Módulo 1: Conceitos e NRs&#10;Módulo 2: Procedimentos de segurança&#10;Módulo 3: Prática operacional"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed font-sans"
                     />
                   </div>
-                )}
                 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Incio</label>
@@ -771,18 +772,19 @@ export default function AdminPanel() {
                   />
                 </div>
 
-                {editForm.classification === 'Treinamento' && (
-                  <div className="animate-in fade-in duration-200">
-                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Conteúdo Programático</label>
+                <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+                      <span>Conteúdo Programático (Treinamento)</span>
+                      <span className="text-[10px] text-emerald-400 font-normal lowercase">sai na ata em pdf</span>
+                    </label>
                     <textarea
                       rows={3}
                       value={editForm.programmaticContent}
                       onChange={(e) => setEditForm({...editForm, programmaticContent: e.target.value})}
-                      placeholder="Módulos, tópicos ou NRs ensinadas no treinamento..."
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed"
+                      placeholder="Ex: Módulo 1: Conceitos e NRs&#10;Módulo 2: Procedimentos de segurança&#10;Módulo 3: Prática operacional"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed font-sans"
                     />
                   </div>
-                )}
                 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Incio</label>
@@ -1080,10 +1082,10 @@ export default function AdminPanel() {
               </div>
 
               {/* Conteúdo Programático (Exibido apenas quando for Treinamento) */}
-              {classification === 'Treinamento' && (
-                <div className="animate-in fade-in duration-200">
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                    Conteúdo Programático *
+              <div>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+                    <span>Conteúdo Programático (Treinamento)</span>
+                    <span className="text-[10px] text-emerald-400 font-normal lowercase">sai na ata em pdf</span>
                   </label>
                   <textarea
                     rows={3}
@@ -1093,7 +1095,6 @@ export default function AdminPanel() {
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed font-sans"
                   />
                 </div>
-              )}
 
               {/* Botão de Iniciar */}
               <button

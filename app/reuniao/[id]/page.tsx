@@ -446,7 +446,7 @@ export default function MeetingRoom() {
             🎯 <strong>Objetivo:</strong> {objective}
           </p>
         )}
-        {programmaticContent && classification === 'Treinamento' && (
+        {programmaticContent && (
           <p className="text-xs text-teal-200/95 font-medium mt-1.5 bg-black/20 px-3 py-1.5 rounded-xl border border-white/10 text-center whitespace-pre-line">
             📚 <strong>Conteúdo Programático:</strong>
 {programmaticContent}

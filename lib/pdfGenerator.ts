@@ -169,9 +169,9 @@ export function generateDdsPdf(meeting: MeetingData) {
 
   currentY += objCardH + 3;
 
-  // Row 5 (Conteúdo Programático) — exibido como último item quando for Treinamento
-  if (meeting.classification === 'Treinamento') {
-    const rawContent = (meeting.programmaticContent || '').trim();
+  // Row 5 (Conteúdo Programático) — exibido como último item quando preenchido ou for Treinamento
+  const rawContent = (meeting.programmaticContent || '').trim();
+  if (rawContent || meeting.classification === 'Treinamento') {
     const contentText = rawContent || 'Não informado';
     const contentLines = doc.splitTextToSize(contentText, fullWidth - 10);
     const contentLineCount = Array.isArray(contentLines) ? contentLines.length : 1;
