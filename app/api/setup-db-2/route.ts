@@ -26,5 +26,11 @@ export async function GET() {
     console.error('objective error', error);
   }
 
+  try {
+    await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN "programmaticContent" TEXT;');
+  } catch (error) {
+    console.error('programmaticContent error', error);
+  }
+
   return NextResponse.json({ success: true, message: 'Schema updated successfully.' });
 }

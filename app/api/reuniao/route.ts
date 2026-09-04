@@ -6,6 +6,7 @@ async function ensureDbColumns() {
   if (dbInitialized) return;
   try {
     await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "objective" TEXT;');
+    await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "programmaticContent" TEXT;');
     await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "endedAt" TIMESTAMP(3);');
     await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "instructorName" TEXT;');
     await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "classification" TEXT DEFAULT \'DDS\';');
@@ -95,7 +96,7 @@ export async function POST(req: Request) {
   try {
     await ensureDbColumns();
     const body = await req.json();
-    const { topic, farm, organizerId, email, groupPhoto, type, classification, objective } = body;
+    const { topic, farm, organizerId, email, groupPhoto, type, classification, objective, programmaticContent } = body;
 
     let user = null;
 
@@ -137,6 +138,7 @@ export async function POST(req: Request) {
         type: type || 'REMOTE',
         classification: classification || 'DDS',
         objective: objective ? objective.trim() : null,
+        programmaticContent: classification === 'Treinamento' && programmaticContent ? programmaticContent.trim() : null,
         status: 'LIVE',
         organizerId: user ? user.id : null,
         companyId: user?.companyId || null,
@@ -159,7 +161,7 @@ export async function PUT(req: Request) {
   try {
     await ensureDbColumns();
     const body = await req.json().catch(() => ({}));
-    const { meetingId, organizerId, groupPhoto, status, createdAt, endedAt, instructorName, classification, objective } = body;
+    const { meetingId, organizerId, groupPhoto, status, createdAt, endedAt, instructorName, classification, objective, programmaticContent } = body;
 
     if (meetingId) {
       const updateData: any = {};
@@ -170,11 +172,14 @@ export async function PUT(req: Request) {
       if (instructorName !== undefined) updateData.instructorName = instructorName;
       if (classification !== undefined) updateData.classification = classification;
       if (objective !== undefined) updateData.objective = objective ? objective.trim() : null;
+      if (programmaticContent !== undefined) {
+        updateData.programmaticContent = programmaticContent ? programmaticContent.trim() : null;
+      }
 
       // Se nenhum status específico foi passado e não é apenas foto, o padrão é encerrar (ENDED)
-      // Mas NÃO encerra se estamos apenas editando campos como instructorName/classification/objective
+      // Mas NÃO encerra se estamos apenas editando campos como instructorName/classification/objective/programmaticContent
       const isJustEditing = !status && groupPhoto === undefined && 
-        (instructorName !== undefined || classification !== undefined || objective !== undefined || createdAt || endedAt !== undefined);
+        (instructorName !== undefined || classification !== undefined || objective !== undefined || programmaticContent !== undefined || createdAt || endedAt !== undefined);
       if (!status && groupPhoto === undefined && !isJustEditing) {
         updateData.status = 'ENDED';
       }

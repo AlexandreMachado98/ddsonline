@@ -18,6 +18,7 @@ interface MeetingData {
   farm: string;
   type?: 'PRESENTIAL' | 'REMOTE';
   objective?: string | null;
+  programmaticContent?: string | null;
   createdAt?: number | string;
   endedAt?: string | null;
   instructorName?: string | null;
@@ -166,7 +167,29 @@ export function generateDdsPdf(meeting: MeetingData) {
   doc.setFont('helvetica', 'normal');
   doc.text(objLines, col1 + 5, currentY + 10.5);
 
-  currentY += objCardH + 5;
+  currentY += objCardH + 3;
+
+  // Row 5 (Conteúdo Programático) — exibido como último item quando for Treinamento
+  if (meeting.classification === 'Treinamento') {
+    const rawContent = (meeting.programmaticContent || '').trim();
+    const contentText = rawContent || 'Não informado';
+    const contentLines = doc.splitTextToSize(contentText, fullWidth - 10);
+    const contentLineCount = Array.isArray(contentLines) ? contentLines.length : 1;
+    const contentCardH = Math.max(14, 7 + contentLineCount * 4);
+
+    doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
+    doc.roundedRect(col1, currentY, fullWidth, contentCardH, 2, 2, 'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+    doc.text('Conteúdo Programático', col1 + 5, currentY + 5.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(contentLines, col1 + 5, currentY + 10.5);
+
+    currentY += contentCardH + 3;
+  }
+
+  currentY += 2;
 
   // --- TABLE ---
   

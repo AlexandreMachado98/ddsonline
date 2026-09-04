@@ -24,6 +24,8 @@ function PresencialContent() {
   const [topic, setTopic] = useState('DDS Presencial');
   const [farm, setFarm] = useState('');
   const [objective, setObjective] = useState('');
+  const [programmaticContent, setProgrammaticContent] = useState('');
+  const [classification, setClassification] = useState('DDS');
   const [meetingId, setMeetingId] = useState<string>(queryMeetingId || '');
   const [isLoadingMeeting, setIsLoadingMeeting] = useState(true);
   const [isMeetingEnded, setIsMeetingEnded] = useState(false);
@@ -58,6 +60,8 @@ function PresencialContent() {
           setTopic(data.meeting.topic || 'DDS Presencial');
           setFarm(data.meeting.farm || '');
           setObjective(data.meeting.objective || '');
+          setProgrammaticContent(data.meeting.programmaticContent || '');
+          setClassification(data.meeting.classification || 'DDS');
           if (data.meeting.status === 'ENDED') {
             setIsMeetingEnded(true);
           } else {
@@ -296,6 +300,12 @@ function PresencialContent() {
         {objective && (
           <p className="text-xs text-white/95 font-medium mt-2 bg-black/20 px-3 py-1.5 rounded-xl border border-white/10 text-center">
             🎯 <strong>Objetivo:</strong> {objective}
+          </p>
+        )}
+        {programmaticContent && classification === 'Treinamento' && (
+          <p className="text-xs text-teal-200/95 font-medium mt-1.5 bg-black/20 px-3 py-1.5 rounded-xl border border-white/10 text-center whitespace-pre-line">
+            📚 <strong>Conteúdo Programático:</strong>
+{programmaticContent}
           </p>
         )}
       </header>

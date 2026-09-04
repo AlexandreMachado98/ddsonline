@@ -63,12 +63,13 @@ model Meeting {
   companyId       String?
   company         Company?     @relation(fields: [companyId], references: [id])
   type            String?      @default("REMOTE")
-  groupPhoto      String?
-  objective       String?
-  endedAt         DateTime?
-  instructorName  String?
-  classification  String?      @default("DDS")
-  attendees       Attendance[]
+  groupPhoto          String?
+  objective           String?
+  programmaticContent String?
+  endedAt             DateTime?
+  instructorName      String?
+  classification      String?      @default("DDS")
+  attendees           Attendance[]
 }
 
 model Attendance {

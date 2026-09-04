@@ -26,6 +26,7 @@ export default function AdminPanel() {
   const [topic, setTopic] = useState('');
   const [farm, setFarm] = useState('');
   const [objective, setObjective] = useState('');
+  const [programmaticContent, setProgrammaticContent] = useState('');
 
   // Fotos da Equipe
   const [teamPhotos, setTeamPhotos] = useState<string[]>([]);
@@ -79,7 +80,7 @@ export default function AdminPanel() {
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'info' }>({ show: false, message: '', type: 'info' });
   const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [editingMeeting, setEditingMeeting] = useState<any>(null);
-  const [editForm, setEditForm] = useState({ createdAt: '', endedAt: '', instructorName: '', classification: 'DDS', objective: '' });
+  const [editForm, setEditForm] = useState({ createdAt: '', endedAt: '', instructorName: '', classification: 'DDS', objective: '', programmaticContent: '' });
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ show: true, message, type });
@@ -251,6 +252,7 @@ export default function AdminPanel() {
       farm: activeMeeting.farm,
       type: activeMeeting.type,
       objective: activeMeeting.objective,
+      programmaticContent: activeMeeting.programmaticContent,
       classification: activeMeeting.classification,
       instructorName: activeMeeting.instructorName,
       endedAt: activeMeeting.endedAt,
@@ -276,6 +278,7 @@ export default function AdminPanel() {
       endedAt: meeting.endedAt,
       organizer: meeting.organizer,
       objective: meeting.objective,
+      programmaticContent: meeting.programmaticContent,
       groupPhoto: meeting.groupPhoto,
       createdAt: meeting.createdAt,
       attendees: meeting.attendees
@@ -1034,7 +1037,7 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              {/* Objetivo */}
+                            {/* Objetivo */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
                   Objetivo / Observações da Reunião
@@ -1047,6 +1050,22 @@ export default function AdminPanel() {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed"
                 />
               </div>
+
+              {/* Conteúdo Programático (Exibido apenas quando for Treinamento) */}
+              {classification === 'Treinamento' && (
+                <div className="animate-in fade-in duration-200">
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Conteúdo Programático *
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={programmaticContent}
+                    onChange={(e) => setProgrammaticContent(e.target.value)}
+                    placeholder="Ex: Módulo 1: Legislação e NRs aplicáveis&#10;Módulo 2: Procedimentos de segurança e EPIs&#10;Módulo 3: Prática operacional e primeiros socorros."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed font-sans"
+                  />
+                </div>
+              )}
 
               {/* Botão de Iniciar */}
               <button
@@ -1158,7 +1177,8 @@ export default function AdminPanel() {
                             endedAt: m.endedAt ? formatDatetimeLocal(m.endedAt) : '',
                             instructorName: m.instructorName || '',
                             classification: m.classification || 'DDS',
-                            objective: m.objective || ''
+                            objective: m.objective || '',
+                            programmaticContent: m.programmaticContent || ''
                           });
                         }}
                         title="Editar Detalhes"
