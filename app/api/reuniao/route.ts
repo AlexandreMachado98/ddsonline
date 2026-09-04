@@ -169,3 +169,33 @@ export async function PUT(req: Request) {
     return NextResponse.json({ success: false, error: 'Erro ao atualizar reunião' }, { status: 500 });
   }
 }
+// 4. DELETE: Exclui reuniões específicas
+export async function DELETE(req: Request) {
+  try {
+    const body = await req.json();
+    const { meetingIds } = body;
+
+    if (!meetingIds || !Array.isArray(meetingIds) || meetingIds.length === 0) {
+      return NextResponse.json({ success: false, error: 'Nenhum ID de reunião fornecido para exclusão' }, { status: 400 });
+    }
+
+    // Deleta primeiro as presenças (attendees) para evitar erro de chave estrangeira
+    await prisma.attendance.deleteMany({
+      where: {
+        meetingId: { in: meetingIds }
+      }
+    });
+
+    // Em seguida, deleta as reuniões
+    await prisma.meeting.deleteMany({
+      where: {
+        id: { in: meetingIds }
+      }
+    });
+
+    return NextResponse.json({ success: true, message: 'DDS excluído(s) com sucesso' });
+  } catch (error) {
+    console.error('Erro no DELETE /api/reuniao:', error);
+    return NextResponse.json({ success: false, error: 'Erro ao excluir reuniões' }, { status: 500 });
+  }
+}
