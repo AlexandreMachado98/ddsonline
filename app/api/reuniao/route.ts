@@ -72,7 +72,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { topic, farm, organizerId, email, groupPhoto, type } = body;
+    const { topic, farm, organizerId, email, groupPhoto, type, classification } = body;
 
     let user = null;
 
@@ -112,6 +112,7 @@ export async function POST(req: Request) {
         topic: topic || 'DDS de Segurança',
         farm: farm || 'Unidade Rural',
         type: type || 'REMOTE',
+        classification: classification || 'DDS',
         status: 'LIVE',
         organizerId: user ? user.id : null,
         companyId: user?.companyId || null,
@@ -133,7 +134,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { meetingId, organizerId, groupPhoto, status, createdAt, endedAt, instructorName } = body;
+    const { meetingId, organizerId, groupPhoto, status, createdAt, endedAt, instructorName, classification } = body;
 
     if (meetingId) {
       const updateData: any = {};
@@ -142,6 +143,7 @@ export async function PUT(req: Request) {
       if (createdAt) updateData.createdAt = new Date(createdAt);
       if (endedAt !== undefined) updateData.endedAt = endedAt ? new Date(endedAt) : null;
       if (instructorName !== undefined) updateData.instructorName = instructorName;
+      if (classification !== undefined) updateData.classification = classification;
 
       // Se nenhum status específico foi passado e não é apenas foto, o padrão é encerrar (ENDED)
       if (!status && groupPhoto === undefined) {

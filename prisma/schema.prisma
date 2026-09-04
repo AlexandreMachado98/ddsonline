@@ -66,6 +66,7 @@ model Meeting {
   groupPhoto      String?
   endedAt         DateTime?
   instructorName  String?
+  classification  String?      @default("DDS")
   attendees       Attendance[]
 }
 

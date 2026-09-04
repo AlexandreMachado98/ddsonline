@@ -22,6 +22,7 @@ export default function AdminPanel() {
 
   // Formulário do Novo DDS
   const [meetingType, setMeetingType] = useState<'PRESENTIAL' | 'REMOTE'>('PRESENTIAL');
+  const [classification, setClassification] = useState('DDS');
   const [topic, setTopic] = useState('');
   const [farm, setFarm] = useState('');
   const [objective, setObjective] = useState('');
@@ -77,7 +78,7 @@ export default function AdminPanel() {
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'info' }>({ show: false, message: '', type: 'info' });
   const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [editingMeeting, setEditingMeeting] = useState<any>(null);
-  const [editForm, setEditForm] = useState({ createdAt: '', endedAt: '', instructorName: '' });
+  const [editForm, setEditForm] = useState({ createdAt: '', endedAt: '', instructorName: '', classification: 'DDS' });
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ show: true, message, type });
@@ -380,6 +381,19 @@ export default function AdminPanel() {
               </div>
               
               <form onSubmit={handleSaveEditMeeting} className="space-y-4">
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Tipo de Conteúdo</label>
+                  <select
+                    value={editForm.classification}
+                    onChange={(e) => setEditForm({...editForm, classification: e.target.value})}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+                  >
+                    <option value="DDS">DDS</option>
+                    <option value="Treinamento">Treinamento</option>
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Responsǭvel pelo Treinamento</label>
                   <input
@@ -446,11 +460,27 @@ export default function AdminPanel() {
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
               </span>
               <span className="text-[10px] bg-slate-800 text-slate-300 font-bold px-2 py-0.5 rounded-lg border border-slate-700 ml-1">
-                {isPresential ? '👥 Presencial' : '🎙️ Remoto / Vídeo'}
+                {isPresential ? '📍 Presencial' : '💻 EAD'}
               </span>
             </div>
 
+            
             <div className="flex items-center gap-2 self-end sm:self-auto">
+              <label className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-colors border border-slate-700 flex items-center gap-1.5 cursor-pointer" title="Adicionar Logo da Empresa ao PDF">
+                <span>➕ Logo Empresa</span>
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      localStorage.setItem('dds_company_logo', reader.result as string);
+                      alert('Logo salva! Ela aparecerá no canto superior direito das próximas Atas em PDF.');
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }} />
+              </label>
+
               <span className="text-xs text-slate-400 hidden sm:inline">
                 Técnico: <strong className="text-white">{currentUser?.name}</strong>
               </span>
@@ -472,7 +502,7 @@ export default function AdminPanel() {
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
                 </span>
                 <span className="font-bold text-emerald-200 uppercase tracking-widest text-[10px]">
-                  {isPresential ? 'DDS Presencial em Andamento' : 'DDS Remoto Ao Vivo'}
+                  {isPresential ? 'DDS Presencial em Andamento' : 'DDS EAD Ao Vivo'}
                 </span>
               </div>
               <h2 className="text-xl sm:text-2xl font-black">{activeMeeting.topic}</h2>
@@ -761,7 +791,7 @@ export default function AdminPanel() {
                     }`}
                   >
                     <span className="text-xs font-black flex items-center gap-1.5 text-emerald-400">
-                      👥 Presencial
+                      📍 Presencial
                     </span>
                     <span className="text-[10px] text-slate-400 mt-1 leading-tight">
                       Coleta de assinaturas e fotos no próprio aparelho em campo.
@@ -778,7 +808,7 @@ export default function AdminPanel() {
                     }`}
                   >
                     <span className="text-xs font-black flex items-center gap-1.5 text-emerald-400">
-                      🎙️ Remoto (Vídeo P2P)
+                      💻 EAD (Vídeo P2P)
                     </span>
                     <span className="text-[10px] text-slate-400 mt-1 leading-tight">
                       Transmissão de áudio, vídeo e tela para colaboradores remotos.
@@ -788,6 +818,22 @@ export default function AdminPanel() {
               </div>
 
               {/* Tema e Local */}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Tipo de Conteúdo *</label>
+                  <select
+                    value={classification}
+                    onChange={(e) => setClassification(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                  >
+                    <option value="DDS">DDS</option>
+                    <option value="Treinamento">Treinamento</option>
+                  </select>
+                </div>
+                <div></div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">

@@ -20,6 +20,7 @@ interface MeetingData {
   createdAt?: number | string;
   endedAt?: string | null;
   instructorName?: string | null;
+  classification?: string | null;
   organizer?: { name: string };
   attendees?: AttendanceData[];
   groupPhoto?: string | null;
@@ -43,14 +44,25 @@ export function generateDdsPdf(meeting: MeetingData) {
   doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
   doc.rect(0, 0, pageWidth, 30, 'F');
   
-  // Fake Logo "DDS ON"
+  // Logo "DDS ON"
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
   doc.text('DDS ON', 14, 18);
-  doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(230, 240, 235);
   doc.text('Plataforma de registro de presença online', 14, 24);
+
+  // Logo da Empresa
+  if (typeof window !== 'undefined') {
+    try {
+      const companyLogo = localStorage.getItem('dds_company_logo');
+      if (companyLogo) {
+        doc.addImage(companyLogo, 'PNG', 160, 12, 35, 15);
+      }
+    } catch (e) {}
+  }
   
   currentY = 45;
 
@@ -83,8 +95,8 @@ export function generateDdsPdf(meeting: MeetingData) {
   };
 
   // Row 1
-  drawCard(col1, currentY, cardW, cardH, 'Tema do DDS', meeting.topic || 'Não informado');
-  drawCard(col2, currentY, cardW, cardH, 'Modalidade', meeting.type === 'PRESENTIAL' ? 'Presencial (Canteiro/Galpão)' : 'Remoto / Ao Vivo');
+  drawCard(col1, currentY, cardW, cardH, meeting.classification === 'Treinamento' ? 'Tema do Treinamento' : 'Tema do DDS', meeting.topic || 'Não informado');
+  drawCard(col2, currentY, cardW, cardH, 'Modalidade', meeting.type === 'PRESENTIAL' ? 'Presencial' : 'EAD');
   
   // Right large card (Total)
   doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
