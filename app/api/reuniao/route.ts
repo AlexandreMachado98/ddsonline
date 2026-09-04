@@ -186,7 +186,15 @@ export async function PUT(req: Request) {
 
       const updated = await prisma.meeting.update({
         where: { id: meetingId },
-        data: updateData
+        data: updateData,
+        include: {
+          attendees: {
+            orderBy: { createdAt: 'desc' }
+          },
+          organizer: {
+            select: { name: true, position: true, company: true }
+          }
+        }
       });
 
       return NextResponse.json({ success: true, meeting: updated, message: 'DDS atualizado com sucesso' });
