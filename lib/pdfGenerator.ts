@@ -60,15 +60,21 @@ export function generateDdsPdf(meeting: MeetingData) {
       const companyLogo = localStorage.getItem('dds_company_logo');
       if (companyLogo) {
         const props = doc.getImageProperties(companyLogo);
-        const maxW = 35;
-        const maxH = 15;
+        const maxW = 50; // allow a bit wider
+        const maxH = 22; // max height out of 30px banner
         const ratio = Math.min(maxW / props.width, maxH / props.height);
         const finalW = props.width * ratio;
         const finalH = props.height * ratio;
         
         // Alinha a logo no canto superior direito (margem direita de 14px)
-        const xPos = 200 - 14 - finalW;
-        doc.addImage(companyLogo, 'PNG', xPos, 14, finalW, finalH);
+        const xPos = pageWidth - 14 - finalW;
+        const yPos = (30 - finalH) / 2; // Centraliza verticalmente no header de 30px
+        
+        // Fundo branco arredondado para garantir contraste e estética (já que o fundo é verde escuro)
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(xPos - 3, yPos - 3, finalW + 6, finalH + 6, 2, 2, 'F');
+        
+        doc.addImage(companyLogo, 'PNG', xPos, yPos, finalW, finalH);
       }
     } catch (e) {}
   }
