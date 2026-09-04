@@ -18,6 +18,9 @@ interface MeetingData {
   farm: string;
   type?: 'PRESENTIAL' | 'REMOTE';
   createdAt?: number | string;
+  endedAt?: string | null;
+  instructorName?: string | null;
+  organizer?: { name: string };
   attendees?: AttendanceData[];
   groupPhoto?: string | null;
 }
@@ -102,9 +105,19 @@ export function generateDdsPdf(meeting: MeetingData) {
 
   // Row 2
   const ddsDate = new Date(meeting.createdAt || Date.now());
-  const dateStr = ddsDate.toLocaleDateString('pt-BR') + ', ' + ddsDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  drawCard(col1, currentY, cardW, cardH, 'Local / Fazenda', meeting.farm || 'Não informado');
+  const endDate = meeting.endedAt ? new Date(meeting.endedAt) : null;
+  let dateStr = ddsDate.toLocaleDateString('pt-BR') + ' às ' + ddsDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  if (endDate) {
+    dateStr += ' até ' + endDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  drawCard(col1, currentY, cardW, cardH, 'Local', meeting.farm || 'Não informado');
   drawCard(col2, currentY, cardW, cardH, 'Data e Horário', dateStr);
+
+  currentY += cardH + 3;
+
+  // Row 3 (Responsável)
+  drawCard(col1, currentY, cardW * 2 + 17, cardH, 'Responsável pelo Treinamento', meeting.instructorName || meeting.organizer?.name || 'Não informado');
 
   currentY += cardH + 12;
 

@@ -133,12 +133,15 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { meetingId, organizerId, groupPhoto, status } = body;
+    const { meetingId, organizerId, groupPhoto, status, createdAt, endedAt, instructorName } = body;
 
     if (meetingId) {
       const updateData: any = {};
       if (status) updateData.status = status;
       if (groupPhoto !== undefined) updateData.groupPhoto = groupPhoto;
+      if (createdAt) updateData.createdAt = new Date(createdAt);
+      if (endedAt !== undefined) updateData.endedAt = endedAt ? new Date(endedAt) : null;
+      if (instructorName !== undefined) updateData.instructorName = instructorName;
 
       // Se nenhum status específico foi passado e não é apenas foto, o padrão é encerrar (ENDED)
       if (!status && groupPhoto === undefined) {

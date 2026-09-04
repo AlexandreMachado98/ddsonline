@@ -39,9 +39,45 @@ export default function AdminPanel() {
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  const formatDatetimeLocal = (dateStr: string) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  };
+  
+  const handleSaveEditMeeting = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMeeting) return;
+    try {
+      const res = await fetch('/api/reuniao', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          meetingId: editingMeeting.id,
+          createdAt: editForm.createdAt ? new Date(editForm.createdAt).toISOString() : undefined,
+          endedAt: editForm.endedAt ? new Date(editForm.endedAt).toISOString() : null,
+          instructorName: editForm.instructorName
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('DDS atualizado com sucesso!', 'success');
+        setEditingMeeting(null);
+        fetchAllData();
+      } else {
+        showToast('Erro ao atualizar: ' + (data.error || 'Falha no servidor'), 'error');
+      }
+    } catch {
+      showToast('Erro de conexǜo ao tentar atualizar.', 'error');
+    }
+  };
+
+
   // Notificações
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'info' }>({ show: false, message: '', type: 'info' });
   const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [editingMeeting, setEditingMeeting] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ createdAt: '', endedAt: '', instructorName: '' });
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ show: true, message, type });
@@ -328,6 +364,63 @@ export default function AdminPanel() {
     return (
       <main className="min-h-screen bg-slate-950 p-3 sm:p-6 font-sans text-white flex flex-col justify-between">
         {/* Toast rendering removed as requested */}
+        
+        {/* EDIT MODAL */}
+        {editingMeeting && (
+          <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <span className="text-emerald-400">✏️</span>
+                  Editar Informaes do Treinamento
+                </h2>
+                <button onClick={() => setEditingMeeting(null)} className="text-slate-500 hover:text-white transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <form onSubmit={handleSaveEditMeeting} className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Responsǭvel pelo Treinamento</label>
+                  <input
+                    type="text"
+                    value={editForm.instructorName}
+                    onChange={(e) => setEditForm({...editForm, instructorName: e.target.value})}
+                    placeholder={currentUser?.name || 'Nome do Instrutor'}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Incio</label>
+                  <input
+                    type="datetime-local"
+                    value={editForm.createdAt}
+                    onChange={(e) => setEditForm({...editForm, createdAt: e.target.value})}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Fim</label>
+                  <input
+                    type="datetime-local"
+                    value={editForm.endedAt}
+                    onChange={(e) => setEditForm({...editForm, endedAt: e.target.value})}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+                  />
+                </div>
+                
+                <div className="flex gap-2.5 pt-2">
+                  <button type="button" onClick={() => setEditingMeeting(null)} className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-colors">Cancelar</button>
+                  <button type="submit" className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all">Salvar Alteraes</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {confirmDialog && (
           <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
