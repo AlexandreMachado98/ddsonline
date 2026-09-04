@@ -6,28 +6,28 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { name, cpf, meetingId, exitReason, exitSignature } = body;
 
-    if (!cpf) {
-      return NextResponse.json({ success: false, error: 'CPF é obrigatório para registrar saída' }, { status: 400 });
+    if (!name && !cpf) {
+      return NextResponse.json({ success: false, error: 'Identificação necessária para registrar saída' }, { status: 400 });
     }
 
-    // Busca o registro de presença desse colaborador
+    // Busca o registro de presença desse colaborador pelo nome
     let attendance = null;
 
-    if (meetingId) {
+    if (meetingId && name) {
       attendance = await prisma.attendance.findFirst({
         where: {
           meetingId: meetingId,
-          cpf: cpf
+          name: { contains: name.trim(), mode: 'insensitive' }
         },
         orderBy: { createdAt: 'desc' }
       });
     }
 
-    if (!attendance) {
+    if (!attendance && name) {
       // Busca na reunião ativa mais recente
       attendance = await prisma.attendance.findFirst({
         where: {
-          cpf: cpf,
+          name: { contains: name.trim(), mode: 'insensitive' },
           meeting: {
             status: 'LIVE'
           }

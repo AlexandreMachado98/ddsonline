@@ -23,20 +23,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Reunião não encontrada ou link expirado' }, { status: 404 });
     }
 
-    // Evita duplicidade de presença para o mesmo CPF na mesma reunião
+    // Evita duplicidade de presença para o mesmo NOME na mesma reunião
     const existing = await prisma.attendance.findFirst({
       where: {
         meetingId: meeting.id,
-        cpf: cpf.trim()
+        name: { equals: name.trim(), mode: 'insensitive' }
       }
     });
 
     if (existing) {
-      // Atualiza os dados biométricos e assinatura
+      // Atualiza os dados do colaborador existente (caso refaça a assinatura)
       const updated = await prisma.attendance.update({
         where: { id: existing.id },
         data: {
           name: name.trim(),
+          cpf: cpf.trim(), // Guarda a função / cargo
           selfie: savedSelfie || existing.selfie,
           signature: savedSignature || existing.signature
         }

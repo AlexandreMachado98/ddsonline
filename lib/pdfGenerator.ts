@@ -194,6 +194,7 @@ export function generateDdsPdf(meeting: MeetingData) {
 
   autoTable(doc, {
     startY: currentY,
+    margin: { top: 20, bottom: 25, left: 14, right: 14 },
     head: [['#', 'NOME COMPLETO', 'FUNÇÃO', 'ENTRADA', 'STATUS / SAÍDA', 'BIOMETRIA', 'ASSINATURA DIGITAL']],
     body: tableRows.length > 0 ? tableRows : [['-', 'Nenhum participante', '-', '-', '-', '-', '-']],
     theme: 'grid',
