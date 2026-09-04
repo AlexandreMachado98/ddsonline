@@ -45,6 +45,9 @@ export function generateDdsPdf(meeting: MeetingData) {
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
   doc.text('DDS ON', 14, 18);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Plataforma de registro de presença online', 14, 24);
   
   currentY = 45;
 
