@@ -169,6 +169,7 @@ export default function AdminPanel() {
           topic: topic.trim(), 
           farm: farm.trim(),
           type: meetingType,
+          classification,
           objective: objective.trim(),
           organizerId: currentUser?.id,
           email: currentUser?.email,

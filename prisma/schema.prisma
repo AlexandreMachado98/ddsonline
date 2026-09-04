@@ -64,6 +64,7 @@ model Meeting {
   company         Company?     @relation(fields: [companyId], references: [id])
   type            String?      @default("REMOTE")
   groupPhoto      String?
+  objective       String?
   endedAt         DateTime?
   instructorName  String?
   classification  String?      @default("DDS")

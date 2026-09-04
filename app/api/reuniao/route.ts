@@ -78,7 +78,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { topic, farm, organizerId, email, groupPhoto, type, classification } = body;
+    const { topic, farm, organizerId, email, groupPhoto, type, classification, objective } = body;
 
     let user = null;
 
@@ -119,6 +119,7 @@ export async function POST(req: Request) {
         farm: farm || 'Unidade Rural',
         type: type || 'REMOTE',
         classification: classification || 'DDS',
+        objective: objective ? objective.trim() : null,
         status: 'LIVE',
         organizerId: user ? user.id : null,
         companyId: user?.companyId || null,
@@ -150,12 +151,12 @@ export async function PUT(req: Request) {
       if (endedAt !== undefined) updateData.endedAt = endedAt ? new Date(endedAt) : null;
       if (instructorName !== undefined) updateData.instructorName = instructorName;
       if (classification !== undefined) updateData.classification = classification;
-      if (objective !== undefined) updateData.objective = objective;
+      if (objective !== undefined) updateData.objective = objective ? objective.trim() : null;
 
       // Se nenhum status específico foi passado e não é apenas foto, o padrão é encerrar (ENDED)
-      // Mas NÃO encerra se estamos apenas editando campos como instructorName/classification
+      // Mas NÃO encerra se estamos apenas editando campos como instructorName/classification/objective
       const isJustEditing = !status && groupPhoto === undefined && 
-        (instructorName !== undefined || classification !== undefined || createdAt || endedAt !== undefined);
+        (instructorName !== undefined || classification !== undefined || objective !== undefined || createdAt || endedAt !== undefined);
       if (!status && groupPhoto === undefined && !isJustEditing) {
         updateData.status = 'ENDED';
       }

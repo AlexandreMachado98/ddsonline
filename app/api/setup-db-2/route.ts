@@ -20,5 +20,11 @@ export async function GET() {
     console.error('classification error', error);
   }
 
+  try {
+    await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN "objective" TEXT;');
+  } catch (error) {
+    console.error('objective error', error);
+  }
+
   return NextResponse.json({ success: true, message: 'Schema updated successfully.' });
 }
