@@ -78,7 +78,7 @@ function PresencialContent() {
     };
 
     fetchMeeting();
-    const interval = setInterval(fetchMeeting, 2500); // Polling a cada 2.5s para detectar encerramento em tempo real
+    const interval = setInterval(fetchMeeting, 20000); // Polling a cada 2.5s para detectar encerramento em tempo real
 
     return () => {
       isMounted = false;

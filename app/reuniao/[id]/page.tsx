@@ -78,7 +78,7 @@ export default function MeetingRoom() {
     };
 
     fetchMeeting();
-    const interval = setInterval(fetchMeeting, 2500); // Polling a cada 2.5s para desconexão imediata quando o organizador encerra
+    const interval = setInterval(fetchMeeting, 20000); // Polling a cada 2.5s para desconexão imediata quando o organizador encerra
 
     return () => {
       isMounted = false;

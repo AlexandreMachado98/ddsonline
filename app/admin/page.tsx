@@ -147,7 +147,7 @@ export default function AdminPanel() {
   useEffect(() => {
     if (currentUser?.id) {
       fetchAllData();
-      const interval = setInterval(fetchAllData, 3000);
+      const interval = setInterval(fetchAllData, 20000);
       return () => clearInterval(interval);
     }
   }, [currentUser?.id, fetchAllData]);
