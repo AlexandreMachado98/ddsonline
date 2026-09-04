@@ -17,6 +17,7 @@ interface MeetingData {
   topic: string;
   farm: string;
   type?: 'PRESENTIAL' | 'REMOTE';
+  objective?: string | null;
   createdAt?: number | string;
   endedAt?: string | null;
   instructorName?: string | null;
@@ -146,7 +147,25 @@ export function generateDdsPdf(meeting: MeetingData) {
   // Row 3 (Responsável)
   drawCard(col1, currentY, cardW * 2 + 17, cardH, 'Responsável pelo Treinamento', meeting.instructorName || meeting.organizer?.name || 'Não informado');
 
-  currentY += cardH + 12;
+  currentY += cardH + 3;
+
+  // Row 4 (Objetivo) — só aparece se preenchido
+  if (meeting.objective && meeting.objective.trim()) {
+    // Card de largura total com texto que quebra linha se necessário
+    const objCardH = 20;
+    doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
+    doc.roundedRect(col1, currentY, cardW * 2 + 17, objCardH, 2, 2, 'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+    doc.text('Objetivo', col1 + 5, currentY + 6);
+    doc.setFont('helvetica', 'normal');
+    const objLines = doc.splitTextToSize(meeting.objective.trim(), (cardW * 2 + 17) - 10);
+    doc.text(objLines, col1 + 5, currentY + 12);
+    currentY += objCardH + 3;
+  }
+
+  currentY += 9;
 
   // --- TABLE ---
   
