@@ -262,27 +262,36 @@ export function generateDdsPdf(meeting: MeetingData) {
 
   // --- GROUP PHOTO ---
   if (meeting.groupPhoto && meeting.groupPhoto.length > 50) {
-    if (finalY + 90 > pageHeight - 30) {
+    if (finalY + 60 > pageHeight - 30) {
       doc.addPage();
       finalY = 20;
     }
     try {
-      doc.setFontSize(10);
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-      doc.text('FOTO DA EQUIPE (EVIDÊNCIA)', 14, finalY);
+      doc.text('FOTO DA EQUIPE (EVIDÊNCIA)', pageWidth / 2, finalY, { align: 'center' });
       
       const imgProps = doc.getImageProperties(meeting.groupPhoto);
-      let imgWidth = 100;
-      let imgHeight = 56;
+      const maxW = 80;  // máx 80mm de largura (era 100)
+      const maxH = 45;  // máx 45mm de altura
+      let imgWidth = maxW;
+      let imgHeight = maxH;
       if (imgProps) {
         const ratio = imgProps.width / imgProps.height;
         imgHeight = imgWidth / ratio;
+        // Se a altura ultrapassar o limite, recalcula pela altura
+        if (imgHeight > maxH) {
+          imgHeight = maxH;
+          imgWidth = imgHeight * ratio;
+        }
       }
       
+      // Centraliza horizontalmente na página
+      const imgX = (pageWidth - imgWidth) / 2;
       const format = meeting.groupPhoto.includes('image/png') ? 'PNG' : 'JPEG';
-      doc.addImage(meeting.groupPhoto, format, 14, finalY + 5, imgWidth, imgHeight);
-      finalY += imgHeight + 15;
+      doc.addImage(meeting.groupPhoto, format, imgX, finalY + 5, imgWidth, imgHeight);
+      finalY += imgHeight + 10;
     } catch(e){}
   }
 
