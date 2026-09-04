@@ -698,29 +698,27 @@ export default function AdminPanel() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                    Tema do DDS *
+                    Tema *
                   </label>
                   <input
                     type="text"
                     required
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
-                    placeholder="Ex: Uso Correto dos EPIs e Riscos de Queda"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
                   />
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                    Fazenda / Unidade / Setor *
+                    Local *
                   </label>
                   <input
                     type="text"
                     required
                     value={farm}
                     onChange={(e) => setFarm(e.target.value)}
-                    placeholder="Ex: Fazenda Santa Maria - Talhão 04"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
                   />
                 </div>
               </div>
