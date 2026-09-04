@@ -145,27 +145,28 @@ export function generateDdsPdf(meeting: MeetingData) {
   currentY += cardH + 3;
 
   // Row 3 (Responsável)
-  drawCard(col1, currentY, cardW * 2 + 17, cardH, 'Responsável pelo Treinamento', meeting.instructorName || meeting.organizer?.name || 'Não informado');
+  const fullWidth = pageWidth - 28;
+  drawCard(col1, currentY, fullWidth, cardH, 'Responsável pelo Treinamento', meeting.instructorName || meeting.organizer?.name || 'Não informado');
 
   currentY += cardH + 3;
 
-  // Row 4 (Objetivo) — só aparece se preenchido
-  if (meeting.objective && meeting.objective.trim()) {
-    // Card de largura total com texto que quebra linha se necessário
-    const objCardH = 20;
-    doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
-    doc.roundedRect(col1, currentY, cardW * 2 + 17, objCardH, 2, 2, 'F');
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-    doc.text('Objetivo', col1 + 5, currentY + 6);
-    doc.setFont('helvetica', 'normal');
-    const objLines = doc.splitTextToSize(meeting.objective.trim(), (cardW * 2 + 17) - 10);
-    doc.text(objLines, col1 + 5, currentY + 12);
-    currentY += objCardH + 3;
-  }
+  // Row 4 (Objetivo)
+  const rawObjective = (meeting.objective || '').trim();
+  const objText = rawObjective || 'Não informado';
+  const objLines = doc.splitTextToSize(objText, fullWidth - 10);
+  const textLineCount = Array.isArray(objLines) ? objLines.length : 1;
+  const objCardH = Math.max(14, 7 + textLineCount * 4);
 
-  currentY += 9;
+  doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
+  doc.roundedRect(col1, currentY, fullWidth, objCardH, 2, 2, 'F');
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  doc.text('Objetivo', col1 + 5, currentY + 5.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(objLines, col1 + 5, currentY + 10.5);
+
+  currentY += objCardH + 5;
 
   // --- TABLE ---
   

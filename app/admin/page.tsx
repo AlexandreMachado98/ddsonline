@@ -1133,6 +1133,11 @@ export default function AdminPanel() {
                         <p className="text-[11px] text-slate-400 mt-0.5 truncate">
                           📍 {m.farm} • {new Date(m.createdAt).toLocaleDateString('pt-BR')} às {new Date(m.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • {m.attendees?.length || 0} presenças
                         </p>
+                        {m.objective && (
+                          <p className="text-[11px] text-emerald-400/90 mt-0.5 truncate italic font-medium">
+                            🎯 {m.objective}
+                          </p>
+                        )}
                       </div>
                     </div>
 

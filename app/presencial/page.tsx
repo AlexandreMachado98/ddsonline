@@ -23,6 +23,7 @@ function PresencialContent() {
   const [meeting, setMeeting] = useState<any>(null);
   const [topic, setTopic] = useState('DDS Presencial');
   const [farm, setFarm] = useState('');
+  const [objective, setObjective] = useState('');
   const [meetingId, setMeetingId] = useState<string>(queryMeetingId || '');
   const [isLoadingMeeting, setIsLoadingMeeting] = useState(true);
   const [isMeetingEnded, setIsMeetingEnded] = useState(false);
@@ -56,6 +57,7 @@ function PresencialContent() {
           setMeetingId(data.meeting.id);
           setTopic(data.meeting.topic || 'DDS Presencial');
           setFarm(data.meeting.farm || '');
+          setObjective(data.meeting.objective || '');
           if (data.meeting.status === 'ENDED') {
             setIsMeetingEnded(true);
           } else {
@@ -289,6 +291,11 @@ function PresencialContent() {
         {farm && (
           <p className="text-xs text-slate-950 font-bold mt-1 flex items-center justify-center gap-1">
             <Building2 size={13} /> {farm}
+          </p>
+        )}
+        {objective && (
+          <p className="text-xs text-white/95 font-medium mt-2 bg-black/20 px-3 py-1.5 rounded-xl border border-white/10 text-center">
+            🎯 <strong>Objetivo:</strong> {objective}
           </p>
         )}
       </header>

@@ -1,9 +1,25 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+let dbInitialized = false;
+async function ensureDbColumns() {
+  if (dbInitialized) return;
+  try {
+    await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "objective" TEXT;');
+    await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "endedAt" TIMESTAMP(3);');
+    await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "instructorName" TEXT;');
+    await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "classification" TEXT DEFAULT \'DDS\';');
+    await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "groupPhoto" TEXT;');
+    dbInitialized = true;
+  } catch (e) {
+    console.error("ensureDbColumns error:", e);
+  }
+}
+
 // 1. GET: Busca reunião por ID específico ou busca reunião e histórico ISOLADOS do organizador
 export async function GET(req: Request) {
   try {
+    await ensureDbColumns();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const organizerId = searchParams.get('organizerId');
@@ -77,6 +93,7 @@ export async function GET(req: Request) {
 // 2. POST: Abre uma nova sala de DDS vinculada estritamente ao organizador
 export async function POST(req: Request) {
   try {
+    await ensureDbColumns();
     const body = await req.json();
     const { topic, farm, organizerId, email, groupPhoto, type, classification, objective } = body;
 
@@ -140,6 +157,7 @@ export async function POST(req: Request) {
 // 3. PUT: Atualiza a reunião (anexa foto em grupo ou encerra a reunião)
 export async function PUT(req: Request) {
   try {
+    await ensureDbColumns();
     const body = await req.json().catch(() => ({}));
     const { meetingId, organizerId, groupPhoto, status, createdAt, endedAt, instructorName, classification, objective } = body;
 
