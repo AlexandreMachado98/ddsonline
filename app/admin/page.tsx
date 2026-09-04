@@ -79,7 +79,7 @@ export default function AdminPanel() {
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'info' }>({ show: false, message: '', type: 'info' });
   const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [editingMeeting, setEditingMeeting] = useState<any>(null);
-  const [editForm, setEditForm] = useState({ createdAt: '', endedAt: '', instructorName: '', classification: 'DDS' });
+  const [editForm, setEditForm] = useState({ createdAt: '', endedAt: '', instructorName: '', classification: 'DDS', objective: '' });
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ show: true, message, type });
@@ -416,6 +416,17 @@ export default function AdminPanel() {
                   />
                 </div>
                 
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Objetivo</label>
+                  <textarea
+                    rows={2}
+                    value={editForm.objective}
+                    onChange={(e) => setEditForm({...editForm, objective: e.target.value})}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed"
+                  />
+                </div>
+                
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Incio</label>
                   <input
@@ -727,6 +738,17 @@ export default function AdminPanel() {
                     onChange={(e) => setEditForm({...editForm, instructorName: e.target.value})}
                     placeholder={currentUser?.name || 'Nome do Instrutor'}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+                  />
+                </div>
+                
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Objetivo</label>
+                  <textarea
+                    rows={2}
+                    value={editForm.objective}
+                    onChange={(e) => setEditForm({...editForm, objective: e.target.value})}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed"
                   />
                 </div>
                 
@@ -1129,7 +1151,8 @@ export default function AdminPanel() {
                             createdAt: formatDatetimeLocal(m.createdAt),
                             endedAt: m.endedAt ? formatDatetimeLocal(m.endedAt) : '',
                             instructorName: m.instructorName || '',
-                            classification: m.classification || 'DDS'
+                            classification: m.classification || 'DDS',
+                            objective: m.objective || ''
                           });
                         }}
                         title="Editar Detalhes"
