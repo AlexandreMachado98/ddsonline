@@ -249,6 +249,10 @@ export default function AdminPanel() {
       topic: activeMeeting.topic,
       farm: activeMeeting.farm,
       type: activeMeeting.type,
+      classification: activeMeeting.classification,
+      instructorName: activeMeeting.instructorName,
+      endedAt: activeMeeting.endedAt,
+      organizer: activeMeeting.organizer,
       groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : activeMeeting.groupPhoto,
       createdAt: activeMeeting.createdAt,
       attendees: activeMeeting.attendees
@@ -265,6 +269,10 @@ export default function AdminPanel() {
       topic: meeting.topic,
       farm: meeting.farm,
       type: meeting.type,
+      classification: meeting.classification,
+      instructorName: meeting.instructorName,
+      endedAt: meeting.endedAt,
+      organizer: meeting.organizer,
       groupPhoto: meeting.groupPhoto,
       createdAt: meeting.createdAt,
       attendees: meeting.attendees

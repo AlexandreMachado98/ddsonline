@@ -39,6 +39,9 @@ export async function GET(req: Request) {
         include: {
           attendees: {
             orderBy: { createdAt: 'desc' }
+          },
+          organizer: {
+            select: { name: true, position: true, company: true }
           }
         }
       });
@@ -53,6 +56,9 @@ export async function GET(req: Request) {
         include: {
           attendees: {
             orderBy: { createdAt: 'asc' }
+          },
+          organizer: {
+            select: { name: true, position: true, company: true }
           }
         }
       });
