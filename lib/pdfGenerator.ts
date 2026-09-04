@@ -63,10 +63,8 @@ export function generateDdsPdf(meeting: MeetingData) {
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('REGISTRO DE CONFORMIDADE,', 14, currentY);
-  currentY += 7;
-  doc.text('PRESENÇA E AUDITORIA', 14, currentY);
-  currentY += 6;
+  doc.text('REGISTRO DE PRESENÇA', 14, currentY);
+  currentY += 8;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
