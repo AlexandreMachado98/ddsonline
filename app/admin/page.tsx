@@ -427,9 +427,23 @@ export default function AdminPanel() {
                     rows={2}
                     value={editForm.objective}
                     onChange={(e) => setEditForm({...editForm, objective: e.target.value})}
+                    placeholder="Objetivo do DDS / Treinamento..."
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed"
                   />
                 </div>
+
+                {editForm.classification === 'Treinamento' && (
+                  <div className="animate-in fade-in duration-200">
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Conteúdo Programático</label>
+                    <textarea
+                      rows={3}
+                      value={editForm.programmaticContent}
+                      onChange={(e) => setEditForm({...editForm, programmaticContent: e.target.value})}
+                      placeholder="Módulos, tópicos ou NRs ensinadas no treinamento..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed"
+                    />
+                  </div>
+                )}
                 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Incio</label>
@@ -752,9 +766,23 @@ export default function AdminPanel() {
                     rows={2}
                     value={editForm.objective}
                     onChange={(e) => setEditForm({...editForm, objective: e.target.value})}
+                    placeholder="Objetivo do DDS / Treinamento..."
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed"
                   />
                 </div>
+
+                {editForm.classification === 'Treinamento' && (
+                  <div className="animate-in fade-in duration-200">
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Conteúdo Programático</label>
+                    <textarea
+                      rows={3}
+                      value={editForm.programmaticContent}
+                      onChange={(e) => setEditForm({...editForm, programmaticContent: e.target.value})}
+                      placeholder="Módulos, tópicos ou NRs ensinadas no treinamento..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed"
+                    />
+                  </div>
+                )}
                 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Incio</label>
