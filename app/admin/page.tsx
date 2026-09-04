@@ -399,7 +399,7 @@ export default function AdminPanel() {
               <div className="flex items-center justify-between mb-5">
                 <h2 className="text-base font-extrabold text-white flex items-center gap-2">
                   <span className="text-emerald-400">✏️</span>
-                  Editar Informaes do Treinamento
+                  Editar Informações do Treinamento / DDS
                 </h2>
                 <button onClick={() => setEditingMeeting(null)} className="text-slate-500 hover:text-white transition-colors">
                   <X size={20} />
@@ -421,7 +421,7 @@ export default function AdminPanel() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Responsǭvel pelo Treinamento</label>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Responsável pelo Treinamento / DDS</label>
                   <input
                     type="text"
                     value={editForm.instructorName}
@@ -458,7 +458,7 @@ export default function AdminPanel() {
                   </div>
                 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Incio</label>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Início</label>
                   <input
                     type="datetime-local"
                     value={editForm.createdAt}
@@ -480,7 +480,7 @@ export default function AdminPanel() {
                 
                 <div className="flex gap-2.5 pt-2">
                   <button type="button" onClick={() => setEditingMeeting(null)} className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-colors">Cancelar</button>
-                  <button type="submit" className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all">Salvar Alteraes</button>
+                  <button type="submit" className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all">Salvar Alterações</button>
                 </div>
               </form>
             </div>
@@ -758,7 +758,7 @@ export default function AdminPanel() {
               <div className="flex items-center justify-between mb-5">
                 <h2 className="text-base font-extrabold text-white flex items-center gap-2">
                   <span className="text-emerald-400">✏️</span>
-                  Editar Informaes do Treinamento
+                  Editar Informações do Treinamento / DDS
                 </h2>
                 <button onClick={() => setEditingMeeting(null)} className="text-slate-500 hover:text-white transition-colors">
                   <X size={20} />
@@ -780,7 +780,7 @@ export default function AdminPanel() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Responsǭvel pelo Treinamento</label>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Responsável pelo Treinamento / DDS</label>
                   <input
                     type="text"
                     value={editForm.instructorName}
@@ -817,7 +817,7 @@ export default function AdminPanel() {
                   </div>
                 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Incio</label>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Início</label>
                   <input
                     type="datetime-local"
                     value={editForm.createdAt}
@@ -839,7 +839,7 @@ export default function AdminPanel() {
                 
                 <div className="flex gap-2.5 pt-2">
                   <button type="button" onClick={() => setEditingMeeting(null)} className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-colors">Cancelar</button>
-                  <button type="submit" className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all">Salvar Alteraes</button>
+                  <button type="submit" className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all">Salvar Alterações</button>
                 </div>
               </form>
             </div>
