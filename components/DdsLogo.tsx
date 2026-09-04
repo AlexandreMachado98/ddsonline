@@ -55,15 +55,13 @@ export default function DdsLogo({
     <div className={`inline-flex items-center gap-2.5 font-sans select-none ${className}`}>
       
       {/* Ícone / Badge DDS ON */}
-      <div className={`${currentSize.badge} rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-emerald-500/40 p-1 flex items-center justify-center shadow-lg shadow-emerald-950/40 shrink-0 relative overflow-hidden group`}>
-        <div className="absolute inset-0 bg-emerald-500/10 opacity-50 group-hover:opacity-100 transition-opacity"></div>
+      <div className={`${currentSize.badge} rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 border border-emerald-400/40 p-1 flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0 relative overflow-hidden group`}>
         <div className="flex items-center justify-center relative z-10 font-black tracking-tighter">
-          <span className="text-[10px] text-white font-extrabold">D</span>
-          <span className="text-[10px] text-emerald-400 font-black">ON</span>
+          <span className="text-white font-extrabold text-[12px] leading-none">DDS</span>
         </div>
-        <span className="absolute top-1 right-1 flex h-1.5 w-1.5">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+        <span className="absolute top-0.5 right-0.5 flex h-1.5 w-1.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
         </span>
       </div>
 

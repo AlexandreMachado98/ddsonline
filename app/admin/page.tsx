@@ -154,7 +154,7 @@ export default function AdminPanel() {
   const handleStartNewMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic.trim() || !farm.trim()) {
-      showToast('Por favor, preencha o Tema do DDS e o Local da fazenda.', 'error');
+      showToast('Por favor, preencha o Tema e o Local.', 'error');
       return;
     }
 
