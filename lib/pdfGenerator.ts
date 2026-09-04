@@ -255,7 +255,6 @@ export function generateDdsPdf(meeting: MeetingData) {
     doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
     doc.text('Documento oficial de auditoria', 14, footY);
     doc.text('emitido digitalmente pelo DDS ON', 14, footY + 4);
-    doc.text('Desenvolvido e Auditado por AM TST', 14, footY + 10);
     
     doc.text(`Página ${i} de ${pageCount}`, pageWidth - 14, footY, { align: 'right' });
     doc.text(dateStr, pageWidth - 14, footY + 4, { align: 'right' });
