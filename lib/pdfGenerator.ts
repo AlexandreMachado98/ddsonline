@@ -59,7 +59,16 @@ export function generateDdsPdf(meeting: MeetingData) {
     try {
       const companyLogo = localStorage.getItem('dds_company_logo');
       if (companyLogo) {
-        doc.addImage(companyLogo, 'PNG', 160, 12, 35, 15);
+        const props = doc.getImageProperties(companyLogo);
+        const maxW = 35;
+        const maxH = 15;
+        const ratio = Math.min(maxW / props.width, maxH / props.height);
+        const finalW = props.width * ratio;
+        const finalH = props.height * ratio;
+        
+        // Alinha a logo no canto superior direito (margem direita de 14px)
+        const xPos = 200 - 14 - finalW;
+        doc.addImage(companyLogo, 'PNG', xPos, 14, finalW, finalH);
       }
     } catch (e) {}
   }

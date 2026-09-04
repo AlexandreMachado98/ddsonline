@@ -804,16 +804,47 @@ export default function AdminPanel() {
                 ) : (
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                 )}
-                <span className="text-xs font-bold hidden sm:inline">{companyLogo ? 'Mudar Logo' : 'Logo PDF'}</span>
+                <span className="text-xs font-bold">{companyLogo ? 'Mudar Logo' : 'Logo PDF'}</span>
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
                     const reader = new FileReader();
                     reader.onloadend = () => {
-                      const base64 = reader.result as string;
-                      localStorage.setItem('dds_company_logo', base64);
-                      setCompanyLogo(base64);
-                      showToast('Logo atualizada com sucesso!', 'success');
+                      const img = new Image();
+                      img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 400;
+                        const MAX_HEIGHT = 200;
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                          if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                          }
+                        } else {
+                          if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                          }
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx?.drawImage(img, 0, 0, width, height);
+                        
+                        const base64 = canvas.toDataURL('image/png', 0.8);
+                        try {
+                          localStorage.setItem('dds_company_logo', base64);
+                          setCompanyLogo(base64);
+                          showToast('Logo atualizada com sucesso!', 'success');
+                        } catch (err) {
+                          console.error(err);
+                          showToast('Erro: Imagem muito grande.', 'error');
+                        }
+                      };
+                      img.src = reader.result as string;
                     };
                     reader.readAsDataURL(file);
                   }
