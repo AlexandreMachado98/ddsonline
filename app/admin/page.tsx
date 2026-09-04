@@ -59,19 +59,28 @@ export default function AdminPanel() {
           meetingId: editingMeeting.id,
           createdAt: editForm.createdAt ? new Date(editForm.createdAt).toISOString() : undefined,
           endedAt: editForm.endedAt ? new Date(editForm.endedAt).toISOString() : null,
-          instructorName: editForm.instructorName
+          instructorName: editForm.instructorName,
+          classification: editForm.classification,
+          objective: editForm.objective,
+          programmaticContent: editForm.programmaticContent
         })
       });
       const data = await res.json();
       if (data.success) {
         showToast('DDS atualizado com sucesso!', 'success');
         setEditingMeeting(null);
+        if (data.meeting) {
+          if (activeMeeting && activeMeeting.id === data.meeting.id) {
+            setActiveMeeting(data.meeting);
+          }
+          setMeetingHistory(prev => prev.map(m => m.id === data.meeting.id ? data.meeting : m));
+        }
         fetchAllData();
       } else {
         showToast('Erro ao atualizar: ' + (data.error || 'Falha no servidor'), 'error');
       }
     } catch {
-      showToast('Erro de conexǜo ao tentar atualizar.', 'error');
+      showToast('Erro de conexão ao tentar atualizar.', 'error');
     }
   };
 
@@ -172,6 +181,7 @@ export default function AdminPanel() {
           type: meetingType,
           classification,
           objective: objective.trim(),
+          programmaticContent: programmaticContent.trim(),
           organizerId: currentUser?.id,
           email: currentUser?.email,
           groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : null
@@ -185,6 +195,7 @@ export default function AdminPanel() {
         setIsLiveMode(true);
         setTopic('');
         setObjective('');
+        setProgrammaticContent('');
         showToast('DDS Iniciado com sucesso!', 'success');
       } else {
         showToast('Erro ao iniciar reunião: ' + (data.error || 'Falha no banco.'), 'error');
@@ -554,9 +565,28 @@ export default function AdminPanel() {
               {activeMeeting.objective && (
                 <p className="text-emerald-200/90 text-xs mt-1 italic">🎯 Objetivo: {activeMeeting.objective}</p>
               )}
+              {activeMeeting.programmaticContent && (
+                <p className="text-teal-200/90 text-xs mt-1 whitespace-pre-line">📚 Conteúdo: {activeMeeting.programmaticContent}</p>
+              )}
             </div>
             
             <div className="flex flex-wrap gap-2">
+              <button 
+                onClick={() => {
+                  setEditingMeeting(activeMeeting);
+                  setEditForm({
+                    createdAt: formatDatetimeLocal(activeMeeting.createdAt),
+                    endedAt: activeMeeting.endedAt ? formatDatetimeLocal(activeMeeting.endedAt) : '',
+                    instructorName: activeMeeting.instructorName || activeMeeting.organizer?.name || '',
+                    classification: activeMeeting.classification || 'DDS',
+                    objective: activeMeeting.objective || '',
+                    programmaticContent: activeMeeting.programmaticContent || ''
+                  });
+                }}
+                className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-sm text-xs cursor-pointer border border-slate-700"
+              >
+                <span>✏️ Editar Detalhes</span>
+              </button>
               <button 
                 onClick={handleCopyInviteLink} 
                 className="px-3.5 py-2.5 bg-white text-slate-950 hover:bg-slate-100 rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-md text-xs cursor-pointer"
