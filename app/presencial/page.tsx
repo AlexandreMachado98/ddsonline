@@ -30,7 +30,7 @@ function PresencialContent() {
 
   // Estados do Formulário do Colaborador
   const [name, setName] = useState('');
-  const [cpf, setCpf] = useState('');
+  const [funcao, setFuncao] = useState('');
   const [savedSelfie, setSavedSelfie] = useState<string | null>(null);
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,22 +86,7 @@ function PresencialContent() {
     };
   }, [queryMeetingId]);
 
-  // Formatação de CPF
-  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let raw = e.target.value.replace(/\D/g, '');
-    if (raw.length > 11) raw = raw.slice(0, 11);
-
-    let formatted = raw;
-    if (raw.length > 9) {
-      formatted = `${raw.slice(0, 3)}.${raw.slice(3, 6)}.${raw.slice(6, 9)}-${raw.slice(9)}`;
-    } else if (raw.length > 6) {
-      formatted = `${raw.slice(0, 3)}.${raw.slice(3, 6)}.${raw.slice(6)}`;
-    } else if (raw.length > 3) {
-      formatted = `${raw.slice(0, 3)}.${raw.slice(3)}`;
-    }
-
-    setCpf(formatted);
-  };
+  
 
   // Submissão de Presença Presencial
   const handleAdmit = async (e: React.FormEvent) => {
@@ -112,9 +97,8 @@ function PresencialContent() {
       return;
     }
 
-    const cleanCpf = cpf.replace(/\D/g, '');
-    if (cleanCpf.length < 11) {
-      toast.warning('CPF Incompleto', 'Por favor, digite os 11 dígitos do seu CPF.');
+    if (!funcao.trim()) {
+      toast.warning('Função obrigatória', 'Por favor, informe sua função/cargo.');
       return;
     }
 
@@ -136,7 +120,7 @@ function PresencialContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
-          cpf: cleanCpf,
+          cpf: funcao.trim(),
           savedSelfie,
           savedSignature,
           meetingId: meetingId || 'presencial'
@@ -160,7 +144,7 @@ function PresencialContent() {
 
   const handleRegisterAnother = () => {
     setName('');
-    setCpf('');
+    setFuncao('');
     setSavedSelfie(null);
     setSavedSignature(null);
     setHasAdmitted(false);
@@ -346,17 +330,17 @@ function PresencialContent() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Número do CPF</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Função / Cargo</label>
               <div className="relative flex items-center">
                 <input 
-                  type="tel" 
-                  value={cpf} 
-                  onChange={handleCpfChange}
-                  placeholder="000.000.000-00"
-                  maxLength={14}
-                  className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono min-h-[44px]"
+                  type="text" 
+                  value={funcao} 
+                  onChange={(e) => setFuncao(e.target.value)}
+                  placeholder="Ex: Operador de Máquina"
+                  
+                  className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[44px]"
                 />
-                {cpf.replace(/\D/g, '').length === 11 && (
+                {funcao.trim().length > 1 && (
                   <Check size={18} className="absolute right-3.5 text-emerald-400" />
                 )}
               </div>

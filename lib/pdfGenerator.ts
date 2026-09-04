@@ -184,7 +184,7 @@ export function generateDdsPdf(meeting: MeetingData) {
     return [
       String(idx + 1),
       a.name.replace(/\(Saída:.*\)/, '').trim(),
-      a.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4"),
+      a.cpf || '-',
       new Date(a.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       '', // Status pill drawn manually
       '', // Selfie
@@ -194,7 +194,7 @@ export function generateDdsPdf(meeting: MeetingData) {
 
   autoTable(doc, {
     startY: currentY,
-    head: [['#', 'NOME COMPLETO', 'CPF', 'ENTRADA', 'STATUS / SAÍDA', 'BIOMETRIA', 'ASSINATURA DIGITAL']],
+    head: [['#', 'NOME COMPLETO', 'FUNÇÃO', 'ENTRADA', 'STATUS / SAÍDA', 'BIOMETRIA', 'ASSINATURA DIGITAL']],
     body: tableRows.length > 0 ? tableRows : [['-', 'Nenhum participante', '-', '-', '-', '-', '-']],
     theme: 'grid',
     headStyles: {

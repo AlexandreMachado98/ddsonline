@@ -7,7 +7,7 @@ export async function POST(req: Request) {
     const { name, cpf, savedSelfie, savedSignature, meetingId } = body;
 
     if (!name || !cpf) {
-      return NextResponse.json({ success: false, error: 'Nome e CPF são obrigatórios' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Nome e Função são obrigatórios' }, { status: 400 });
     }
 
     if (!meetingId) {
