@@ -45,17 +45,6 @@ export function generateDdsPdf(meeting: MeetingData) {
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
   doc.text('DDS ON', 14, 18);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('SEGURANÇA HOJE, UM AMANHÃ MELHOR', 14, 25);
-  
-  // Right side text
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'italic');
-  doc.setTextColor(150, 220, 180);
-  doc.text('Pessoas seguras', 195, 15, { align: 'right' });
-  doc.text('constroem grandes', 195, 20, { align: 'right' });
-  doc.text('resultados', 195, 25, { align: 'right' });
   
   currentY = 45;
 
@@ -64,16 +53,11 @@ export function generateDdsPdf(meeting: MeetingData) {
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   doc.text('REGISTRO DE PRESENÇA', 14, currentY);
-  currentY += 8;
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('Documento que comprova a realização do Diálogo Diário de Segurança (DDS)', 14, currentY);
   
   currentY += 12;
 
   // --- CARDS ---
-  const cardH = 22;
+  const cardH = 15;
   const col1 = 14;
   const col2 = 82;
   const col3 = 150;
@@ -83,13 +67,13 @@ export function generateDdsPdf(meeting: MeetingData) {
   const drawCard = (x: number, y: number, w: number, h: number, title: string, value: string) => {
     doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
     doc.roundedRect(x, y, w, h, 2, 2, 'F');
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-    doc.text(title, x + 15, y + 8);
-    doc.setFontSize(9);
+    doc.text(title, x + 5, y + 6);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text(value, x + 15, y + 14);
+    doc.text(value, x + 5, y + 11);
   };
 
   // Row 1
@@ -98,20 +82,20 @@ export function generateDdsPdf(meeting: MeetingData) {
   
   // Right large card (Total)
   doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
-  doc.roundedRect(col3, currentY, col3W, cardH * 2 + 4, 3, 3, 'F');
-  doc.setFontSize(10);
+  doc.roundedRect(col3, currentY, col3W, cardH * 2 + 3, 3, 3, 'F');
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('Total Registrado', col3 + (col3W/2), currentY + 12, { align: 'center' });
-  doc.setFontSize(26);
+  doc.text('Total Registrado', col3 + (col3W/2), currentY + 8, { align: 'center' });
+  doc.setFontSize(22);
   doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-  doc.text(String(meeting.attendees?.length || 0), col3 + (col3W/2), currentY + 28, { align: 'center' });
-  doc.setFontSize(10);
+  doc.text(String(meeting.attendees?.length || 0), col3 + (col3W/2), currentY + 20, { align: 'center' });
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('colaborador(es)', col3 + (col3W/2), currentY + 36, { align: 'center' });
+  doc.text('colaborador(es)', col3 + (col3W/2), currentY + 28, { align: 'center' });
 
-  currentY += cardH + 4;
+  currentY += cardH + 3;
 
   // Row 2
   const ddsDate = new Date(meeting.createdAt || Date.now());
@@ -137,10 +121,10 @@ export function generateDdsPdf(meeting: MeetingData) {
   const tableRows = attendeesList.map((a, idx) => {
     return [
       String(idx + 1),
-      a.name.replace(/(Saída:.*)/, '').trim(),
-      a.cpf.replace(/(d{3})(d{3})(d{3})(d{2})/, "$1.$2.$3-$4"),
+      a.name.replace(/\(Saída:.*\)/, '').trim(),
+      a.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4"),
       new Date(a.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      a.exitReason ? 'SAÍDA' : 'PRESENTE ATÉ O FIM',
+      '', // Status pill drawn manually
       '', // Selfie
       ''  // Signature
     ];
@@ -259,40 +243,6 @@ export function generateDdsPdf(meeting: MeetingData) {
     } catch(e){}
   }
 
-  // --- SUCCESS BOX ---
-  if (finalY + 30 > pageHeight - 40) {
-    doc.addPage();
-    finalY = 20;
-  }
-  
-  doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
-  doc.roundedRect(14, finalY, pageWidth - 28, 25, 2, 2, 'F');
-  
-  // Fake Check Icon
-  doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-  doc.circle(26, finalY + 12.5, 6, 'F');
-  // Checkmark inside circle
-  doc.setDrawColor(255, 255, 255);
-  doc.setLineWidth(1);
-  doc.lines([[2, 2], [3, -4]], 24, 13.5, [1, 1], 'D', true); // Draw a simple V inside the circle
-  
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('Registro concluído com sucesso!', 40, finalY + 11);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Este documento atesta a presença dos colaboradores no DDS, conforme os dados registrados', 40, finalY + 16);
-  doc.text('no sistema DDS ON.', 40, finalY + 20);
-
-  // Quote
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.2);
-  doc.line(135, finalY + 4, 135, finalY + 21);
-  doc.setFont('helvetica', 'italic');
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('"Segurança não é um custo,', 140, finalY + 11);
-  doc.text('é um investimento na vida."', 140, finalY + 16);
 
   // --- FOOTER PAGES ---
   const pageCount = (doc as any).internal.getNumberOfPages();
@@ -300,21 +250,12 @@ export function generateDdsPdf(meeting: MeetingData) {
     doc.setPage(i);
     const footY = pageHeight - 20;
     
-    // QR Code Placeholder
-    doc.setFillColor(240, 240, 240);
-    doc.rect(14, footY - 4, 16, 16, 'F');
-    // Mini qr code dots
-    doc.setFillColor(0, 0, 0);
-    doc.rect(15, footY - 3, 3, 3, 'F');
-    doc.rect(26, footY - 3, 3, 3, 'F');
-    doc.rect(15, footY + 8, 3, 3, 'F');
-    
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-    doc.text('Documento oficial de auditoria', 34, footY);
-    doc.text('emitido digitalmente pelo DDS ON', 34, footY + 4);
-    doc.text('Desenvolvido e Auditado por AM TST', 34, footY + 10);
+    doc.text('Documento oficial de auditoria', 14, footY);
+    doc.text('emitido digitalmente pelo DDS ON', 14, footY + 4);
+    doc.text('Desenvolvido e Auditado por AM TST', 14, footY + 10);
     
     doc.text(`Página ${i} de ${pageCount}`, pageWidth - 14, footY, { align: 'right' });
     doc.text(dateStr, pageWidth - 14, footY + 4, { align: 'right' });
@@ -326,7 +267,7 @@ export function generateDdsPdf(meeting: MeetingData) {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(6);
     doc.setFont('helvetica', 'bold');
-    doc.text('DDS ON   |   MAIS SEGURANÇA, MAIS PESSOAS, MAIS FUTURO', pageWidth/2, pageHeight - 2, { align: 'center' });
+    doc.text('DDS ON   |   DESENVOLVIDO E CRIADO PELA AM TST', pageWidth/2, pageHeight - 2, { align: 'center' });
   }
 
   const cleanTopic = (meeting.topic || 'DDS').replace(/[^a-zA-Z0-9]/g, '_');
