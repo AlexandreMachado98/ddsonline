@@ -39,6 +39,7 @@ export default function AdminPanel() {
   const [activeMeeting, setActiveMeeting] = useState<any>(null);
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 
   const formatDatetimeLocal = (dateStr: string) => {
     if (!dateStr) return '';
@@ -727,21 +728,43 @@ export default function AdminPanel() {
               </button>
             )}
 
-            <label className="p-2 text-slate-400 hover:text-emerald-400 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-2" title="Adicionar Logo da Empresa ao PDF">
-              <span className="text-xs font-bold hidden sm:inline">Logo PDF</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    localStorage.setItem('dds_company_logo', reader.result as string);
-                    alert('Logo salva! Ela aparecerá no canto superior direito das próximas Atas em PDF.');
-                  };
-                  reader.readAsDataURL(file);
-                }
-              }} />
-            </label>
+            <div className="flex items-center gap-1">
+              <label className="p-2 text-slate-400 hover:text-emerald-400 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-2" title={companyLogo ? "Substituir Logo da Empresa" : "Adicionar Logo da Empresa ao PDF"}>
+                {companyLogo ? (
+                  <img src={companyLogo} alt="Logo" className="h-5 w-auto rounded-sm object-contain bg-white" />
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                )}
+                <span className="text-xs font-bold hidden sm:inline">{companyLogo ? 'Mudar Logo' : 'Logo PDF'}</span>
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      const base64 = reader.result as string;
+                      localStorage.setItem('dds_company_logo', base64);
+                      setCompanyLogo(base64);
+                      showToast('Logo atualizada com sucesso!', 'success');
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }} />
+              </label>
+              
+              {companyLogo && (
+                <button
+                  onClick={() => {
+                    localStorage.removeItem('dds_company_logo');
+                    setCompanyLogo(null);
+                    showToast('Logo removida.', 'info');
+                  }}
+                  className="p-2 text-slate-500 hover:text-red-400 rounded-xl hover:bg-slate-800 transition-colors"
+                  title="Remover Logo"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                </button>
+              )}
+            </div>
 
             <button
               onClick={handleLogout}
