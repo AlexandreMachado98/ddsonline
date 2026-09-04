@@ -323,6 +323,8 @@ export default function MeetingRoom() {
               <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 text-left text-xs space-y-2 max-w-md mx-auto">
                 <p className="text-slate-400">Tema: <strong className="text-white">{topic}</strong></p>
                 {farm && <p className="text-slate-400">Local: <strong className="text-white">{farm}</strong></p>}
+                {objective && <p className="text-slate-400">Objetivo: <strong className="text-emerald-400">{objective}</strong></p>}
+                {programmaticContent && <p className="text-slate-400">Conteúdo: <strong className="text-teal-300">{programmaticContent}</strong></p>}
                 <p className="text-slate-400">Data/Hora: <strong className="text-white">{new Date().toLocaleString('pt-BR')}</strong></p>
                 <p className="text-slate-400">Status: <strong className="text-emerald-400">Biometria e Assinatura Auditadas (NRs)</strong></p>
               </div>

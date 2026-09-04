@@ -242,6 +242,8 @@ function PresencialContent() {
           <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 text-left text-xs space-y-2 text-slate-300">
             <p>Tema: <strong className="text-white">{topic}</strong></p>
             {farm && <p>Local: <strong className="text-white">{farm}</strong></p>}
+            {objective && <p>Objetivo: <strong className="text-emerald-400">{objective}</strong></p>}
+            {programmaticContent && <p>Conteúdo: <strong className="text-teal-300">{programmaticContent}</strong></p>}
             <p>Horário do Registro: <strong className="text-emerald-400">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></p>
             <p>Status: <strong className="text-emerald-400">✅ 100% Válido para Auditoria</strong></p>
           </div>
