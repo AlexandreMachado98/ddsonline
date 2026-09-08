@@ -224,92 +224,62 @@ export default function DdsReportPreviewModal({
 
           {/* Conteúdo da Página 1 */}
           <div className="p-4 sm:p-6 space-y-4 flex-1 flex flex-col">
-            {/* Título do Documento */}
-            <div className="border-b border-slate-200 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <h1 className="text-lg sm:text-xl font-black text-slate-900 uppercase tracking-tight">
-                REGISTRO DE PRESENÇA
-              </h1>
-              <span className="text-xs font-bold text-slate-600 font-mono">
-                {ddsDate.toLocaleDateString('pt-BR')}
-              </span>
-            </div>
-
-            {/* Grid de Cards Metadados */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {/* Card 1: Tema */}
-              <div style={{ backgroundColor: lightGreenBg }} className="p-3 rounded-xl border border-emerald-900/10">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-600 block">
-                  {meeting.classification === 'Treinamento' ? 'Tema do Treinamento' : 'Tema do DDS'}
+            {/* Cabeçalho Editorial do Documento */}
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3">
+              <div className="flex-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 block mb-1">
+                  {meeting.classification === 'Treinamento'
+                    ? 'Registro de Treinamento Obrigatório (SST)'
+                    : 'Diálogo Diário de Segurança e Saúde do Trabalho'}
                 </span>
-                <p className="text-xs sm:text-sm font-black text-slate-900 mt-0.5 truncate" title={meeting.topic}>
-                  {meeting.topic || 'Não informado'}
-                </p>
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
+                  {meeting.topic || 'Diálogo Diário de Segurança'}
+                </h1>
               </div>
 
-              {/* Card 2: Modalidade */}
-              <div style={{ backgroundColor: lightGreenBg }} className="p-3 rounded-xl border border-emerald-900/10">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-600 block">
-                  Modalidade
-                </span>
-                <p className="text-xs sm:text-sm font-black text-slate-900 mt-0.5">
-                  {meeting.type === 'PRESENTIAL' ? '👥 Presencial' : '💻 Remoto / EAD'}
-                </p>
-              </div>
-
-              {/* Card 3: Total Auditadas */}
-              <div style={{ backgroundColor: lightGreenBg }} className="p-3 rounded-xl border border-emerald-900/10 sm:row-span-2 flex flex-col justify-center text-center">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-600">
+              {/* Badge de Total Registrado */}
+              <div style={{ backgroundColor: lightGreenBg }} className="shrink-0 px-4 py-2.5 rounded-xl border border-emerald-900/10 text-center min-w-[100px]">
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-800 block">
                   Total Registrado
                 </span>
-                <span style={{ color: darkGreen }} className="text-3xl sm:text-4xl font-black my-0.5">
+                <span style={{ color: darkGreen }} className="text-2xl sm:text-3xl font-black block leading-none my-1">
                   {attendeesList.length}
                 </span>
-                <span className="text-[10px] text-slate-600">colaborador(es)</span>
-              </div>
-
-              {/* Card 4: Local */}
-              <div style={{ backgroundColor: lightGreenBg }} className="p-3 rounded-xl border border-emerald-900/10">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-600 block">
-                  Local / Unidade
-                </span>
-                <p className="text-xs font-bold text-slate-800 mt-0.5 truncate" title={meeting.farm}>
-                  {meeting.farm || 'Não informado'}
-                </p>
-              </div>
-
-              {/* Card 5: Data e Horário */}
-              <div style={{ backgroundColor: lightGreenBg }} className="p-3 rounded-xl border border-emerald-900/10">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-600 block">
-                  Data e Horário
-                </span>
-                <p className="text-xs font-bold text-slate-800 mt-0.5 truncate">
-                  {dateStr}
-                </p>
+                <span className="text-[10px] text-slate-500 font-medium">colaborador(es)</span>
               </div>
             </div>
 
-            {/* Card de Responsável Técnico */}
-            <div style={{ backgroundColor: lightGreenBg }} className="p-3 rounded-xl border border-emerald-900/10 flex items-center justify-between">
+            {/* Faixa de Metadados Editorial */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-600 block">
-                  Responsável pelo Treinamento / DDS
-                </span>
-                <p className="text-xs font-bold text-slate-900 mt-0.5">
-                  {meeting.instructorName || meeting.organizer?.name || 'Responsável Técnico'}
+                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 block">Data & Horário</span>
+                <p className="font-bold text-slate-900 mt-0.5 text-[11px] sm:text-xs">{dateStr}</p>
+              </div>
+              <div>
+                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 block">Local / Unidade</span>
+                <p className="font-bold text-slate-900 mt-0.5 text-[11px] sm:text-xs">{meeting.farm || 'Não informado'}</p>
+              </div>
+              <div>
+                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 block">Modalidade</span>
+                <p className="font-bold text-slate-900 mt-0.5 text-[11px] sm:text-xs">
+                  {meeting.type === 'PRESENTIAL' ? '👥 Presencial' : '💻 EAD / Remoto'}
                 </p>
               </div>
-              <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg">
-                Instrutor Habilitado
-              </span>
+              <div>
+                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 block">Responsável / Instrutor</span>
+                <p className="font-bold text-slate-900 mt-0.5 text-[11px] sm:text-xs">
+                  {meeting.instructorName || meeting.organizer?.name || 'Não informado'}
+                </p>
+              </div>
             </div>
 
-            {/* Card de Objetivo */}
+            {/* Objetivo do DDS (se informado) */}
             {meeting.objective && (
-              <div style={{ backgroundColor: lightGreenBg }} className="p-3 rounded-xl border border-emerald-900/10 space-y-0.5">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-600 block">
-                  Objetivo
+              <div className="bg-slate-50/80 border-l-4 border-l-emerald-700 border border-slate-200/60 rounded-r-xl p-3">
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-800 block mb-0.5">
+                  Objetivo Específico:
                 </span>
-                <p className="text-xs text-slate-800 leading-relaxed font-medium">
+                <p className="text-xs text-slate-800 leading-relaxed font-normal">
                   {meeting.objective}
                 </p>
               </div>
@@ -317,9 +287,9 @@ export default function DdsReportPreviewModal({
 
             {/* Tabela de Presença Oficial */}
             <div className="space-y-1.5 pt-1">
-              <div style={{ backgroundColor: tableHeaderGreen }} className="px-4 py-2 rounded-xl text-white font-bold text-xs uppercase tracking-wider flex items-center justify-between">
-                <span>LISTA DE PRESENÇA OFICIAL</span>
-                <span className="text-[10px] font-mono text-emerald-100 font-normal">{attendeesList.length} registros</span>
+              <div className="bg-slate-100/90 border-l-4 border-l-emerald-800 px-3.5 py-2 rounded-r-lg text-slate-900 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                <span>Lista Oficial de Presença & Assinaturas Eletrônicas</span>
+                <span className="text-[10px] font-medium text-slate-500 lowercase">Conformidade NR-01</span>
               </div>
 
               {attendeesList.length === 0 ? (
@@ -556,87 +526,86 @@ export default function DdsReportPreviewModal({
         {/* =================================================================== */}
         {attachmentsList.length > 0 && (
           <>
-            {/* Índice Geral de Evidências */}
-            <div 
-              className={`w-full max-w-[210mm] bg-white text-slate-900 shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 transition-all flex flex-col ${
-                viewMode === 'A4_PAGES' ? 'min-h-[297mm]' : ''
-              }`}
-            >
-              <div style={{ backgroundColor: darkGreen }} className="p-4 sm:p-5 text-white flex items-center justify-between gap-4">
-                <div>
-                  <span className="text-xl sm:text-2xl font-black tracking-tight">DDS ON</span>
-                  <p className="text-[10px] text-emerald-100 font-medium mt-0.5">
-                    DOSSIÊ DE EVIDÊNCIAS & MATERIAIS APRESENTADOS
-                  </p>
-                </div>
-                <span className="text-xs bg-white/20 px-3 py-1 rounded-full font-bold">
-                  {attachmentsList.length} {attachmentsList.length === 1 ? 'anexo' : 'anexos'}
-                </span>
-              </div>
-
-              <div className="p-4 sm:p-6 space-y-4 flex-1 flex flex-col">
-                <div className="border-b border-slate-200 pb-2">
-                  <h2 className="text-base sm:text-lg font-black text-slate-900 uppercase">
-                    ÍNDICE DE EVIDÊNCIAS E MATERIAIS APRESENTADOS
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Comprovação documental dos arquivos, cartilhas, imagens e procedimentos exibidos à equipe durante o DDS.
-                  </p>
+            {/* Índice Geral de Evidências (exibido apenas quando houver mais de 2 anexos para evitar desperdício de página) */}
+            {attachmentsList.length > 2 && (
+              <div 
+                className={`w-full max-w-[210mm] bg-white text-slate-900 shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 transition-all flex flex-col ${
+                  viewMode === 'A4_PAGES' ? 'min-h-[297mm]' : ''
+                }`}
+              >
+                <div style={{ backgroundColor: darkGreen }} className="p-4 sm:p-5 text-white flex items-center justify-between gap-4">
+                  <div>
+                    <span className="text-xl sm:text-2xl font-black tracking-tight">DDS ON</span>
+                    <p className="text-[10px] text-emerald-100 font-medium mt-0.5">
+                      DOSSIÊ DE EVIDÊNCIAS & MATERIAIS APRESENTADOS
+                    </p>
+                  </div>
+                  <span className="text-xs bg-white/20 px-3 py-1 rounded-full font-bold">
+                    {attachmentsList.length} anexos
+                  </span>
                 </div>
 
-                {/* Tabela Índice de Anexos */}
-                <div className="rounded-xl border border-slate-200 overflow-hidden">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr style={{ backgroundColor: lightGreenBg }} className="border-b border-slate-200 text-slate-800 font-bold text-[10px] uppercase">
-                        <th className="p-2.5 text-center w-16">Anexo</th>
-                        <th className="p-2.5">Nome do Material</th>
-                        <th className="p-2.5 text-center">Formato</th>
-                        <th className="p-2.5 text-center">Tamanho</th>
-                        <th className="p-2.5">Descrição / Observação</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-[11px]">
-                      {attachmentsList.map((att, idx) => {
-                        const isPdf = att.mimeType === 'application/pdf' || att.fileName.toLowerCase().endsWith('.pdf');
-                        const sizeStr = att.fileSize < 1024 * 1024 
-                          ? `${(att.fileSize / 1024).toFixed(1)} KB` 
-                          : `${(att.fileSize / (1024 * 1024)).toFixed(2)} MB`;
+                <div className="p-4 sm:p-6 space-y-4 flex-1 flex flex-col">
+                  <div className="border-b border-slate-200 pb-2">
+                    <h2 className="text-base sm:text-lg font-black text-slate-900 uppercase">
+                      ÍNDICE GERAL DE EVIDÊNCIAS E ANEXOS
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Comprovação documental dos arquivos, cartilhas, imagens e procedimentos exibidos durante o DDS.
+                    </p>
+                  </div>
 
-                        return (
-                          <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                            <td className="p-2.5 text-center font-bold text-emerald-800">
-                              ANEXO {String(idx + 1).padStart(2, '0')}
-                            </td>
-                            <td className="p-2.5 font-bold text-slate-900">
-                              {att.displayName || att.fileName}
-                            </td>
-                            <td className="p-2.5 text-center">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                isPdf ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
-                              }`}>
-                                {isPdf ? `PDF (${att.pageCount || 1} pág)` : 'IMAGEM'}
-                              </span>
-                            </td>
-                            <td className="p-2.5 text-center font-mono text-slate-600">
-                              {sizeStr}
-                            </td>
-                            <td className="p-2.5 text-slate-700 italic">
-                              {att.description || 'Material apresentado aos participantes'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                  {/* Tabela Índice de Anexos */}
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-200 text-slate-800 font-bold text-[10px] uppercase">
+                          <th className="p-2.5 text-center w-16">Anexo</th>
+                          <th className="p-2.5">Nome do Material</th>
+                          <th className="p-2.5 text-center">Formato</th>
+                          <th className="p-2.5 text-center">Tamanho</th>
+                          <th className="p-2.5">Descrição / Observação</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-[11px]">
+                        {attachmentsList.map((att, idx) => {
+                          const isPdf = att.mimeType === 'application/pdf' || att.fileName.toLowerCase().endsWith('.pdf');
+                          const sizeStr = att.fileSize < 1024 * 1024 
+                            ? `${(att.fileSize / 1024).toFixed(1)} KB` 
+                            : `${(att.fileSize / (1024 * 1024)).toFixed(2)} MB`;
 
-                <div className="pt-4 mt-auto border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
-                  <p>Índice oficial consolidado pelo DDS ON</p>
-                  <p className="font-bold">Página {shouldRenderVerso ? 3 : 2} de {totalEstimatedPages}</p>
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                              <td className="p-2.5 text-center font-bold text-emerald-800 font-mono">
+                                {String(idx + 1).padStart(2, '0')}
+                              </td>
+                              <td className="p-2.5 font-bold text-slate-900">
+                                {att.displayName || att.fileName}
+                              </td>
+                              <td className="p-2.5 text-center font-medium">
+                                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  isPdf ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'
+                                }`}>
+                                  {isPdf ? `PDF (${att.pageCount || 1} pág)` : 'IMAGEM'}
+                                </span>
+                              </td>
+                              <td className="p-2.5 text-center text-slate-500 font-mono text-[10px]">
+                                {sizeStr}
+                              </td>
+                              <td className="p-2.5 text-slate-600">
+                                {att.description || 'Material apresentado aos participantes'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Renderização Visual de cada Anexo */}
 
             {/* Renderização Visual de cada Anexo */}
             {attachmentsList.map((att, idx) => {

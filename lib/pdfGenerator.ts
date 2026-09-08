@@ -102,57 +102,31 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
   
   currentY = 43;
 
-  // --- MAIN TITLE ---
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('REGISTRO DE PRESENÇA', 14, currentY);
+  // --- HEADER PRINCIPAL / FAIXA INSTITUCIONAL ---
+  doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+  doc.rect(0, 0, pageWidth, 28, 'F');
   
-  currentY += 10;
+  // Linha dourada/verde clara de acento institucional
+  doc.setFillColor(74, 163, 122);
+  doc.rect(0, 27, pageWidth, 1, 'F');
 
-  // --- CARDS ---
-  const cardH = 14;
-  const col1 = 14;
-  const col2 = 82;
-  const col3 = 150;
-  const cardW = 65;
-  const col3W = 46;
-
-  const drawCard = (x: number, y: number, w: number, h: number, title: string, value: string) => {
-    doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
-    doc.roundedRect(x, y, w, h, 2, 2, 'F');
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-    doc.text(title, x + 4, y + 5.5);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    const splitVal = doc.splitTextToSize(value, w - 8);
-    doc.text(splitVal, x + 4, y + 10);
-  };
-
-  // Row 1
-  drawCard(col1, currentY, cardW, cardH, meeting.classification === 'Treinamento' ? 'Tema do Treinamento' : 'Tema do DDS', meeting.topic || 'Não informado');
-  drawCard(col2, currentY, cardW, cardH, 'Modalidade', meeting.type === 'PRESENTIAL' ? 'Presencial' : 'EAD');
-  
-  // Right large card (Total)
-  doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
-  doc.roundedRect(col3, currentY, col3W, cardH * 2 + 3, 3, 3, 'F');
-  doc.setFontSize(8.5);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('Total Registrado', col3 + (col3W/2), currentY + 7.5, { align: 'center' });
+  // Identidade DDS ON
+  doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
-  doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-  doc.text(String(meeting.attendees?.length || 0), col3 + (col3W/2), currentY + 19, { align: 'center' });
-  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('DDS ON', 14, 16);
+  
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('colaborador(es)', col3 + (col3W/2), currentY + 27, { align: 'center' });
+  doc.setFontSize(7.5);
+  doc.setTextColor(215, 235, 225);
+  doc.text('REGISTRO OFICIAL DE DIÁLOGO DIÁRIO DE SEGURANÇA & TREINAMENTO', 14, 22);
 
-  currentY += cardH + 3;
+  // Logo da Empresa à direita
+  renderCompanyLogo(28);
 
-  // Row 2
+  currentY = 36;
+
+  // --- CABEÇALHO EDITORIAL DO DOCUMENTO ---
   const ddsDate = new Date(meeting.createdAt || Date.now());
   const endDate = meeting.endedAt ? new Date(meeting.endedAt) : null;
   let dateStr = ddsDate.toLocaleDateString('pt-BR') + ' às ' + ddsDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -160,45 +134,158 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
     dateStr += ' até ' + endDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   }
 
-  drawCard(col1, currentY, cardW, cardH, 'Local', meeting.farm || 'Não informado');
-  drawCard(col2, currentY, cardW, cardH, 'Data e Horário', dateStr);
+  // Tag de Categoria Superior
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+  const categoriaLabel = meeting.classification === 'Treinamento' 
+    ? 'REGISTRO DE TREINAMENTO OBRIGATÓRIO (SST)' 
+    : 'DIÁLOGO DIÁRIO DE SEGURANÇA E SAÚDE DO TRABALHO';
+  doc.text(categoriaLabel.toUpperCase(), 14, currentY);
 
-  currentY += cardH + 3;
+  currentY += 6;
 
-  // Row 3 (Responsável)
-  const fullWidth = pageWidth - 28;
-  drawCard(col1, currentY, fullWidth, cardH, 'Responsável pelo Treinamento / DDS', meeting.instructorName || meeting.organizer?.name || 'Não informado');
+  // --- TEMA DO DDS EM DESTAQUE MÁXIMO (NUNCA TRUNCADO) ---
+  const topicTitle = (meeting.topic || 'Diálogo Diário de Segurança').trim();
+  doc.setFontSize(15);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  
+  // Largura disponível considerando eventual badge de total de colaboradores à direita
+  const availableTopicWidth = pageWidth - 28 - 48;
+  const topicLines = doc.splitTextToSize(topicTitle, availableTopicWidth);
+  doc.text(topicLines, 14, currentY);
 
-  currentY += cardH + 3;
-
-  // Row 4 (Objetivo)
-  const rawObjective = (meeting.objective || '').trim();
-  const objText = rawObjective || 'Não informado';
-  const objLines = doc.splitTextToSize(objText, fullWidth - 10);
-  const textLineCount = Array.isArray(objLines) ? objLines.length : 1;
-  const objCardH = Math.max(13, 6 + textLineCount * 4);
-
+  // Badge elegante de total de participantes à direita
+  const badgeX = pageWidth - 14 - 44;
+  const badgeY = currentY - 5;
   doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
-  doc.roundedRect(col1, currentY, fullWidth, objCardH, 2, 2, 'F');
+  doc.roundedRect(badgeX, badgeY, 44, 18, 2, 2, 'F');
+  doc.setDrawColor(200, 225, 215);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(badgeX, badgeY, 44, 18, 2, 2, 'S');
+
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+  doc.text('TOTAL REGISTRADO', badgeX + 22, badgeY + 5, { align: 'center' });
+
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  doc.text(String(meeting.attendees?.length || 0), badgeX + 22, badgeY + 12, { align: 'center' });
+
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text('colaborador(es)', badgeX + 22, badgeY + 16, { align: 'center' });
+
+  // Avança o Y conforme a quantidade de linhas do tema
+  const topicHeight = Math.max(16, (Array.isArray(topicLines) ? topicLines.length : 1) * 6.5);
+  currentY += topicHeight;
+
+  // --- FAIXA DE METADADOS EDITORIAL (SEM EXCESSO DE CARDS) ---
+  const fullWidth = pageWidth - 28;
+  
+  doc.setFillColor(248, 250, 249);
+  doc.roundedRect(14, currentY, fullWidth, 14, 2, 2, 'F');
+  doc.setDrawColor(230, 235, 232);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(14, currentY, fullWidth, 14, 2, 2, 'S');
+
+  const metaColW = fullWidth / 4;
+  const metaY = currentY + 4.5;
+  const metaValY = currentY + 10;
+
+  // Coluna 1: Data e Horário
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text('DATA & HORÁRIO', 17, metaY);
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('Objetivo', col1 + 4, currentY + 5);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text(objLines, col1 + 4, currentY + 9.5);
+  doc.text(dateStr, 17, metaValY);
 
-  currentY += objCardH + 4;
-
-  // --- TABLE DE PRESENÇA ---
-  doc.setFillColor(tableHeaderGreen[0], tableHeaderGreen[1], tableHeaderGreen[2]);
-  doc.roundedRect(14, currentY, pageWidth - 28, 10, 2, 2, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(10);
+  // Coluna 2: Local / Unidade
+  doc.setFontSize(6.5);
   doc.setFont('helvetica', 'bold');
-  doc.text('LISTA DE PRESENÇA', 22, currentY + 6.8);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text('LOCAL / UNIDADE', 14 + metaColW + 3, metaY);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  const localText = meeting.farm || 'Não informado';
+  const splitLocal = doc.splitTextToSize(localText, metaColW - 6);
+  doc.text(splitLocal[0] || localText, 14 + metaColW + 3, metaValY);
+
+  // Coluna 3: Modalidade
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text('MODALIDADE', 14 + (metaColW * 2) + 3, metaY);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  doc.text(meeting.type === 'PRESENTIAL' ? 'Presencial' : 'EAD / Remoto', 14 + (metaColW * 2) + 3, metaValY);
+
+  // Coluna 4: Responsável
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text('RESPONSÁVEL / INSTRUTOR', 14 + (metaColW * 3) + 3, metaY);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  const respName = meeting.instructorName || meeting.organizer?.name || 'Não informado';
+  const splitResp = doc.splitTextToSize(respName, metaColW - 6);
+  doc.text(splitResp[0] || respName, 14 + (metaColW * 3) + 3, metaValY);
+
+  currentY += 18;
+
+  // --- OBJETIVO DO DDS (SE PREENCHIDO) ---
+  const rawObjective = (meeting.objective || '').trim();
+  if (rawObjective) {
+    const objLines = doc.splitTextToSize(rawObjective, fullWidth - 14);
+    const textLineCount = Array.isArray(objLines) ? objLines.length : 1;
+    const objCardH = Math.max(12, 6 + textLineCount * 4);
+
+    // Barra sutil de destaque lateral
+    doc.setFillColor(248, 250, 249);
+    doc.rect(14, currentY, fullWidth, objCardH, 'F');
+    doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+    doc.rect(14, currentY, 2, objCardH, 'F');
+
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+    doc.text('OBJETIVO ESPECÍFICO:', 19, currentY + 4.5);
+
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+    doc.text(objLines, 19, currentY + 9);
+
+    currentY += objCardH + 4;
+  }
+
+  // --- CABEÇALHO DA LISTA DE PRESENÇA ---
+  doc.setFillColor(243, 246, 244);
+  doc.rect(14, currentY, fullWidth, 7, 'F');
+  doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+  doc.rect(14, currentY, 2.5, 7, 'F');
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  doc.text('LISTA OFICIAL DE PRESENÇA & ASSINATURAS ELETRÔNICAS', 19, currentY + 4.8);
+
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text('Conformidade com NR-01 / Assinatura Eletrônica e Biometria Facial', pageWidth - 14, currentY + 4.8, { align: 'right' });
   
-  currentY += 10;
+  currentY += 9;
   
   const attendeesList = meeting.attendees || [];
   const tableRows = attendeesList.map((a, idx) => {
@@ -218,33 +305,38 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
     margin: { top: 20, bottom: 25, left: 14, right: 14 },
     head: [['#', 'NOME COMPLETO', 'FUNÇÃO', 'ENTRADA', 'STATUS / SAÍDA', 'BIOMETRIA', 'ASSINATURA DIGITAL']],
     body: tableRows.length > 0 ? tableRows : [['-', 'Nenhum participante', '-', '-', '-', '-', '-']],
-    theme: 'grid',
+    theme: 'plain',
     headStyles: {
-      fillColor: lightGreenBg,
+      fillColor: [243, 246, 244],
       textColor: textDark,
       fontStyle: 'bold',
-      halign: 'center',
+      halign: 'left',
       valign: 'middle',
-      fontSize: 8,
-      minCellHeight: 9
+      fontSize: 7.5,
+      minCellHeight: 8,
+      cellPadding: { top: 2, bottom: 2, left: 2, right: 2 }
     },
     styles: {
-      fontSize: 8,
+      fontSize: 7.5,
       valign: 'middle',
-      halign: 'center',
+      halign: 'left',
       textColor: textDark,
-      lineColor: [229, 231, 235],
-      lineWidth: 0.1,
-      minCellHeight: 17
+      lineColor: [230, 235, 232],
+      lineWidth: { bottom: 0.1, top: 0, left: 0, right: 0 },
+      minCellHeight: 18,
+      cellPadding: { top: 2, bottom: 2, left: 2, right: 2 }
+    },
+    alternateRowStyles: {
+      fillColor: [252, 253, 252]
     },
     columnStyles: {
-      0: { cellWidth: 8 },
-      1: { cellWidth: 38, halign: 'left' },
-      2: { cellWidth: 26 },
-      3: { cellWidth: 16 },
-      4: { cellWidth: 35 },
-      5: { cellWidth: 26 },
-      6: { cellWidth: 33 }
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 40, halign: 'left', fontStyle: 'bold' },
+      2: { cellWidth: 26, halign: 'left' },
+      3: { cellWidth: 15, halign: 'center' },
+      4: { cellWidth: 32, halign: 'center' },
+      5: { cellWidth: 26, halign: 'center' },
+      6: { cellWidth: 35, halign: 'center' }
     },
     didDrawCell: (data) => {
       if (data.section === 'body' && attendeesList.length > 0) {
@@ -374,23 +466,61 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
 
     versoY += 12;
 
-    // Cards Informativos Resumidos no Topo do Verso
-    const vCardH = 13;
-    const vCol1 = 14;
-    const vCol2 = 104;
-    const vWidthHalf = 92;
+    // Faixa de Resumo Editorial no Topo do Verso
+    doc.setFillColor(248, 250, 249);
+    doc.roundedRect(14, versoY, fullWidth, 14, 2, 2, 'F');
+    doc.setDrawColor(230, 235, 232);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(14, versoY, fullWidth, 14, 2, 2, 'S');
 
-    // Linha 1 de Resumo
-    drawCard(vCol1, versoY, vWidthHalf, vCardH, 'Tema / Treinamento', meeting.topic || 'Não informado');
-    drawCard(vCol2, versoY, vWidthHalf, vCardH, 'Data e Carga Horária', dateStr);
+    const vColW = fullWidth / 4;
+    const vMetaY = versoY + 4.5;
+    const vValY = versoY + 10;
 
-    versoY += vCardH + 3;
+    // Col 1: Tema
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+    doc.text('TEMA / TREINAMENTO', 17, vMetaY);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+    const vTopicStr = meeting.topic || 'Não informado';
+    doc.text(doc.splitTextToSize(vTopicStr, vColW - 6)[0] || vTopicStr, 17, vValY);
 
-    // Linha 2 de Resumo
-    drawCard(vCol1, versoY, vWidthHalf, vCardH, 'Local / Unidade', meeting.farm || 'Não informado');
-    drawCard(vCol2, versoY, vWidthHalf, vCardH, 'Instrutor / Responsável Técnico', meeting.instructorName || meeting.organizer?.name || 'Não informado');
+    // Col 2: Data e Carga Horária
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+    doc.text('DATA & HORÁRIO', 14 + vColW + 3, vMetaY);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+    doc.text(dateStr, 14 + vColW + 3, vValY);
 
-    versoY += vCardH + 5;
+    // Col 3: Local / Unidade
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+    doc.text('LOCAL / UNIDADE', 14 + (vColW * 2) + 3, vMetaY);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+    const vFarmStr = meeting.farm || 'Não informado';
+    doc.text(doc.splitTextToSize(vFarmStr, vColW - 6)[0] || vFarmStr, 14 + (vColW * 2) + 3, vValY);
+
+    // Col 4: Instrutor
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+    doc.text('INSTRUTOR / RESPONSÁVEL', 14 + (vColW * 3) + 3, vMetaY);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+    const vInstStr = meeting.instructorName || meeting.organizer?.name || 'Não informado';
+    doc.text(doc.splitTextToSize(vInstStr, vColW - 6)[0] || vInstStr, 14 + (vColW * 3) + 3, vValY);
+
+    versoY += 18;
 
     // 1. Bloco de Objetivo Geral
     const vObjText = rawObjective || 'Orientação, instrução normativa e conscientização operacional conforme as diretrizes de Segurança e Saúde no Trabalho.';
@@ -486,84 +616,91 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
   const pdfAttachmentsToMerge: { index: number; attachment: AttachmentPdfData }[] = [];
 
   if (attachmentsList.length > 0) {
-    // 1. Resumo Geral de Anexos / Evidências na Ata
-    doc.addPage();
-    let attPageY = 0;
+    // Se houver mais de 2 anexos, gera página de Sumário Editorial. Se houver 1 ou 2, integra direto nas páginas de evidência.
+    if (attachmentsList.length > 2) {
+      doc.addPage();
+      let attPageY = 0;
 
-    // Header Banner
-    doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-    doc.rect(0, 0, pageWidth, 30, 'F');
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.text('DDS ON', 14, 18);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(230, 240, 235);
-    doc.text('DOSSIÊ DE EVIDÊNCIAS & MATERIAIS APRESENTADOS', 14, 24);
+      // Header Banner
+      doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+      doc.rect(0, 0, pageWidth, 28, 'F');
+      doc.setFillColor(74, 163, 122);
+      doc.rect(0, 27, pageWidth, 1, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DDS ON', 14, 16);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(215, 235, 225);
+      doc.text('DOSSIÊ DE EVIDÊNCIAS & MATERIAIS APRESENTADOS', 14, 22);
 
-    renderCompanyLogo(30);
+      renderCompanyLogo(28);
 
-    attPageY = 43;
+      attPageY = 38;
 
-    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-    doc.setFontSize(15);
-    doc.setFont('helvetica', 'bold');
-    doc.text('ÍNDICE DE EVIDÊNCIAS E MATERIAIS APRESENTADOS', 14, attPageY);
-    
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-    doc.text('Comprovação documental dos arquivos, cartilhas, imagens e procedimentos exibidos à equipe durante o DDS.', 14, attPageY + 5);
+      doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ÍNDICE GERAL DE EVIDÊNCIAS E ANEXOS', 14, attPageY);
+      
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+      doc.text('Comprovação documental dos arquivos, cartilhas, imagens e procedimentos exibidos durante o DDS.', 14, attPageY + 5);
 
-    attPageY += 13;
+      attPageY += 12;
 
-    // Tabela Sumário de Anexos
-    const attTableRows = attachmentsList.map((att, idx) => {
-      const isPdf = att.mimeType === 'application/pdf' || att.fileName.toLowerCase().endsWith('.pdf');
-      const sizeStr = att.fileSize < 1024 * 1024 
-        ? `${(att.fileSize / 1024).toFixed(1)} KB` 
-        : `${(att.fileSize / (1024 * 1024)).toFixed(2)} MB`;
+      // Tabela Sumário de Anexos
+      const attTableRows = attachmentsList.map((att, idx) => {
+        const isPdf = att.mimeType === 'application/pdf' || att.fileName.toLowerCase().endsWith('.pdf');
+        const sizeStr = att.fileSize < 1024 * 1024 
+          ? `${(att.fileSize / 1024).toFixed(1)} KB` 
+          : `${(att.fileSize / (1024 * 1024)).toFixed(2)} MB`;
 
-      return [
-        String(idx + 1).padStart(2, '0'),
-        att.displayName || att.fileName,
-        isPdf ? `PDF (${att.pageCount || 1} pág)` : 'IMAGEM',
-        sizeStr,
-        att.description || 'Material apresentado aos participantes'
-      ];
-    });
+        return [
+          String(idx + 1).padStart(2, '0'),
+          att.displayName || att.fileName,
+          isPdf ? `PDF (${att.pageCount || 1} pág)` : 'IMAGEM',
+          sizeStr,
+          att.description || 'Material apresentado aos participantes'
+        ];
+      });
 
-    autoTable(doc, {
-      startY: attPageY,
-      margin: { top: 20, bottom: 25, left: 14, right: 14 },
-      head: [['ANEXO', 'NOME DO MATERIAL', 'FORMATO', 'TAMANHO', 'DESCRIÇÃO / OBSERVAÇÃO TÉCNICA']],
-      body: attTableRows,
-      theme: 'grid',
-      headStyles: {
-        fillColor: lightGreenBg,
-        textColor: textDark,
-        fontStyle: 'bold',
-        halign: 'center',
-        fontSize: 8,
-        minCellHeight: 8
-      },
-      styles: {
-        fontSize: 7.5,
-        textColor: textDark,
-        lineColor: [229, 231, 235],
-        lineWidth: 0.1,
-        cellPadding: 3
-      },
-      columnStyles: {
-        0: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
-        1: { cellWidth: 46, fontStyle: 'bold' },
-        2: { cellWidth: 24, halign: 'center' },
-        3: { cellWidth: 18, halign: 'center' },
-        4: { cellWidth: 78 }
-      }
-    });
+      autoTable(doc, {
+        startY: attPageY,
+        margin: { top: 20, bottom: 25, left: 14, right: 14 },
+        head: [['ANEXO', 'NOME DO MATERIAL', 'FORMATO', 'TAMANHO', 'DESCRIÇÃO / OBSERVAÇÃO TÉCNICA']],
+        body: attTableRows,
+        theme: 'plain',
+        headStyles: {
+          fillColor: [243, 246, 244],
+          textColor: textDark,
+          fontStyle: 'bold',
+          halign: 'left',
+          fontSize: 7.5,
+          minCellHeight: 8
+        },
+        styles: {
+          fontSize: 7.5,
+          textColor: textDark,
+          lineColor: [230, 235, 232],
+          lineWidth: { bottom: 0.1, top: 0, left: 0, right: 0 },
+          cellPadding: 3
+        },
+        alternateRowStyles: {
+          fillColor: [252, 253, 252]
+        },
+        columnStyles: {
+          0: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
+          1: { cellWidth: 46, fontStyle: 'bold' },
+          2: { cellWidth: 24, halign: 'center' },
+          3: { cellWidth: 18, halign: 'center' },
+          4: { cellWidth: 78 }
+        }
+      });
+    }
 
     // 2. Renderização de cada Anexo
     attachmentsList.forEach((att, idx) => {
