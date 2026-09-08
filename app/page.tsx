@@ -127,23 +127,23 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-3.5 sm:p-6 font-sans relative overflow-hidden">
+    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-3 sm:p-6 font-sans relative overflow-x-hidden max-w-full">
       
       {/* Luz de fundo decorativa */}
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-96 h-80 sm:h-96 bg-emerald-600/15 blur-[130px] rounded-full pointer-events-none"></div>
 
-      <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative z-10 space-y-5 backdrop-blur-md">
+      <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-8 shadow-2xl relative z-10 space-y-5 backdrop-blur-md overflow-hidden">
         
         {/* LOGO OFICIAL: DDS ON */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-[11px] font-bold tracking-wide mb-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            Plataforma Digital de SST & NR
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-[11px] font-bold tracking-wide mb-1 flex-wrap justify-center text-center">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+            <span className="break-words">Plataforma Digital de SST & NR</span>
           </div>
           <div className="flex justify-center">
             <DdsLogo size="xl" showSubtitle={false} />
           </div>
-          <p className="text-xs text-slate-300 font-medium max-w-xs mx-auto leading-relaxed">
+          <p className="text-xs text-slate-300 font-medium max-w-xs mx-auto leading-relaxed break-words">
             {isRegisterMode 
               ? 'Insira a Palavra-Chave da sua empresa para acesso instantâneo.' 
               : 'Diálogo Diário de Segurança com Biometria Facial e Videoconferência.'}

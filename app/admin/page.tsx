@@ -548,10 +548,10 @@ export default function AdminPanel() {
           </header>
 
           {/* Banner de Status do DDS */}
-          <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 rounded-3xl p-4 sm:p-6 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-emerald-500/40">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="relative flex h-2.5 w-2.5">
+          <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 rounded-3xl p-4 sm:p-6 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-emerald-500/40 overflow-hidden max-w-full">
+            <div className="min-w-0 max-w-full overflow-hidden space-y-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
                 </span>
@@ -559,20 +559,20 @@ export default function AdminPanel() {
                   {isPresential ? 'DDS Presencial em Andamento' : 'DDS EAD Ao Vivo'}
                 </span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black">{activeMeeting.topic}</h2>
-              <p className="text-emerald-100 text-xs sm:text-sm mt-0.5 flex items-center gap-1">
+              <h2 className="text-lg sm:text-2xl font-black break-words leading-snug">{activeMeeting.topic}</h2>
+              <p className="text-emerald-100 text-xs sm:text-sm mt-0.5 flex items-center gap-1 break-words">
                 <MapPin size={12} className="shrink-0 text-emerald-300" />
-                <span>{activeMeeting.farm}</span>
+                <span className="break-words">{activeMeeting.farm}</span>
               </p>
               {activeMeeting.objective && (
-                <p className="text-emerald-200/90 text-xs mt-1 italic">🎯 Objetivo: {activeMeeting.objective}</p>
+                <p className="text-emerald-200/90 text-xs mt-1 italic break-words">🎯 Objetivo: {activeMeeting.objective}</p>
               )}
               {activeMeeting.programmaticContent && (
-                <p className="text-teal-200/90 text-xs mt-1 whitespace-pre-line">📚 Conteúdo: {activeMeeting.programmaticContent}</p>
+                <p className="text-teal-200/90 text-xs mt-1 whitespace-pre-line break-words">📚 Conteúdo: {activeMeeting.programmaticContent}</p>
               )}
             </div>
             
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 shrink-0">
               <button 
                 onClick={() => {
                   setEditingMeeting(activeMeeting);
@@ -585,27 +585,27 @@ export default function AdminPanel() {
                     programmaticContent: activeMeeting.programmaticContent || ''
                   });
                 }}
-                className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-sm text-xs cursor-pointer border border-slate-700"
+                className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-sm text-xs cursor-pointer border border-slate-700 min-h-[40px]"
               >
-                <span>✏️ Editar Detalhes</span>
+                <span>✏️ Editar</span>
               </button>
               <button 
                 onClick={handleCopyInviteLink} 
-                className="px-3.5 py-2.5 bg-white text-slate-950 hover:bg-slate-100 rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-md text-xs cursor-pointer"
+                className="px-3.5 py-2.5 bg-white text-slate-950 hover:bg-slate-100 rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-md text-xs cursor-pointer min-h-[40px]"
               >
                 {copiedLink ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
-                <span>{copiedLink ? 'Link Copiado!' : 'Copiar Link'}</span>
+                <span>{copiedLink ? 'Copiado!' : 'Copiar Link'}</span>
               </button>
               <button 
                 onClick={handleDownloadActivePdf} 
-                className="px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-600 border border-emerald-400/40 text-white rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-sm text-xs cursor-pointer"
+                className="px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-600 border border-emerald-400/40 text-white rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-sm text-xs cursor-pointer min-h-[40px]"
               >
                 <Download size={16} />
-                <span>Baixar Ata PDF</span>
+                <span>Ata PDF</span>
               </button>
               <button 
                 onClick={handleEndMeeting} 
-                className="px-3.5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold transition-all text-xs shadow-md cursor-pointer ml-auto sm:ml-0"
+                className="px-3.5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold transition-all text-xs shadow-md cursor-pointer ml-auto sm:ml-0 min-h-[40px]"
               >
                 Encerrar DDS
               </button>
@@ -868,20 +868,20 @@ export default function AdminPanel() {
 
       <div className="max-w-6xl w-full mx-auto space-y-4 sm:space-y-6">
         {/* Topbar do Painel */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-3xl shadow-xl">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-emerald-950/40">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-3xl shadow-xl overflow-hidden max-w-full">
+          <div className="flex items-center gap-3 min-w-0 max-w-full">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-emerald-950/40 shrink-0">
               <ShieldCheck size={22} />
             </div>
-            <div>
-              <h1 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
+            <div className="min-w-0 max-w-full overflow-hidden">
+              <h1 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2 flex-wrap">
                 <span>DDS</span>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
                 <span className="text-[10px] font-extrabold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
                   Painel TST
                 </span>
               </h1>
-              <p className="text-[11px] text-slate-400 truncate">
+              <p className="text-[11px] text-slate-400 break-words leading-tight mt-0.5">
                 {currentUser?.name} • {currentUser?.company || 'AM TST'}
               </p>
             </div>
@@ -1209,18 +1209,18 @@ export default function AdminPanel() {
                         />
                       </label>
 
-                      <div className="min-w-0">
+                      <div className="min-w-0 max-w-full">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs sm:text-sm font-extrabold text-white truncate">{m.topic}</span>
+                          <span className="text-xs sm:text-sm font-extrabold text-white break-words">{m.topic}</span>
                           <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                             {m.type === 'PRESENTIAL' ? 'Presencial' : 'Remoto'}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                        <p className="text-[11px] text-slate-400 mt-0.5 break-words">
                           📍 {m.farm} • {new Date(m.createdAt).toLocaleDateString('pt-BR')} às {new Date(m.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • <strong className="text-emerald-400">{m.attendees?.length || 0} presenças</strong>
                         </p>
                         {m.objective && (
-                          <p className="text-[11px] text-emerald-400/90 mt-0.5 truncate italic font-medium">
+                          <p className="text-[11px] text-emerald-400/90 mt-0.5 break-words italic font-medium">
                             🎯 {m.objective}
                           </p>
                         )}

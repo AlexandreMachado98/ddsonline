@@ -10,17 +10,30 @@
   --sal: env(safe-area-inset-left, 0px);
 }
 
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   scroll-behavior: smooth;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 body {
   background-color: #020617;
   color: #f1f5f9;
   min-height: 100dvh;
+  max-width: 100vw;
   overflow-x: hidden;
+}
+
+/* Prevenção universal de estouro de textos e palavras longas em celulares */
+p, span, h1, h2, h3, h4, h5, h6, a, button, label, strong, em, b, i, div, td, th {
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 /* Touch responsiveness & mobile ergonomics */

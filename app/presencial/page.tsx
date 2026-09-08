@@ -239,11 +239,11 @@ function PresencialContent() {
             </p>
           </div>
 
-          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 text-left text-xs space-y-2 text-slate-300">
-            <p>Tema: <strong className="text-white">{topic}</strong></p>
-            {farm && <p>Local: <strong className="text-white">{farm}</strong></p>}
-            {objective && <p>Objetivo: <strong className="text-emerald-400">{objective}</strong></p>}
-            {programmaticContent && <p>Conteúdo: <strong className="text-teal-300">{programmaticContent}</strong></p>}
+          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 text-left text-xs space-y-2 text-slate-300 max-w-full overflow-hidden">
+            <p className="break-words">Tema: <strong className="text-white break-words">{topic}</strong></p>
+            {farm && <p className="break-words">Local: <strong className="text-white break-words">{farm}</strong></p>}
+            {objective && <p className="break-words">Objetivo: <strong className="text-emerald-400 break-words">{objective}</strong></p>}
+            {programmaticContent && <p className="break-words whitespace-pre-line">Conteúdo: <strong className="text-teal-300 break-words">{programmaticContent}</strong></p>}
             <p>Horário do Registro: <strong className="text-emerald-400">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></p>
             <p>Status: <strong className="text-emerald-400">✅ 100% Válido para Auditoria</strong></p>
           </div>
@@ -268,7 +268,7 @@ function PresencialContent() {
           </div>
 
           <footer className="pt-2 text-center">
-            <p className="text-[10px] text-slate-500">
+            <p className="text-[10px] text-slate-500 break-words">
               © {new Date().getFullYear()} <strong>DDS ON</strong> • Auditado por AM TST
             </p>
           </footer>
@@ -279,7 +279,7 @@ function PresencialContent() {
 
   // 5. FORMULÁRIO DE ENTRADA DO COLABORADOR PRESENCIAL
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center py-6 px-3.5 sm:px-6 font-sans relative overflow-x-hidden">
+    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center py-6 px-3 sm:px-6 font-sans relative overflow-x-hidden max-w-full">
       
       {/* Luz de fundo */}
       <div className="absolute top-10 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-600/15 blur-[130px] rounded-full pointer-events-none"></div>
@@ -287,25 +287,25 @@ function PresencialContent() {
       {/* Topo com Identificação do DDS ON Presencial */}
       <div className="w-full max-w-md flex items-center justify-between py-2 mb-3 relative z-10">
         <DdsLogo size="sm" showSubtitle={true} />
-        <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full inline-flex items-center gap-1">
+        <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full inline-flex items-center gap-1 shrink-0">
           <QrCode size={12} /> Presencial
         </span>
       </div>
 
-      <header className="w-full max-w-md bg-gradient-to-r from-emerald-600 to-teal-600 text-slate-950 p-5 rounded-3xl shadow-2xl mb-5 text-center relative z-10 border border-emerald-400/30">
-        <h1 className="text-lg sm:text-xl font-black mt-1 tracking-tight text-white leading-snug">{topic}</h1>
+      <header className="w-full max-w-md bg-gradient-to-r from-emerald-600 to-teal-600 text-slate-950 p-4 sm:p-5 rounded-3xl shadow-2xl mb-5 text-center relative z-10 border border-emerald-400/30 overflow-hidden">
+        <h1 className="text-base sm:text-xl font-black mt-1 tracking-tight text-white leading-snug break-words">{topic}</h1>
         {farm && (
-          <p className="text-xs text-slate-950 font-bold mt-1 flex items-center justify-center gap-1">
-            <Building2 size={13} /> {farm}
+          <p className="text-xs text-slate-950 font-bold mt-1 flex items-center justify-center gap-1 break-words">
+            <Building2 size={13} className="shrink-0" /> <span className="break-words">{farm}</span>
           </p>
         )}
         {objective && (
-          <p className="text-xs text-white/95 font-medium mt-2 bg-black/20 px-3 py-1.5 rounded-xl border border-white/10 text-center">
+          <p className="text-xs text-white/95 font-medium mt-2 bg-black/20 px-3 py-1.5 rounded-xl border border-white/10 text-center break-words">
             🎯 <strong>Objetivo:</strong> {objective}
           </p>
         )}
         {programmaticContent && (
-          <p className="text-xs text-teal-200/95 font-medium mt-1.5 bg-black/20 px-3 py-1.5 rounded-xl border border-white/10 text-center whitespace-pre-line">
+          <p className="text-xs text-teal-200/95 font-medium mt-1.5 bg-black/20 px-3 py-1.5 rounded-xl border border-white/10 text-center whitespace-pre-line break-words">
             📚 <strong>Conteúdo Programático:</strong>
 {programmaticContent}
           </p>
