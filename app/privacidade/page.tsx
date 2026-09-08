@@ -212,10 +212,10 @@ export default function PrivacidadePage() {
                 <p className="text-slate-400 text-xs">Para esclarecimentos adicionais sobre a infraestrutura e segurança da plataforma.</p>
               </div>
               <a
-                href="mailto:privacidade@ddsonline.com.br"
+                href="mailto:apoioamtst@gmail.com"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-emerald-400 text-xs font-bold rounded-xl transition-colors cursor-pointer"
               >
-                <Mail size={14} /> privacidade@ddsonline.com.br
+                <Mail size={14} /> apoioamtst@gmail.com
               </a>
             </div>
           </section>
