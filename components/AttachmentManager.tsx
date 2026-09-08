@@ -54,9 +54,25 @@ export default function AttachmentManager({
   const [editingDescriptionIndex, setEditingDescriptionIndex] = useState<number | null>(null);
   const [tempDescription, setTempDescription] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoadingFile, setIsLoadingFile] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const openPreview = (att: DdsAttachment) => {
+  const openPreview = async (att: DdsAttachment) => {
+    // Se o anexo veio sem fileData (otimização de tráfego de rede), busca sob demanda
+    if (!att.fileData && att.id) {
+      try {
+        setIsLoadingFile(true);
+        const res = await fetch(`/api/reuniao?attachmentId=${encodeURIComponent(att.id)}`);
+        const data = await res.json();
+        if (data.success && data.attachment?.fileData) {
+          att.fileData = data.attachment.fileData;
+        }
+      } catch (e) {
+        console.error("Erro ao carregar dados do anexo:", e);
+      } finally {
+        setIsLoadingFile(false);
+      }
+    }
     setPreviewItem(att);
     setZoomScale(1);
     setFitMode('width');
@@ -399,12 +415,17 @@ export default function AttachmentManager({
                           <FileText size={22} />
                           <span className="text-[8px] font-black uppercase text-rose-300">PDF</span>
                         </div>
-                      ) : (
+                      ) : att.fileData ? (
                         <img 
                           src={att.fileData} 
                           alt={att.fileName} 
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
                         />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-emerald-400">
+                          <Camera size={20} />
+                          <span className="text-[8px] font-black uppercase text-emerald-300">FOTO</span>
+                        </div>
                       )}
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                         <Eye size={16} className="text-white" />
@@ -443,10 +464,11 @@ export default function AttachmentManager({
                     <button
                       type="button"
                       onClick={() => openPreview(att)}
+                      disabled={isLoadingFile}
                       className="px-2.5 py-1.5 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-emerald-800/60 flex items-center gap-1 min-h-[36px]"
                       title="Visualizar documento / imagem completa"
                     >
-                      <Eye size={14} />
+                      {isLoadingFile ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
                       <span className="text-xs">Ver</span>
                     </button>
 

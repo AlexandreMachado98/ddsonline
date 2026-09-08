@@ -169,8 +169,22 @@ export default function AdminPanel() {
   useEffect(() => {
     if (currentUser?.id) {
       fetchAllData();
-      const interval = setInterval(fetchAllData, 20000);
-      return () => clearInterval(interval);
+      const interval = setInterval(() => {
+        if (typeof document !== 'undefined' && document.hidden) return;
+        fetchAllData();
+      }, 20000);
+
+      const handleVisibilityChange = () => {
+        if (typeof document !== 'undefined' && !document.hidden) {
+          fetchAllData();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      return () => {
+        clearInterval(interval);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
     }
   }, [currentUser?.id, fetchAllData]);
 
@@ -272,22 +286,31 @@ export default function AdminPanel() {
       showToast('Ainda não há presenças registradas nesta reunião.', 'error');
       return;
     }
-    showToast('Gerando Ata Oficial em PDF consolidado com evidências...', 'info');
+    showToast('Carregando dados completos da reunião...', 'info');
     try {
+      let fullMeeting = activeMeeting;
+      if (activeMeeting.id) {
+        const res = await fetch(`/api/reuniao?id=${activeMeeting.id}&full=true`);
+        const data = await res.json();
+        if (data.success && data.meeting) {
+          fullMeeting = data.meeting;
+        }
+      }
+      showToast('Gerando Ata Oficial em PDF consolidado com evidências...', 'info');
       await generateDdsPdf({
-        topic: activeMeeting.topic,
-        farm: activeMeeting.farm,
-        type: activeMeeting.type,
-        objective: activeMeeting.objective,
-        programmaticContent: activeMeeting.programmaticContent,
-        classification: activeMeeting.classification,
-        instructorName: activeMeeting.instructorName,
-        endedAt: activeMeeting.endedAt,
-        organizer: activeMeeting.organizer,
-        groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : activeMeeting.groupPhoto,
-        createdAt: activeMeeting.createdAt,
-        attendees: activeMeeting.attendees,
-        attachments: activeMeeting.attachments || newAttachments || []
+        topic: fullMeeting.topic,
+        farm: fullMeeting.farm,
+        type: fullMeeting.type,
+        objective: fullMeeting.objective,
+        programmaticContent: fullMeeting.programmaticContent,
+        classification: fullMeeting.classification,
+        instructorName: fullMeeting.instructorName,
+        endedAt: fullMeeting.endedAt,
+        organizer: fullMeeting.organizer,
+        groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : fullMeeting.groupPhoto,
+        createdAt: fullMeeting.createdAt,
+        attendees: fullMeeting.attendees,
+        attachments: fullMeeting.attachments || newAttachments || []
       });
       showToast('Ata em PDF gerada com sucesso!', 'success');
     } catch (e) {
@@ -301,27 +324,84 @@ export default function AdminPanel() {
       showToast('Esta reunião não possui presenças registradas.', 'error');
       return;
     }
-    showToast('Gerando Ata Oficial em PDF com evidências...', 'info');
+    showToast('Carregando dados completos da reunião...', 'info');
     try {
+      let fullMeeting = meeting;
+      const hasFullSignatures = meeting.attendees.some((a: any) => a.signature);
+      if (!hasFullSignatures && meeting.id) {
+        const res = await fetch(`/api/reuniao?id=${meeting.id}&full=true`);
+        const data = await res.json();
+        if (data.success && data.meeting) {
+          fullMeeting = data.meeting;
+        }
+      }
+      showToast('Gerando Ata Oficial em PDF com evidências...', 'info');
       await generateDdsPdf({
-        topic: meeting.topic,
-        farm: meeting.farm,
-        type: meeting.type,
-        classification: meeting.classification,
-        instructorName: meeting.instructorName,
-        endedAt: meeting.endedAt,
-        organizer: meeting.organizer,
-        objective: meeting.objective,
-        programmaticContent: meeting.programmaticContent,
-        groupPhoto: meeting.groupPhoto,
-        createdAt: meeting.createdAt,
-        attendees: meeting.attendees,
-        attachments: meeting.attachments || []
+        topic: fullMeeting.topic,
+        farm: fullMeeting.farm,
+        type: fullMeeting.type,
+        classification: fullMeeting.classification,
+        instructorName: fullMeeting.instructorName,
+        endedAt: fullMeeting.endedAt,
+        organizer: fullMeeting.organizer,
+        objective: fullMeeting.objective,
+        programmaticContent: fullMeeting.programmaticContent,
+        groupPhoto: fullMeeting.groupPhoto,
+        createdAt: fullMeeting.createdAt,
+        attendees: fullMeeting.attendees,
+        attachments: fullMeeting.attachments || []
       });
       showToast('Ata em PDF gerada com sucesso!', 'success');
     } catch (e) {
       console.error('Erro ao gerar PDF histórico:', e);
       showToast('Erro ao compilar o PDF da ata.', 'error');
+    }
+  };
+
+  const handleOpenPreview = async (meeting: any) => {
+    if (!meeting?.id) return;
+    try {
+      showToast('Carregando prévia completa...', 'info');
+      const res = await fetch(`/api/reuniao?id=${meeting.id}&full=true`);
+      const data = await res.json();
+      if (data.success && data.meeting) {
+        const full = data.meeting;
+        setPreviewMeeting({
+          ...full,
+          groupPhoto: (teamPhotos.length > 0 && activeMeeting && activeMeeting.id === full.id) ? teamPhotos[0] : full.groupPhoto,
+          attachments: full.attachments || (activeMeeting && activeMeeting.id === full.id ? (activeMeeting.attachments || newAttachments) : []) || []
+        });
+      } else {
+        setPreviewMeeting(meeting);
+      }
+    } catch (e) {
+      console.error("Erro ao abrir prévia:", e);
+      setPreviewMeeting(meeting);
+    }
+  };
+
+  const handleOpenEditModal = async (m: any) => {
+    setEditingMeeting(m);
+    setEditAttachments(m.attachments || []);
+    setEditForm({
+      createdAt: formatDatetimeLocal(m.createdAt),
+      endedAt: m.endedAt ? formatDatetimeLocal(m.endedAt) : '',
+      instructorName: m.instructorName || '',
+      classification: m.classification || 'DDS',
+      objective: m.objective || '',
+      programmaticContent: m.programmaticContent || ''
+    });
+
+    if (m.attachments && m.attachments.length > 0 && m.id) {
+      try {
+        const res = await fetch(`/api/reuniao?id=${m.id}&full=true`);
+        const data = await res.json();
+        if (data.success && data.meeting?.attachments) {
+          setEditAttachments(data.meeting.attachments);
+        }
+      } catch (err) {
+        console.warn("Erro ao buscar anexos completos para edição:", err);
+      }
     }
   };
 
@@ -579,11 +659,7 @@ export default function AdminPanel() {
               <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setPreviewMeeting({
-                    ...activeMeeting,
-                    groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : activeMeeting.groupPhoto,
-                    attachments: activeMeeting.attachments || newAttachments || []
-                  })}
+                  onClick={() => handleOpenPreview(activeMeeting)}
                   className="flex-1 py-3 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-emerald-700/60 transition-all min-h-[44px]"
                 >
                   <Eye size={15} />
@@ -744,11 +820,7 @@ export default function AdminPanel() {
                 <span>{copiedLink ? 'Copiado!' : 'Copiar Link'}</span>
               </button>
               <button 
-                onClick={() => setPreviewMeeting({
-                  ...activeMeeting,
-                  groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : activeMeeting.groupPhoto,
-                  attachments: activeMeeting.attachments || newAttachments || []
-                })} 
+                onClick={() => handleOpenPreview(activeMeeting)} 
                 className="px-3.5 py-2.5 bg-emerald-950/80 hover:bg-emerald-900/90 border border-emerald-500/50 text-emerald-300 rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-sm text-xs cursor-pointer min-h-[40px]"
                 title="Pré-visualizar Lista de Presença e Dossiê Completo"
               >
@@ -1493,7 +1565,7 @@ export default function AdminPanel() {
 
                     <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto pt-2 sm:pt-0 border-t border-slate-900 sm:border-0 w-full sm:w-auto justify-end">
                       <button
-                        onClick={() => setPreviewMeeting(m)}
+                        onClick={() => handleOpenPreview(m)}
                         className="px-3.5 py-2 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-emerald-200 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-700/60 cursor-pointer min-h-[38px] transition-all shadow-sm"
                         title="Pré-visualizar Lista de Presença e Dossiê Completo"
                       >
@@ -1510,18 +1582,7 @@ export default function AdminPanel() {
                       </button>
 
                       <button
-                        onClick={() => {
-                          setEditingMeeting(m);
-                          setEditAttachments(m.attachments || []);
-                          setEditForm({
-                            createdAt: formatDatetimeLocal(m.createdAt),
-                            endedAt: m.endedAt ? formatDatetimeLocal(m.endedAt) : '',
-                            instructorName: m.instructorName || '',
-                            classification: m.classification || 'DDS',
-                            objective: m.objective || '',
-                            programmaticContent: m.programmaticContent || ''
-                          });
-                        }}
+                        onClick={() => handleOpenEditModal(m)}
                         title="Editar Detalhes"
                         className="p-2 text-slate-400 hover:text-emerald-400 rounded-xl hover:bg-slate-800 border border-slate-800 hover:border-slate-700 cursor-pointer min-h-[38px] min-w-[38px] flex items-center justify-center transition-colors"
                       >

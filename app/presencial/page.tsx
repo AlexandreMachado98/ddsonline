@@ -122,11 +122,22 @@ function PresencialContent() {
     };
 
     fetchMeeting();
-    const interval = setInterval(fetchMeeting, 20000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchMeeting();
+    }, 20000);
+
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchMeeting();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [queryMeetingId]);
 

@@ -43,22 +43,99 @@ export async function GET(req: Request) {
     await ensureDbColumns();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const attachmentId = searchParams.get('attachmentId');
     const organizerId = searchParams.get('organizerId');
     const email = searchParams.get('email')?.trim().toLowerCase();
+    const isFull = searchParams.get('full') === 'true' || searchParams.get('includeFiles') === 'true';
 
-    // Cenário A: Colaborador acessando reunião específica pelo ID do link
+    // Cenário 0: Download sob demanda de um anexo específico (evita transferir megabytes em polling)
+    if (attachmentId) {
+      const attachment = await prisma.meetingAttachment.findUnique({
+        where: { id: attachmentId },
+        select: {
+          id: true,
+          meetingId: true,
+          fileName: true,
+          displayName: true,
+          description: true,
+          mimeType: true,
+          fileSize: true,
+          fileData: true,
+          pageCount: true,
+          order: true
+        }
+      });
+      if (!attachment) {
+        return NextResponse.json({ success: false, error: 'Anexo não encontrado' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, attachment });
+    }
+
+    // Cenário A: Colaborador acessando reunião específica ou visualização completa com 'full=true'
     if (id) {
+      if (isFull) {
+        // Carga completa sob demanda (para gerar PDF de Ata Oficial ou Abrir Prévia Completa)
+        const meeting = await prisma.meeting.findUnique({
+          where: { id },
+          include: {
+            attendees: {
+              orderBy: { createdAt: 'desc' }
+            },
+            attachments: {
+              orderBy: { order: 'asc' }
+            },
+            organizer: {
+              select: { name: true, position: true, company: true }
+            }
+          }
+        });
+        return NextResponse.json({ success: true, meeting });
+      }
+
+      // Projeção ultraleve para polling da sala de DDS (evita transferir selfies, assinaturas e PDFs a cada 20s)
       const meeting = await prisma.meeting.findUnique({
         where: { id },
-        include: {
+        select: {
+          id: true,
+          topic: true,
+          farm: true,
+          type: true,
+          classification: true,
+          objective: true,
+          programmaticContent: true,
+          status: true,
+          createdAt: true,
+          endedAt: true,
+          instructorName: true,
+          organizerId: true,
+          companyId: true,
+          organizer: {
+            select: { name: true, position: true, company: true }
+          },
           attendees: {
+            select: {
+              id: true,
+              name: true,
+              cpf: true,
+              createdAt: true,
+              leftAt: true,
+              exitReason: true
+            },
             orderBy: { createdAt: 'desc' }
           },
           attachments: {
+            select: {
+              id: true,
+              fileName: true,
+              displayName: true,
+              description: true,
+              mimeType: true,
+              fileSize: true,
+              pageCount: true,
+              order: true,
+              createdAt: true
+            },
             orderBy: { order: 'asc' }
-          },
-          organizer: {
-            select: { name: true, position: true, company: true }
           }
         }
       });
@@ -71,24 +148,82 @@ export async function GET(req: Request) {
         ? { organizerId } 
         : { organizer: { email: email } };
 
+      // Se solicitado modo full para o admin (sob demanda)
+      if (isFull) {
+        const meeting = await prisma.meeting.findFirst({
+          where: {
+            status: 'LIVE',
+            ...whereOrganizer
+          },
+          include: {
+            attendees: {
+              orderBy: { createdAt: 'desc' }
+            },
+            attachments: {
+              orderBy: { order: 'asc' }
+            },
+            organizer: {
+              select: { name: true, position: true, company: true }
+            }
+          }
+        });
+        return NextResponse.json({ success: true, meeting });
+      }
+
+      // Polling padrão: Projeção ultraleve (reduz payload de ~30MB para ~15KB)
       const meeting = await prisma.meeting.findFirst({
         where: {
           status: 'LIVE',
           ...whereOrganizer
         },
-        include: {
+        select: {
+          id: true,
+          topic: true,
+          farm: true,
+          type: true,
+          classification: true,
+          objective: true,
+          programmaticContent: true,
+          groupPhoto: true, // Necessário apenas na reunião ativa
+          status: true,
+          createdAt: true,
+          endedAt: true,
+          instructorName: true,
+          organizerId: true,
+          companyId: true,
+          organizer: {
+            select: { name: true, position: true, company: true }
+          },
           attendees: {
+            select: {
+              id: true,
+              name: true,
+              cpf: true,
+              selfie: true, // Necessário para o avatar do card ao vivo
+              createdAt: true,
+              leftAt: true,
+              exitReason: true
+            },
             orderBy: { createdAt: 'desc' }
           },
           attachments: {
+            select: {
+              id: true,
+              fileName: true,
+              displayName: true,
+              description: true,
+              mimeType: true,
+              fileSize: true,
+              pageCount: true,
+              order: true,
+              createdAt: true
+            },
             orderBy: { order: 'asc' }
-          },
-          organizer: {
-            select: { name: true, position: true, company: true }
           }
         }
       });
 
+      // Histórico de DDS concluídos: Omite estritamente groupPhoto, assinaturas e fileData pesados
       const history = await prisma.meeting.findMany({
         where: {
           status: 'ENDED',
@@ -96,15 +231,47 @@ export async function GET(req: Request) {
         },
         orderBy: { createdAt: 'desc' },
         take: 50,
-        include: {
+        select: {
+          id: true,
+          topic: true,
+          farm: true,
+          type: true,
+          classification: true,
+          objective: true,
+          programmaticContent: true,
+          status: true,
+          createdAt: true,
+          endedAt: true,
+          instructorName: true,
+          organizerId: true,
+          companyId: true,
+          organizer: {
+            select: { name: true, position: true, company: true }
+          },
           attendees: {
+            select: {
+              id: true,
+              name: true,
+              cpf: true,
+              createdAt: true,
+              leftAt: true,
+              exitReason: true
+            },
             orderBy: { createdAt: 'asc' }
           },
           attachments: {
+            select: {
+              id: true,
+              fileName: true,
+              displayName: true,
+              description: true,
+              mimeType: true,
+              fileSize: true,
+              pageCount: true,
+              order: true,
+              createdAt: true
+            },
             orderBy: { order: 'asc' }
-          },
-          organizer: {
-            select: { name: true, position: true, company: true }
           }
         }
       });
@@ -230,21 +397,28 @@ export async function PUT(req: Request) {
         updateData.status = 'ENDED';
       }
 
-      // Sincroniza anexos se fornecidos
+      // Sincroniza anexos se fornecidos preservando fileData se já existirem
       if (Array.isArray(attachments)) {
+        const existingAttachments = await prisma.meetingAttachment.findMany({
+          where: { meetingId },
+          select: { id: true, fileData: true }
+        });
+        const existingMap = new Map(existingAttachments.map(a => [a.id, a.fileData]));
+
         await prisma.meetingAttachment.deleteMany({
           where: { meetingId }
         });
         if (attachments.length > 0) {
           await prisma.meetingAttachment.createMany({
             data: attachments.map((att: any, idx: number) => ({
+              id: att.id && !att.id.startsWith('local_') ? att.id : undefined,
               meetingId,
               fileName: att.fileName || `anexo_${idx+1}`,
               displayName: att.displayName || att.fileName || `Anexo ${idx+1}`,
               description: att.description ? String(att.description).trim() : null,
               mimeType: att.mimeType || 'application/pdf',
               fileSize: Number(att.fileSize) || 0,
-              fileData: att.fileData || '',
+              fileData: att.fileData || (att.id ? existingMap.get(att.id) || '' : ''),
               pageCount: Number(att.pageCount) || 1,
               order: typeof att.order === 'number' ? att.order : idx
             }))
