@@ -394,26 +394,26 @@ export default function AdminPanel() {
         
         {/* EDIT MODAL */}
         {editingMeeting && (
-          <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+          <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-3xl max-w-md w-full max-h-[90dvh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between mb-4 sticky top-0 bg-slate-900/90 backdrop-blur-md pb-2 z-10 border-b border-slate-800">
+                <h2 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
                   <span className="text-emerald-400">✏️</span>
-                  Editar Informações do Treinamento / DDS
+                  Editar Treinamento / DDS
                 </h2>
-                <button onClick={() => setEditingMeeting(null)} className="text-slate-500 hover:text-white transition-colors">
+                <button onClick={() => setEditingMeeting(null)} className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg">
                   <X size={20} />
                 </button>
               </div>
               
-              <form onSubmit={handleSaveEditMeeting} className="space-y-4">
+              <form onSubmit={handleSaveEditMeeting} className="space-y-3.5">
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Tipo de Conteúdo</label>
                   <select
                     value={editForm.classification}
                     onChange={(e) => setEditForm({...editForm, classification: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-base sm:text-xs text-white font-bold focus:border-emerald-500 outline-none min-h-[44px]"
                   >
                     <option value="DDS">DDS</option>
                     <option value="Treinamento">Treinamento</option>
@@ -427,7 +427,7 @@ export default function AdminPanel() {
                     value={editForm.instructorName}
                     onChange={(e) => setEditForm({...editForm, instructorName: e.target.value})}
                     placeholder={currentUser?.name || 'Nome do Instrutor'}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-base sm:text-xs text-white font-bold focus:border-emerald-500 outline-none min-h-[44px]"
                   />
                 </div>
                 
@@ -439,48 +439,50 @@ export default function AdminPanel() {
                     value={editForm.objective}
                     onChange={(e) => setEditForm({...editForm, objective: e.target.value})}
                     placeholder="Objetivo do DDS / Treinamento..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white font-medium focus:border-emerald-500 outline-none leading-relaxed"
                   />
                 </div>
 
                 <div>
-                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
-                      <span>Conteúdo Programático (Treinamento)</span>
-                      <span className="text-[10px] text-emerald-400 font-normal lowercase">sai na ata em pdf</span>
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={editForm.programmaticContent}
-                      onChange={(e) => setEditForm({...editForm, programmaticContent: e.target.value})}
-                      placeholder="Ex: Módulo 1: Conceitos e NRs&#10;Módulo 2: Procedimentos de segurança&#10;Módulo 3: Prática operacional"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed font-sans"
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+                    <span>Conteúdo Programático</span>
+                    <span className="text-[10px] text-emerald-400 font-normal lowercase">sai na ata em pdf</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={editForm.programmaticContent}
+                    onChange={(e) => setEditForm({...editForm, programmaticContent: e.target.value})}
+                    placeholder="Ex: Módulo 1: Conceitos e NRs&#10;Módulo 2: Procedimentos de segurança&#10;Módulo 3: Prática operacional"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white font-medium focus:border-emerald-500 outline-none leading-relaxed font-sans"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data/Hora Início</label>
+                    <input
+                      type="datetime-local"
+                      value={editForm.createdAt}
+                      onChange={(e) => setEditForm({...editForm, createdAt: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-base sm:text-xs text-white font-medium focus:border-emerald-500 outline-none min-h-[44px]"
+                      required
                     />
                   </div>
-                
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Início</label>
-                  <input
-                    type="datetime-local"
-                    value={editForm.createdAt}
-                    onChange={(e) => setEditForm({...editForm, createdAt: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none"
-                    required
-                  />
+                  
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data/Hora Fim</label>
+                    <input
+                      type="datetime-local"
+                      value={editForm.endedAt}
+                      onChange={(e) => setEditForm({...editForm, endedAt: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-base sm:text-xs text-white font-medium focus:border-emerald-500 outline-none min-h-[44px]"
+                    />
+                  </div>
                 </div>
                 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Fim</label>
-                  <input
-                    type="datetime-local"
-                    value={editForm.endedAt}
-                    onChange={(e) => setEditForm({...editForm, endedAt: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none"
-                  />
-                </div>
-                
-                <div className="flex gap-2.5 pt-2">
-                  <button type="button" onClick={() => setEditingMeeting(null)} className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-colors">Cancelar</button>
-                  <button type="submit" className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all">Salvar Alterações</button>
+                <div className="flex gap-2.5 pt-3">
+                  <button type="button" onClick={() => setEditingMeeting(null)} className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-colors min-h-[44px]">Cancelar</button>
+                  <button type="submit" className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all min-h-[44px]">Salvar Alterações</button>
                 </div>
               </form>
             </div>
@@ -753,26 +755,26 @@ export default function AdminPanel() {
 
 {/* EDIT MODAL */}
         {editingMeeting && (
-          <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+          <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-3xl max-w-md w-full max-h-[90dvh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between mb-4 sticky top-0 bg-slate-900/90 backdrop-blur-md pb-2 z-10 border-b border-slate-800">
+                <h2 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
                   <span className="text-emerald-400">✏️</span>
-                  Editar Informações do Treinamento / DDS
+                  Editar Treinamento / DDS
                 </h2>
-                <button onClick={() => setEditingMeeting(null)} className="text-slate-500 hover:text-white transition-colors">
+                <button onClick={() => setEditingMeeting(null)} className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg">
                   <X size={20} />
                 </button>
               </div>
               
-              <form onSubmit={handleSaveEditMeeting} className="space-y-4">
+              <form onSubmit={handleSaveEditMeeting} className="space-y-3.5">
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Tipo de Conteúdo</label>
                   <select
                     value={editForm.classification}
                     onChange={(e) => setEditForm({...editForm, classification: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-base sm:text-xs text-white font-bold focus:border-emerald-500 outline-none min-h-[44px]"
                   >
                     <option value="DDS">DDS</option>
                     <option value="Treinamento">Treinamento</option>
@@ -786,7 +788,7 @@ export default function AdminPanel() {
                     value={editForm.instructorName}
                     onChange={(e) => setEditForm({...editForm, instructorName: e.target.value})}
                     placeholder={currentUser?.name || 'Nome do Instrutor'}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-base sm:text-xs text-white font-bold focus:border-emerald-500 outline-none min-h-[44px]"
                   />
                 </div>
                 
@@ -798,48 +800,50 @@ export default function AdminPanel() {
                     value={editForm.objective}
                     onChange={(e) => setEditForm({...editForm, objective: e.target.value})}
                     placeholder="Objetivo do DDS / Treinamento..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white font-medium focus:border-emerald-500 outline-none leading-relaxed"
                   />
                 </div>
 
                 <div>
-                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
-                      <span>Conteúdo Programático (Treinamento)</span>
-                      <span className="text-[10px] text-emerald-400 font-normal lowercase">sai na ata em pdf</span>
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={editForm.programmaticContent}
-                      onChange={(e) => setEditForm({...editForm, programmaticContent: e.target.value})}
-                      placeholder="Ex: Módulo 1: Conceitos e NRs&#10;Módulo 2: Procedimentos de segurança&#10;Módulo 3: Prática operacional"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none leading-relaxed font-sans"
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+                    <span>Conteúdo Programático</span>
+                    <span className="text-[10px] text-emerald-400 font-normal lowercase">sai na ata em pdf</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={editForm.programmaticContent}
+                    onChange={(e) => setEditForm({...editForm, programmaticContent: e.target.value})}
+                    placeholder="Ex: Módulo 1: Conceitos e NRs&#10;Módulo 2: Procedimentos de segurança&#10;Módulo 3: Prática operacional"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white font-medium focus:border-emerald-500 outline-none leading-relaxed font-sans"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data/Hora Início</label>
+                    <input
+                      type="datetime-local"
+                      value={editForm.createdAt}
+                      onChange={(e) => setEditForm({...editForm, createdAt: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-base sm:text-xs text-white font-medium focus:border-emerald-500 outline-none min-h-[44px]"
+                      required
                     />
                   </div>
-                
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Início</label>
-                  <input
-                    type="datetime-local"
-                    value={editForm.createdAt}
-                    onChange={(e) => setEditForm({...editForm, createdAt: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none"
-                    required
-                  />
+                  
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data/Hora Fim</label>
+                    <input
+                      type="datetime-local"
+                      value={editForm.endedAt}
+                      onChange={(e) => setEditForm({...editForm, endedAt: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-base sm:text-xs text-white font-medium focus:border-emerald-500 outline-none min-h-[44px]"
+                    />
+                  </div>
                 </div>
                 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data e Hora de Fim</label>
-                  <input
-                    type="datetime-local"
-                    value={editForm.endedAt}
-                    onChange={(e) => setEditForm({...editForm, endedAt: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 outline-none"
-                  />
-                </div>
-                
-                <div className="flex gap-2.5 pt-2">
-                  <button type="button" onClick={() => setEditingMeeting(null)} className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-colors">Cancelar</button>
-                  <button type="submit" className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all">Salvar Alterações</button>
+                <div className="flex gap-2.5 pt-3">
+                  <button type="button" onClick={() => setEditingMeeting(null)} className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-colors min-h-[44px]">Cancelar</button>
+                  <button type="submit" className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all min-h-[44px]">Salvar Alterações</button>
                 </div>
               </form>
             </div>
@@ -1060,7 +1064,7 @@ export default function AdminPanel() {
                   <select
                     value={classification}
                     onChange={(e) => setClassification(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-base sm:text-xs text-white font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none min-h-[44px]"
                   >
                     <option value="DDS">DDS</option>
                     <option value="Treinamento">Treinamento</option>
@@ -1079,7 +1083,8 @@ export default function AdminPanel() {
                     required
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                    placeholder="Ex: Trabalho em Altura & EPIs"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-base sm:text-xs text-white font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none min-h-[44px]"
                   />
                 </div>
 
@@ -1092,7 +1097,8 @@ export default function AdminPanel() {
                     required
                     value={farm}
                     onChange={(e) => setFarm(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                    placeholder="Ex: Canteiro de Obras / Fazenda"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-base sm:text-xs text-white font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none min-h-[44px]"
                   />
                 </div>
               </div>
@@ -1107,7 +1113,7 @@ export default function AdminPanel() {
                   value={objective}
                   onChange={(e) => setObjective(e.target.value)}
                   placeholder="Ex: Orientar os operadores de trator quanto à verificação diária do cinto e freios."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-base sm:text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed"
                 />
               </div>
 
@@ -1122,7 +1128,7 @@ export default function AdminPanel() {
                     value={programmaticContent}
                     onChange={(e) => setProgrammaticContent(e.target.value)}
                     placeholder="Ex: Módulo 1: Legislação e NRs aplicáveis&#10;Módulo 2: Procedimentos de segurança e EPIs&#10;Módulo 3: Prática operacional e primeiros socorros."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed font-sans"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-base sm:text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed font-sans"
                   />
                 </div>
 
@@ -1130,7 +1136,7 @@ export default function AdminPanel() {
               <button
                 type="submit"
                 disabled={isCreatingMeeting}
-                className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.99] text-slate-950 font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl shadow-emerald-950/60 transition-all cursor-pointer"
+                className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.99] text-slate-950 font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl shadow-emerald-950/60 transition-all cursor-pointer min-h-[48px]"
               >
                 {isCreatingMeeting ? (
                   <>
@@ -1159,11 +1165,11 @@ export default function AdminPanel() {
                 <p className="text-xs text-slate-400 mt-0.5">Consulte, exporte relatórios consolidados ou baixe atas individuais.</p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {meetingHistory.length > 0 && (
                   <button
                     onClick={handleDownloadConsolidatedPdf}
-                    className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                    className="px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer min-h-[40px]"
                   >
                     <Download size={14} />
                     <span>Exportar Dossiê Consolidado</span>
@@ -1173,7 +1179,7 @@ export default function AdminPanel() {
                 {selectedMeetings.length > 0 && (
                   <button
                     onClick={() => handleDeleteMeetings(selectedMeetings, true)}
-                    className="px-3.5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="px-3.5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer min-h-[40px]"
                   >
                     <Trash2 size={14} />
                     <span>Excluir ({selectedMeetings.length})</span>
@@ -1193,23 +1199,25 @@ export default function AdminPanel() {
                     key={m.id}
                     className="bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <input
-                        type="checkbox"
-                        checked={selectedMeetings.includes(m.id)}
-                        onChange={() => toggleSelectMeeting(m.id)}
-                        className="w-4 h-4 rounded text-emerald-600 bg-slate-900 border-slate-700 cursor-pointer shrink-0"
-                      />
+                    <div className="flex items-start sm:items-center gap-3 min-w-0">
+                      <label className="p-1 cursor-pointer shrink-0 mt-0.5 sm:mt-0" title="Selecionar este DDS">
+                        <input
+                          type="checkbox"
+                          checked={selectedMeetings.includes(m.id)}
+                          onChange={() => toggleSelectMeeting(m.id)}
+                          className="w-5 h-5 rounded text-emerald-600 bg-slate-900 border-slate-700 cursor-pointer shrink-0"
+                        />
+                      </label>
 
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs sm:text-sm font-extrabold text-white truncate">{m.topic}</span>
-                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                             {m.type === 'PRESENTIAL' ? 'Presencial' : 'Remoto'}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-                          📍 {m.farm} • {new Date(m.createdAt).toLocaleDateString('pt-BR')} às {new Date(m.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • {m.attendees?.length || 0} presenças
+                          📍 {m.farm} • {new Date(m.createdAt).toLocaleDateString('pt-BR')} às {new Date(m.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • <strong className="text-emerald-400">{m.attendees?.length || 0} presenças</strong>
                         </p>
                         {m.objective && (
                           <p className="text-[11px] text-emerald-400/90 mt-0.5 truncate italic font-medium">
@@ -1219,10 +1227,10 @@ export default function AdminPanel() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto pt-2 sm:pt-0 border-t border-slate-900 sm:border-0 w-full sm:w-auto justify-end">
                       <button
                         onClick={() => handleDownloadHistoryPdf(m)}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-xs rounded-xl flex items-center gap-1 border border-slate-700 cursor-pointer"
+                        className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-700 cursor-pointer min-h-[38px]"
                       >
                         <Download size={13} />
                         <span>Ata PDF</span>
@@ -1241,16 +1249,17 @@ export default function AdminPanel() {
                           });
                         }}
                         title="Editar Detalhes"
-                        className="p-1.5 text-slate-500 hover:text-emerald-400 rounded-xl hover:bg-slate-850 cursor-pointer"
+                        className="p-2 text-slate-400 hover:text-emerald-400 rounded-xl hover:bg-slate-800 border border-slate-800 hover:border-slate-700 cursor-pointer min-h-[38px] min-w-[38px] flex items-center justify-center transition-colors"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                       </button>
 
                       <button
                         onClick={() => handleDeleteMeetings([m.id], false, m.topic)}
-                        className="p-1.5 text-slate-500 hover:text-red-400 rounded-xl hover:bg-slate-850 cursor-pointer"
+                        className="p-2 text-slate-400 hover:text-red-400 rounded-xl hover:bg-slate-800 border border-slate-800 hover:border-slate-700 cursor-pointer min-h-[38px] min-w-[38px] flex items-center justify-center transition-colors"
+                        title="Excluir DDS"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </div>

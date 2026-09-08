@@ -169,7 +169,7 @@ export default function HomePage() {
                     value={name} 
                     onChange={(e) => setName(e.target.value)} 
                     placeholder="Digite seu nome completo" 
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-3 text-base sm:text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all min-h-[44px]" 
                   />
                 </div>
               </div>
@@ -183,7 +183,7 @@ export default function HomePage() {
                     value={role} 
                     onChange={(e) => setRole(e.target.value)} 
                     placeholder="Ex: Técnico de Segurança" 
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-3 text-base sm:text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all min-h-[44px]" 
                   />
                 </div>
               </div>
@@ -197,7 +197,7 @@ export default function HomePage() {
                     value={company} 
                     onChange={(e) => setCompany(e.target.value)} 
                     placeholder="Ex: Fazenda Ouro Verde" 
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-3 text-base sm:text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all min-h-[44px]" 
                   />
                 </div>
               </div>
@@ -212,7 +212,7 @@ export default function HomePage() {
                   value={secretKey} 
                   onChange={(e) => setSecretKey(e.target.value)} 
                   placeholder="Código da Empresa" 
-                  className="w-full bg-slate-950 border border-emerald-500/30 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none uppercase font-mono" 
+                  className="w-full bg-slate-950 border border-emerald-500/30 rounded-xl px-3 py-2.5 text-base sm:text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none uppercase font-mono min-h-[40px]" 
                 />
               </div>
             </>
@@ -228,7 +228,7 @@ export default function HomePage() {
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)} 
                 placeholder="Digite seu e-mail" 
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" 
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-3 text-base sm:text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all min-h-[44px]" 
               />
             </div>
           </div>
@@ -243,12 +243,12 @@ export default function HomePage() {
                 value={password} 
                 onChange={(e) => setPassword(e.target.value)} 
                 placeholder="Digite sua senha" 
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-11 py-2.5 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all" 
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-11 py-3 text-base sm:text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all min-h-[44px]" 
               />
               <button 
                 type="button" 
                 onClick={() => setShowPassword(!showPassword)} 
-                className="absolute right-3.5 text-slate-500 hover:text-slate-300 p-1" 
+                className="absolute right-3.5 text-slate-500 hover:text-slate-300 p-2 min-h-[40px] min-w-[40px] flex items-center justify-center" 
                 title={showPassword ? "Ocultar senha" : "Ver senha"}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}

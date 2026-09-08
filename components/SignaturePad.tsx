@@ -57,14 +57,14 @@ export default function SignaturePad({ onSave, onConfirm }: SignaturePadProps) {
         )}
       </div>
 
-      <div className="flex items-center justify-between w-full px-1">
+      <div className="flex items-center justify-between w-full px-1 pt-0.5">
         <span className="text-[11px] font-semibold flex items-center gap-1">
           {hasDrawn ? (
             <span className="text-emerald-400 flex items-center gap-1 font-bold">
               <Check size={14} className="text-emerald-400" /> Assinatura Digital Registrada
             </span>
           ) : (
-            <span className="text-slate-500 font-normal">Aguardando traço...</span>
+            <span className="text-slate-500 font-normal">Aguardando traço na tela...</span>
           )}
         </span>
 
@@ -72,9 +72,9 @@ export default function SignaturePad({ onSave, onConfirm }: SignaturePadProps) {
           <button
             type="button"
             onClick={clearCanvas}
-            className="text-xs text-red-400 hover:text-red-300 font-bold flex items-center gap-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 px-3 py-1.5 rounded-xl transition-all active:scale-95"
+            className="text-xs text-red-400 hover:text-red-300 font-bold flex items-center gap-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 px-3.5 py-2 rounded-xl transition-all active:scale-95 min-h-[40px]"
           >
-            <Trash2 size={12} /> Limpar
+            <Trash2 size={13} /> Limpar
           </button>
         )}
       </div>
