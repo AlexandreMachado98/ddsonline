@@ -12,7 +12,13 @@ import SelfieCapture from '@/components/SelfieCapture';
 import SignaturePad from '@/components/SignaturePad';
 import DdsLogo from '@/components/DdsLogo';
 import AttachmentManager from '@/components/AttachmentManager';
+import OfflineSyncBadge from '@/components/OfflineSyncBadge';
 import { useToast } from '@/components/Toast';
+import { 
+  saveOfflineAttendance, 
+  cacheMeetingData, 
+  getCachedMeetingData 
+} from '@/lib/offlineStorage';
 
 function PresencialContent() {
   const searchParams = useSearchParams();
@@ -39,8 +45,9 @@ function PresencialContent() {
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAdmitted, setHasAdmitted] = useState(false);
+  const [isOfflineSubmitted, setIsOfflineSubmitted] = useState(false);
 
-  // 1. Busca a reunião presencial ativa ou pelo ID
+  // 1. Busca a reunião presencial ativa ou pelo ID (com suporte a Cache Offline)
   useEffect(() => {
     let isMounted = true;
 
@@ -63,6 +70,7 @@ function PresencialContent() {
           setObjective(data.meeting.objective || '');
           setProgrammaticContent(data.meeting.programmaticContent || '');
           setClassification(data.meeting.classification || 'DDS');
+          cacheMeetingData(data.meeting);
           if (data.meeting.status === 'ENDED') {
             setIsMeetingEnded(true);
           } else {
@@ -70,22 +78,51 @@ function PresencialContent() {
           }
           setNoMeetingFound(false);
         } else {
-          // Se não encontrou pelo ID nem reunião ativa
-          if (queryMeetingId) {
-            setNoMeetingFound(true);
+          // Se não encontrou online, tenta recuperar do cache local do aparelho
+          const cached = getCachedMeetingData(queryMeetingId || undefined);
+          if (cached) {
+            setMeeting(cached);
+            setMeetingId(cached.id);
+            setTopic(cached.topic || 'DDS Presencial (Offline)');
+            setFarm(cached.farm || '');
+            setObjective(cached.objective || '');
+            setProgrammaticContent(cached.programmaticContent || '');
+            setClassification(cached.classification || 'DDS');
+            setIsMeetingEnded(false);
+            setNoMeetingFound(false);
           } else {
             setNoMeetingFound(true);
           }
         }
       } catch (err) {
-        console.error("Erro ao buscar DDS presencial:", err);
+        console.warn("Sem internet ao buscar DDS, buscando no cache local:", err);
+        const cached = getCachedMeetingData(queryMeetingId || undefined);
+        if (cached && isMounted) {
+          setMeeting(cached);
+          setMeetingId(cached.id);
+          setTopic(cached.topic || 'DDS Presencial (Offline)');
+          setFarm(cached.farm || '');
+          setObjective(cached.objective || '');
+          setProgrammaticContent(cached.programmaticContent || '');
+          setClassification(cached.classification || 'DDS');
+          setIsMeetingEnded(false);
+          setNoMeetingFound(false);
+        } else if (isMounted) {
+          if (queryMeetingId) {
+            setMeetingId(queryMeetingId);
+            setTopic('DDS Presencial em Campo');
+            setNoMeetingFound(false);
+          } else {
+            setNoMeetingFound(true);
+          }
+        }
       } finally {
         if (isMounted) setIsLoadingMeeting(false);
       }
     };
 
     fetchMeeting();
-    const interval = setInterval(fetchMeeting, 20000); // Polling a cada 2.5s para detectar encerramento em tempo real
+    const interval = setInterval(fetchMeeting, 20000);
 
     return () => {
       isMounted = false;
@@ -93,9 +130,7 @@ function PresencialContent() {
     };
   }, [queryMeetingId]);
 
-  
-
-  // Submissão de Presença Presencial
+  // Submissão de Presença Presencial com Suporte Total a Offline-First
   const handleAdmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -121,6 +156,29 @@ function PresencialContent() {
 
     setIsSubmitting(true);
 
+    // Se estiver explicitamente offline no dispositivo
+    if (typeof window !== 'undefined' && !navigator.onLine) {
+      try {
+        await saveOfflineAttendance({
+          name: name.trim(),
+          cpf: funcao.trim(),
+          savedSelfie,
+          savedSignature,
+          meetingId: meetingId || 'presencial'
+        });
+        setIsOfflineSubmitted(true);
+        setHasAdmitted(true);
+        toast.info('Modo Campo Offline', 'Presença gravada com segurança no aparelho. Será enviada ao reconectar.');
+      } catch (err) {
+        console.error('Erro ao salvar offline:', err);
+        toast.error('Erro de Armazenamento', 'Não foi possível gravar na memória do aparelho.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // Se estiver online, tenta enviar diretamente para o servidor
     try {
       const res = await fetch('/api/presenca', {
         method: 'POST',
@@ -137,13 +195,28 @@ function PresencialContent() {
       const data = await res.json();
 
       if (data.success) {
+        setIsOfflineSubmitted(false);
         setHasAdmitted(true);
         toast.success('Presença Presencial Confirmada!', 'Seus dados e biometria foram arquivados com sucesso.');
       } else {
         toast.error('Erro ao Registrar', data.error || 'Não foi possível registrar a presença.');
       }
     } catch {
-      toast.error('Falha de Conexão', 'Verifique sua internet e tente novamente.');
+      // Fallback automático de resiliência: salva na memória do celular se a conexão oscilar no momento do envio
+      try {
+        await saveOfflineAttendance({
+          name: name.trim(),
+          cpf: funcao.trim(),
+          savedSelfie,
+          savedSignature,
+          meetingId: meetingId || 'presencial'
+        });
+        setIsOfflineSubmitted(true);
+        setHasAdmitted(true);
+        toast.info('Salvo no Aparelho', 'A internet oscilou. Os dados foram salvos com segurança na memória do celular.');
+      } catch {
+        toast.error('Falha de Conexão', 'Verifique sua internet e tente novamente.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -154,6 +227,7 @@ function PresencialContent() {
     setFuncao('');
     setSavedSelfie(null);
     setSavedSignature(null);
+    setIsOfflineSubmitted(false);
     setHasAdmitted(false);
   };
 
@@ -231,14 +305,31 @@ function PresencialContent() {
           </div>
 
           <div className="space-y-1">
-            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 inline-block mb-1">
-              Conformidade NR Auditada
+            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border inline-block mb-1 ${
+              isOfflineSubmitted 
+                ? 'text-amber-300 bg-amber-500/15 border-amber-500/30' 
+                : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+            }`}>
+              {isOfflineSubmitted ? '📡 Gravado na Memória do Aparelho (Offline)' : 'Conformidade NR Auditada'}
             </span>
-            <h2 className="text-xl sm:text-2xl font-black text-white">Presença Confirmada!</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-white">
+              {isOfflineSubmitted ? 'Presença Gravada no Aparelho!' : 'Presença Confirmada!'}
+            </h2>
             <p className="text-xs text-slate-300">
-              Obrigado, <strong className="text-white">{name}</strong>. Sua assinatura e biometria facial foram vinculadas ao DDS de hoje.
+              Obrigado, <strong className="text-white">{name}</strong>. Sua assinatura e biometria facial foram salvas para o DDS de hoje.
             </p>
           </div>
+
+          {isOfflineSubmitted && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-[11px] text-amber-200 text-left space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-amber-300">
+                <span>⚡ Modo Campo Ativo:</span>
+              </p>
+              <p className="text-amber-200/90 leading-relaxed">
+                Os dados e biometria estão armazenados com segurança na memória deste celular. Assim que você reconectar ao Wi-Fi ou 4G, a sincronização com o banco de dados ocorrerá automaticamente.
+              </p>
+            </div>
+          )}
 
           <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 text-left text-xs space-y-2 text-slate-300 max-w-full overflow-hidden">
             <p className="break-words">Tema: <strong className="text-white break-words">{topic}</strong></p>
@@ -246,7 +337,9 @@ function PresencialContent() {
             {objective && <p className="break-words">Objetivo: <strong className="text-emerald-400 break-words">{objective}</strong></p>}
             {programmaticContent && <p className="break-words whitespace-pre-line">Conteúdo: <strong className="text-teal-300 break-words">{programmaticContent}</strong></p>}
             <p>Horário do Registro: <strong className="text-emerald-400">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></p>
-            <p>Status: <strong className="text-emerald-400">✅ 100% Válido para Auditoria</strong></p>
+            <p>Status: <strong className={isOfflineSubmitted ? "text-amber-400" : "text-emerald-400"}>
+              {isOfflineSubmitted ? "⏳ Salvo Localmente (Aguardando Sinal)" : "✅ 100% Válido para Auditoria"}
+            </strong></p>
           </div>
 
           <div className="space-y-2 pt-2">
@@ -291,6 +384,11 @@ function PresencialContent() {
         <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full inline-flex items-center gap-1 shrink-0">
           <QrCode size={12} /> Presencial
         </span>
+      </div>
+
+      {/* Badge de Conexão e Fila de Presenças Offline */}
+      <div className="w-full max-w-md mb-3 relative z-10">
+        <OfflineSyncBadge meetingId={meetingId} />
       </div>
 
       <header className="w-full max-w-md bg-gradient-to-r from-emerald-600 to-teal-600 text-slate-950 p-4 sm:p-5 rounded-3xl shadow-2xl mb-5 text-center relative z-10 border border-emerald-400/30 overflow-hidden">

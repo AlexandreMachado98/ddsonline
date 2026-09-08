@@ -13,6 +13,8 @@ import GroupPhotoCapture from '@/components/GroupPhotoCapture';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
 import AttachmentManager, { DdsAttachment } from '@/components/AttachmentManager';
 import DdsReportPreviewModal from '@/components/DdsReportPreviewModal';
+import OfflineSyncBadge from '@/components/OfflineSyncBadge';
+import { cacheMeetingData } from '@/lib/offlineStorage';
 
 export default function AdminPanel() {
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -144,6 +146,7 @@ export default function AdminPanel() {
       if (data.success) {
         if (data.meeting && data.meeting.status === 'LIVE') {
           setActiveMeeting(data.meeting);
+          cacheMeetingData(data.meeting);
 
           if (data.meeting.groupPhoto && typeof data.meeting.groupPhoto === 'string') {
             if (teamPhotos.length === 0) setTeamPhotos([data.meeting.groupPhoto]);
@@ -200,6 +203,7 @@ export default function AdminPanel() {
       
       if (res.ok && data.success && data.meeting) {
         setActiveMeeting(data.meeting);
+        cacheMeetingData(data.meeting);
         setIsLiveMode(true);
         setTopic('');
         setObjective('');
@@ -620,6 +624,9 @@ export default function AdminPanel() {
         )}
 
         <div className="max-w-7xl w-full mx-auto space-y-4 sm:space-y-6">
+          {/* Badge de Sincronização e Fila Offline */}
+          <OfflineSyncBadge meetingId={activeMeeting?.id} onSyncComplete={() => fetchAllData()} />
+
           {/* Header Superior */}
           <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-3xl shadow-xl">
             <div className="flex items-center gap-2">
@@ -1128,6 +1135,9 @@ export default function AdminPanel() {
             </div>
           </div>
         </header>
+
+        {/* Badge de Sincronização e Fila Offline */}
+        <OfflineSyncBadge meetingId={activeMeeting?.id} onSyncComplete={() => fetchAllData()} />
 
         {/* Abas de Navegação (Novo DDS vs Histórico) */}
         <div className="grid grid-cols-2 bg-slate-900 border border-slate-800 p-1.5 rounded-2xl gap-1.5 shadow-lg">

@@ -13,7 +13,13 @@ import SignaturePad from '@/components/SignaturePad';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
 import DdsLogo from '@/components/DdsLogo';
 import AttachmentManager from '@/components/AttachmentManager';
+import OfflineSyncBadge from '@/components/OfflineSyncBadge';
 import { useToast } from '@/components/Toast';
+import { 
+  saveOfflineAttendance, 
+  cacheMeetingData, 
+  getCachedMeetingData 
+} from '@/lib/offlineStorage';
 
 export default function MeetingRoom() {
   const params = useParams();
@@ -41,6 +47,7 @@ export default function MeetingRoom() {
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAdmitted, setHasAdmitted] = useState(false);
+  const [isOfflineSubmitted, setIsOfflineSubmitted] = useState(false);
 
   // Estados do Modal de Saída Antecipada
   const [showExitModal, setShowExitModal] = useState(false);
@@ -49,7 +56,7 @@ export default function MeetingRoom() {
   const [isSubmittingExit, setIsSubmittingExit] = useState(false);
   const [hasExitedSuccessfully, setHasExitedSuccessfully] = useState(false);
 
-  // 1. Polling contínuo (a cada 2.5s) para carregar dados e detectar encerramento em tempo real para todos os membros
+  // 1. Polling contínuo (com suporte a Cache Offline)
   useEffect(() => {
     if (!roomId) return;
     let isMounted = true;
@@ -69,6 +76,7 @@ export default function MeetingRoom() {
           if (data.meeting.type) setMeetingType(data.meeting.type);
           if (data.meeting.organizer) setOrganizerInfo(data.meeting.organizer);
           if (data.meeting.attachments) setAttachments(data.meeting.attachments);
+          cacheMeetingData(data.meeting);
 
           if (data.meeting.status === 'ENDED') {
             setMeetingStatus('ENDED');
@@ -77,17 +85,48 @@ export default function MeetingRoom() {
           }
           setMeetingNotFound(false);
         } else {
-          setMeetingNotFound(true);
+          // Fallback para cache local
+          const cached = getCachedMeetingData(roomId);
+          if (cached) {
+            setTopic(cached.topic || 'DDS de Segurança');
+            setFarm(cached.farm || '');
+            setObjective(cached.objective || '');
+            setProgrammaticContent(cached.programmaticContent || '');
+            setClassification(cached.classification || 'DDS');
+            if (cached.type) setMeetingType(cached.type);
+            if (cached.organizer) setOrganizerInfo(cached.organizer);
+            if (cached.attachments) setAttachments(cached.attachments);
+            setMeetingStatus('LIVE');
+            setMeetingNotFound(false);
+          } else {
+            setMeetingNotFound(true);
+          }
         }
       } catch (err) {
-        console.error("Erro ao sincronizar status da reunião:", err);
+        console.warn("Sem conexão ao buscar reunião, buscando no cache local:", err);
+        const cached = getCachedMeetingData(roomId);
+        if (cached && isMounted) {
+          setTopic(cached.topic || 'DDS de Segurança');
+          setFarm(cached.farm || '');
+          setObjective(cached.objective || '');
+          setProgrammaticContent(cached.programmaticContent || '');
+          setClassification(cached.classification || 'DDS');
+          if (cached.type) setMeetingType(cached.type);
+          if (cached.organizer) setOrganizerInfo(cached.organizer);
+          if (cached.attachments) setAttachments(cached.attachments);
+          setMeetingStatus('LIVE');
+          setMeetingNotFound(false);
+        } else if (isMounted) {
+          setTopic('DDS de Segurança');
+          setMeetingNotFound(false);
+        }
       } finally {
         if (isMounted) setIsLoadingMeeting(false);
       }
     };
 
     fetchMeeting();
-    const interval = setInterval(fetchMeeting, 20000); // Polling a cada 2.5s para desconexão imediata quando o organizador encerra
+    const interval = setInterval(fetchMeeting, 20000);
 
     return () => {
       isMounted = false;
@@ -95,9 +134,7 @@ export default function MeetingRoom() {
     };
   }, [roomId]);
 
-  
-
-  // Submissão de Presença pelo Colaborador
+  // Submissão de Presença pelo Colaborador (com suporte Offline-First)
   const handleAdmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -123,6 +160,28 @@ export default function MeetingRoom() {
 
     setIsSubmitting(true);
 
+    // Se estiver explicitamente offline
+    if (typeof window !== 'undefined' && !navigator.onLine) {
+      try {
+        await saveOfflineAttendance({
+          name: name.trim(),
+          cpf: funcao.trim(),
+          savedSelfie,
+          savedSignature,
+          meetingId: roomId
+        });
+        setIsOfflineSubmitted(true);
+        setHasAdmitted(true);
+        toast.info('Modo Campo Offline', 'Presença gravada com segurança no celular. Será enviada ao reconectar.');
+      } catch (err) {
+        console.error('Erro ao gravar offline:', err);
+        toast.error('Erro de Armazenamento', 'Não foi possível gravar na memória do aparelho.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
     try {
       const res = await fetch('/api/presenca', {
         method: 'POST',
@@ -139,13 +198,28 @@ export default function MeetingRoom() {
       const data = await res.json();
 
       if (data.success) {
+        setIsOfflineSubmitted(false);
         setHasAdmitted(true);
         toast.success('Presença Validada!', 'Sua presença foi registrada com sucesso.');
       } else {
         toast.error('Erro ao Registrar', data.error || 'Não foi possível salvar sua presença.');
       }
     } catch {
-      toast.error('Falha de Conexão', 'Verifique sua internet e tente novamente.');
+      // Fallback de resiliência: salva no dispositivo
+      try {
+        await saveOfflineAttendance({
+          name: name.trim(),
+          cpf: funcao.trim(),
+          savedSelfie,
+          savedSignature,
+          meetingId: roomId
+        });
+        setIsOfflineSubmitted(true);
+        setHasAdmitted(true);
+        toast.info('Salvo no Celular', 'A internet oscilou. Os dados foram salvos com segurança no aparelho.');
+      } catch {
+        toast.error('Falha de Conexão', 'Verifique sua internet e tente novamente.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -434,6 +508,11 @@ export default function MeetingRoom() {
       
       {/* Luz de fundo decorativa */}
       <div className="absolute top-10 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-600/15 blur-[130px] rounded-full pointer-events-none"></div>
+
+      {/* Badge de Conexão e Fila de Presenças Offline */}
+      <div className="w-full max-w-md mb-3 relative z-10">
+        <OfflineSyncBadge meetingId={roomId} />
+      </div>
 
       {/* Topo com Título do DDS ON */}
       <header className="w-full max-w-md bg-gradient-to-r from-emerald-600 to-teal-600 text-slate-950 p-4 sm:p-5 rounded-3xl shadow-2xl mb-5 text-center relative z-10 border border-emerald-400/30 overflow-hidden">
