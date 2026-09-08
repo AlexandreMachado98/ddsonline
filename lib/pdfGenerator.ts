@@ -1,5 +1,18 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { PDFDocument } from 'pdf-lib';
+
+export interface AttachmentPdfData {
+  id?: string;
+  fileName: string;
+  displayName?: string | null;
+  description?: string | null;
+  mimeType: string;
+  fileSize: number;
+  fileData: string; // Base64 data URL
+  pageCount?: number | null;
+  order?: number;
+}
 
 interface AttendanceData {
   name: string;
@@ -11,23 +24,24 @@ interface AttendanceData {
   exitSignature?: string;
 }
 
-interface MeetingData {
+export interface MeetingData {
   id?: string;
   topic: string;
   farm: string;
-  type?: 'PRESENTIAL' | 'REMOTE';
+  type?: 'PRESENTIAL' | 'REMOTE' | string;
   objective?: string | null;
   programmaticContent?: string | null;
-  createdAt?: number | string;
+  createdAt?: number | string | Date;
   endedAt?: string | null;
   instructorName?: string | null;
   classification?: string | null;
-  organizer?: { name: string };
+  organizer?: { name: string; position?: string | null; company?: string | null };
   attendees?: AttendanceData[];
   groupPhoto?: string | null;
+  attachments?: AttachmentPdfData[];
 }
 
-export function generateDdsPdf(meeting: MeetingData) {
+export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
@@ -177,8 +191,6 @@ export function generateDdsPdf(meeting: MeetingData) {
   currentY += objCardH + 4;
 
   // --- TABLE DE PRESENÇA ---
-  
-  // Green header above table
   doc.setFillColor(tableHeaderGreen[0], tableHeaderGreen[1], tableHeaderGreen[2]);
   doc.roundedRect(14, currentY, pageWidth - 28, 10, 2, 2, 'F');
   doc.setTextColor(255, 255, 255);
@@ -467,7 +479,254 @@ export function generateDdsPdf(meeting: MeetingData) {
     doc.text('Instrutor / Responsável pelo Treinamento', pageWidth / 2, signY + 7.5, { align: 'center' });
   }
 
-  // --- FOOTER EM TODAS AS PÁGINAS ---
+  // =========================================================================
+  // PÁGINAS DE EVIDÊNCIAS & MATERIAIS APRESENTADOS (ANEXOS)
+  // =========================================================================
+  const attachmentsList = (meeting.attachments || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+  const pdfAttachmentsToMerge: { index: number; attachment: AttachmentPdfData }[] = [];
+
+  if (attachmentsList.length > 0) {
+    // 1. Resumo Geral de Anexos / Evidências na Ata
+    doc.addPage();
+    let attPageY = 0;
+
+    // Header Banner
+    doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+    doc.rect(0, 0, pageWidth, 30, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DDS ON', 14, 18);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(230, 240, 235);
+    doc.text('DOSSIÊ DE EVIDÊNCIAS & MATERIAIS APRESENTADOS', 14, 24);
+
+    renderCompanyLogo(30);
+
+    attPageY = 43;
+
+    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+    doc.setFontSize(15);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ÍNDICE DE EVIDÊNCIAS E MATERIAIS APRESENTADOS', 14, attPageY);
+    
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+    doc.text('Comprovação documental dos arquivos, cartilhas, imagens e procedimentos exibidos à equipe durante o DDS.', 14, attPageY + 5);
+
+    attPageY += 13;
+
+    // Tabela Sumário de Anexos
+    const attTableRows = attachmentsList.map((att, idx) => {
+      const isPdf = att.mimeType === 'application/pdf' || att.fileName.toLowerCase().endsWith('.pdf');
+      const sizeStr = att.fileSize < 1024 * 1024 
+        ? `${(att.fileSize / 1024).toFixed(1)} KB` 
+        : `${(att.fileSize / (1024 * 1024)).toFixed(2)} MB`;
+
+      return [
+        String(idx + 1).padStart(2, '0'),
+        att.displayName || att.fileName,
+        isPdf ? `PDF (${att.pageCount || 1} pág)` : 'IMAGEM',
+        sizeStr,
+        att.description || 'Material apresentado aos participantes'
+      ];
+    });
+
+    autoTable(doc, {
+      startY: attPageY,
+      margin: { top: 20, bottom: 25, left: 14, right: 14 },
+      head: [['ANEXO', 'NOME DO MATERIAL', 'FORMATO', 'TAMANHO', 'DESCRIÇÃO / OBSERVAÇÃO TÉCNICA']],
+      body: attTableRows,
+      theme: 'grid',
+      headStyles: {
+        fillColor: lightGreenBg,
+        textColor: textDark,
+        fontStyle: 'bold',
+        halign: 'center',
+        fontSize: 8,
+        minCellHeight: 8
+      },
+      styles: {
+        fontSize: 7.5,
+        textColor: textDark,
+        lineColor: [229, 231, 235],
+        lineWidth: 0.1,
+        cellPadding: 3
+      },
+      columnStyles: {
+        0: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
+        1: { cellWidth: 46, fontStyle: 'bold' },
+        2: { cellWidth: 24, halign: 'center' },
+        3: { cellWidth: 18, halign: 'center' },
+        4: { cellWidth: 78 }
+      }
+    });
+
+    // 2. Renderização de cada Anexo
+    attachmentsList.forEach((att, idx) => {
+      const isPdf = att.mimeType === 'application/pdf' || att.fileName.toLowerCase().endsWith('.pdf');
+      const anexoLabel = `ANEXO ${String(idx + 1).padStart(2, '0')}`;
+
+      if (!isPdf) {
+        // Renderiza página de imagem
+        doc.addPage();
+        
+        // Header Banner
+        doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+        doc.rect(0, 0, pageWidth, 26, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${anexoLabel}: ${att.displayName || att.fileName}`, 14, 15);
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(230, 240, 235);
+        doc.text(`Evidência visual apresentada em: ${dateStr}`, 14, 21);
+
+        renderCompanyLogo(26);
+
+        let imgCardY = 32;
+
+        // Card de Descrição
+        if (att.description) {
+          doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
+          doc.roundedRect(14, imgCardY, pageWidth - 28, 12, 2, 2, 'F');
+          doc.setFontSize(7.5);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+          doc.text('Observação:', 18, imgCardY + 5);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+          doc.text(doc.splitTextToSize(att.description, pageWidth - 60), 38, imgCardY + 5);
+          imgCardY += 16;
+        }
+
+        // Imagem Centralizada e Proporcional
+        try {
+          const imgProps = doc.getImageProperties(att.fileData);
+          const maxW = pageWidth - 28;
+          const maxH = pageHeight - imgCardY - 26;
+          let imgW = maxW;
+          let imgH = maxH;
+
+          if (imgProps) {
+            const ratio = imgProps.width / imgProps.height;
+            imgH = imgW / ratio;
+            if (imgH > maxH) {
+              imgH = maxH;
+              imgW = imgH * ratio;
+            }
+          }
+
+          const imgX = (pageWidth - imgW) / 2;
+          const format = att.fileData.includes('image/png') ? 'PNG' : 'JPEG';
+          doc.addImage(att.fileData, format, imgX, imgCardY, imgW, imgH);
+        } catch (imgErr) {
+          console.error("Erro ao desenhar imagem no PDF:", imgErr);
+        }
+      } else {
+        // Anexo é PDF: gera Capa/Separador oficial e marca para mesclagem vetorial posterior
+        doc.addPage();
+        
+        // Banner Superior
+        doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+        doc.rect(0, 0, pageWidth, 30, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text('DDS ON', 14, 18);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(230, 240, 235);
+        doc.text('DOCUMENTO E PROCEDIMENTO TÉCNICO ANEXO', 14, 24);
+
+        renderCompanyLogo(30);
+
+        let sepY = 55;
+
+        // Moldura Decorativa do Anexo
+        doc.setDrawColor(tableHeaderGreen[0], tableHeaderGreen[1], tableHeaderGreen[2]);
+        doc.setLineWidth(0.6);
+        doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
+        doc.roundedRect(20, sepY, pageWidth - 40, 140, 4, 4, 'FD');
+
+        // Título do Anexo
+        doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text(anexoLabel, pageWidth / 2, sepY + 22, { align: 'center' });
+
+        doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        const splitDocTitle = doc.splitTextToSize(att.displayName || att.fileName, pageWidth - 60);
+        doc.text(splitDocTitle, pageWidth / 2, sepY + 34, { align: 'center' });
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+        doc.text(`Arquivo: ${att.fileName}  •  Formato: Documento PDF (${att.pageCount || 1} páginas)`, pageWidth / 2, sepY + 48, { align: 'center' });
+
+        // Divisória
+        doc.setDrawColor(200, 215, 205);
+        doc.setLineWidth(0.3);
+        doc.line(35, sepY + 56, pageWidth - 35, sepY + 56);
+
+        // Bloco de Descrição Técnica
+        const sepDesc = att.description || 'Material normativo e instrucional apresentado integralmente aos colaboradores durante a sessão de DDS.';
+        const splitDesc = doc.splitTextToSize(sepDesc, pageWidth - 70);
+        doc.setFontSize(8.5);
+        doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+        doc.text('Descrição / Finalidade Operacional:', 35, sepY + 68);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+        doc.text(splitDesc, 35, sepY + 76);
+
+        // Metadados do DDS
+        const metaY = sepY + 105;
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+        doc.text(`Tema do DDS:`, 35, metaY);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+        doc.text(meeting.topic || 'DDS de Segurança', 60, metaY);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+        doc.text(`Responsável:`, 35, metaY + 6);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+        doc.text(meeting.instructorName || meeting.organizer?.name || 'Técnico Responsável', 60, metaY + 6);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+        doc.text(`Data / Horário:`, 35, metaY + 12);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+        doc.text(dateStr, 60, metaY + 12);
+
+        // Aviso Informativo
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(30, sepY + 123, pageWidth - 60, 12, 2, 2, 'F');
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+        doc.text('✓ As páginas oficiais deste documento foram anexadas a seguir com qualidade vetorial.', pageWidth / 2, sepY + 130.5, { align: 'center' });
+
+        // Guarda referência para mesclagem
+        pdfAttachmentsToMerge.push({ index: idx, attachment: att });
+      }
+    });
+  }
+
+  // --- FOOTER EM TODAS AS PÁGINAS DO JSPDF ---
   const pageCount = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -493,7 +752,54 @@ export function generateDdsPdf(meeting: MeetingData) {
   }
 
   const cleanTopic = (meeting.topic || 'DDS').replace(/[^a-zA-Z0-9]/g, '_');
-  doc.save(`Relatorio_Auditoria_DDS_ON_${cleanTopic}_${new Date().toISOString().slice(0, 10)}.pdf`);
+  const fileName = `Relatorio_Auditoria_DDS_ON_${cleanTopic}_${new Date().toISOString().slice(0, 10)}.pdf`;
+
+  // =========================================================================
+  // CONSOLIDAÇÃO VETORIAL DOS PDFs ANEXADOS USANDO PDF-LIB
+  // =========================================================================
+  try {
+    const mainPdfBytes = doc.output('arraybuffer');
+
+    if (pdfAttachmentsToMerge.length === 0) {
+      // Sem PDFs para mesclar, salva direto
+      doc.save(fileName);
+      return;
+    }
+
+    const mergedPdf = await PDFDocument.load(mainPdfBytes);
+
+    for (const item of pdfAttachmentsToMerge) {
+      try {
+        const base64Data = item.attachment.fileData.replace(/^data:application\/pdf;base64,/, '').trim();
+        const binaryStr = atob(base64Data);
+        const donorBytes = new Uint8Array(binaryStr.length);
+        for (let j = 0; j < binaryStr.length; j++) {
+          donorBytes[j] = binaryStr.charCodeAt(j);
+        }
+
+        const donorPdf = await PDFDocument.load(donorBytes, { ignoreEncryption: true });
+        const pageIndices = donorPdf.getPageIndices();
+        const copiedPages = await mergedPdf.copyPages(donorPdf, pageIndices);
+        
+        for (const page of copiedPages) {
+          mergedPdf.addPage(page);
+        }
+      } catch (err) {
+        console.error(`Falha ao mesclar páginas do PDF "${item.attachment.fileName}":`, err);
+      }
+    }
+
+    const finalPdfBytes = await mergedPdf.save();
+    const blob = new Blob([finalPdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 8000);
+  } catch (mergeError) {
+    console.error("Erro na consolidação pdf-lib, exportando via jsPDF padrão:", mergeError);
+    doc.save(fileName);
+  }
 }
 
 // 2. RELATÓRIO CONSOLIDADO DO PERÍODO

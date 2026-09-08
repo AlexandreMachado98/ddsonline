@@ -70,6 +70,7 @@ model Meeting {
   instructorName      String?
   classification      String?      @default("DDS")
   attendees           Attendance[]
+  attachments         MeetingAttachment[]
 }
 
 model Attendance {
@@ -83,5 +84,20 @@ model Attendance {
   leftAt        DateTime?
   createdAt     DateTime  @default(now())
   meetingId     String
-  meeting       Meeting   @relation(fields: [meetingId], references: [id])
+  meeting       Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+}
+
+model MeetingAttachment {
+  id          String   @id @default(uuid())
+  fileName    String
+  displayName String?
+  description String?
+  mimeType    String
+  fileSize    Int
+  fileData    String
+  pageCount   Int?     @default(1)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  meetingId   String
+  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
 }

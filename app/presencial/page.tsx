@@ -11,6 +11,7 @@ import Link from 'next/link';
 import SelfieCapture from '@/components/SelfieCapture';
 import SignaturePad from '@/components/SignaturePad';
 import DdsLogo from '@/components/DdsLogo';
+import AttachmentManager from '@/components/AttachmentManager';
 import { useToast } from '@/components/Toast';
 
 function PresencialContent() {
@@ -324,6 +325,17 @@ function PresencialContent() {
             Preencha seus dados, tire a foto facial e assine abaixo para validar sua presença presencial.
           </p>
         </div>
+
+        {/* Material e Evidências Apresentados no DDS */}
+        {meeting?.attachments && meeting.attachments.length > 0 && (
+          <div className="bg-slate-900/90 backdrop-blur-md p-4 sm:p-5 rounded-3xl border border-slate-800 shadow-xl">
+            <AttachmentManager
+              attachments={meeting.attachments}
+              onChange={() => {}}
+              readOnly={true}
+            />
+          </div>
+        )}
 
         {/* PASSO 1: DADOS PESSOAIS */}
         <section className="bg-slate-900/90 backdrop-blur-md p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-xl space-y-3.5">

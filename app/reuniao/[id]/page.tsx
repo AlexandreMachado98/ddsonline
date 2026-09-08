@@ -12,6 +12,7 @@ import SelfieCapture from '@/components/SelfieCapture';
 import SignaturePad from '@/components/SignaturePad';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
 import DdsLogo from '@/components/DdsLogo';
+import AttachmentManager from '@/components/AttachmentManager';
 import { useToast } from '@/components/Toast';
 
 export default function MeetingRoom() {
@@ -29,6 +30,7 @@ export default function MeetingRoom() {
   const [meetingStatus, setMeetingStatus] = useState<'LIVE' | 'ENDED'>('LIVE');
   const [meetingType, setMeetingType] = useState<'PRESENTIAL' | 'REMOTE'>('REMOTE');
   const [organizerInfo, setOrganizerInfo] = useState<any>(null);
+  const [attachments, setAttachments] = useState<any[]>([]);
   const [isLoadingMeeting, setIsLoadingMeeting] = useState(true);
   const [meetingNotFound, setMeetingNotFound] = useState(false);
 
@@ -66,6 +68,7 @@ export default function MeetingRoom() {
           setClassification(data.meeting.classification || 'DDS');
           if (data.meeting.type) setMeetingType(data.meeting.type);
           if (data.meeting.organizer) setOrganizerInfo(data.meeting.organizer);
+          if (data.meeting.attachments) setAttachments(data.meeting.attachments);
 
           if (data.meeting.status === 'ENDED') {
             setMeetingStatus('ENDED');
@@ -468,6 +471,17 @@ export default function MeetingRoom() {
             Preencha seus dados, tire a foto facial e assine na tela para registrar sua presença no DDS.
           </p>
         </div>
+
+        {/* Material Apresentado no DDS */}
+        {attachments.length > 0 && (
+          <div className="bg-slate-900/90 backdrop-blur-md p-4 sm:p-5 rounded-3xl border border-slate-800 shadow-xl">
+            <AttachmentManager
+              attachments={attachments}
+              onChange={() => {}}
+              readOnly={true}
+            />
+          </div>
+        )}
 
         {/* PASSO 1: DADOS PESSOAIS */}
         <section className="bg-slate-900/90 backdrop-blur-md p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-xl space-y-3.5">

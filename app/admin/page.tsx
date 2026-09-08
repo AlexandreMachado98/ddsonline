@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
 import GroupPhotoCapture from '@/components/GroupPhotoCapture';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
+import AttachmentManager, { DdsAttachment } from '@/components/AttachmentManager';
 
 export default function AdminPanel() {
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -27,6 +28,7 @@ export default function AdminPanel() {
   const [farm, setFarm] = useState('');
   const [objective, setObjective] = useState('');
   const [programmaticContent, setProgrammaticContent] = useState('');
+  const [newAttachments, setNewAttachments] = useState<DdsAttachment[]>([]);
 
   // Fotos da Equipe
   const [teamPhotos, setTeamPhotos] = useState<string[]>([]);
@@ -38,6 +40,8 @@ export default function AdminPanel() {
   const [selectedMeetings, setSelectedMeetings] = useState<string[]>([]);
 
   const [activeMeeting, setActiveMeeting] = useState<any>(null);
+  const [editAttachments, setEditAttachments] = useState<DdsAttachment[]>([]);
+  const [isReviewingClose, setIsReviewingClose] = useState(false);
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
@@ -62,7 +66,8 @@ export default function AdminPanel() {
           instructorName: editForm.instructorName,
           classification: editForm.classification,
           objective: editForm.objective,
-          programmaticContent: editForm.programmaticContent
+          programmaticContent: editForm.programmaticContent,
+          attachments: editAttachments
         })
       });
       const data = await res.json();
@@ -184,7 +189,8 @@ export default function AdminPanel() {
           programmaticContent: programmaticContent.trim(),
           organizerId: currentUser?.id,
           email: currentUser?.email,
-          groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : null
+          groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : null,
+          attachments: newAttachments
         })
       });
       
@@ -196,6 +202,7 @@ export default function AdminPanel() {
         setTopic('');
         setObjective('');
         setProgrammaticContent('');
+        setNewAttachments([]);
         showToast('DDS Iniciado com sucesso!', 'success');
       } else {
         showToast('Erro ao iniciar reunião: ' + (data.error || 'Falha no banco.'), 'error');
@@ -252,48 +259,62 @@ export default function AdminPanel() {
     setTimeout(() => setCopiedLink(false), 3000);
   };
 
-  const handleDownloadActivePdf = () => {
+  const handleDownloadActivePdf = async () => {
     if (!activeMeeting || !activeMeeting.attendees || activeMeeting.attendees.length === 0) {
       showToast('Ainda não há presenças registradas nesta reunião.', 'error');
       return;
     }
-    showToast('Gerando Ata Oficial em PDF...', 'info');
-    generateDdsPdf({
-      topic: activeMeeting.topic,
-      farm: activeMeeting.farm,
-      type: activeMeeting.type,
-      objective: activeMeeting.objective,
-      programmaticContent: activeMeeting.programmaticContent,
-      classification: activeMeeting.classification,
-      instructorName: activeMeeting.instructorName,
-      endedAt: activeMeeting.endedAt,
-      organizer: activeMeeting.organizer,
-      groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : activeMeeting.groupPhoto,
-      createdAt: activeMeeting.createdAt,
-      attendees: activeMeeting.attendees
-    });
+    showToast('Gerando Ata Oficial em PDF consolidado com evidências...', 'info');
+    try {
+      await generateDdsPdf({
+        topic: activeMeeting.topic,
+        farm: activeMeeting.farm,
+        type: activeMeeting.type,
+        objective: activeMeeting.objective,
+        programmaticContent: activeMeeting.programmaticContent,
+        classification: activeMeeting.classification,
+        instructorName: activeMeeting.instructorName,
+        endedAt: activeMeeting.endedAt,
+        organizer: activeMeeting.organizer,
+        groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : activeMeeting.groupPhoto,
+        createdAt: activeMeeting.createdAt,
+        attendees: activeMeeting.attendees,
+        attachments: activeMeeting.attachments || newAttachments || []
+      });
+      showToast('Ata em PDF gerada com sucesso!', 'success');
+    } catch (e) {
+      console.error('Erro ao gerar PDF:', e);
+      showToast('Erro ao compilar o PDF da ata.', 'error');
+    }
   };
 
-  const handleDownloadHistoryPdf = (meeting: any) => {
+  const handleDownloadHistoryPdf = async (meeting: any) => {
     if (!meeting.attendees || meeting.attendees.length === 0) {
       showToast('Esta reunião não possui presenças registradas.', 'error');
       return;
     }
-    showToast('Gerando Ata Oficial em PDF...', 'info');
-    generateDdsPdf({
-      topic: meeting.topic,
-      farm: meeting.farm,
-      type: meeting.type,
-      classification: meeting.classification,
-      instructorName: meeting.instructorName,
-      endedAt: meeting.endedAt,
-      organizer: meeting.organizer,
-      objective: meeting.objective,
-      programmaticContent: meeting.programmaticContent,
-      groupPhoto: meeting.groupPhoto,
-      createdAt: meeting.createdAt,
-      attendees: meeting.attendees
-    });
+    showToast('Gerando Ata Oficial em PDF com evidências...', 'info');
+    try {
+      await generateDdsPdf({
+        topic: meeting.topic,
+        farm: meeting.farm,
+        type: meeting.type,
+        classification: meeting.classification,
+        instructorName: meeting.instructorName,
+        endedAt: meeting.endedAt,
+        organizer: meeting.organizer,
+        objective: meeting.objective,
+        programmaticContent: meeting.programmaticContent,
+        groupPhoto: meeting.groupPhoto,
+        createdAt: meeting.createdAt,
+        attendees: meeting.attendees,
+        attachments: meeting.attachments || []
+      });
+      showToast('Ata em PDF gerada com sucesso!', 'success');
+    } catch (e) {
+      console.error('Erro ao gerar PDF histórico:', e);
+      showToast('Erro ao compilar o PDF da ata.', 'error');
+    }
   };
 
   const handleDeleteMeetings = (ids: string[], isMultiple = false, topicName = '') => {
@@ -355,26 +376,28 @@ export default function AdminPanel() {
   };
 
   const handleEndMeeting = () => {
-    setConfirmDialog({
-      title: 'Encerrar DDS em Andamento',
-      message: 'Tem certeza que deseja encerrar este DDS? A ata oficial da AM TST será arquivada e a sala de vídeo será fechada.',
-      onConfirm: async () => {
-        if (activeMeeting && activeMeeting.attendees && activeMeeting.attendees.length > 0) {
-          handleDownloadActivePdf();
-        }
-        await fetch('/api/reuniao', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ meetingId: activeMeeting?.id })
-        });
-        setIsLiveMode(false);
-        setActiveMeeting(null);
-        setTeamPhotos([]);
-        fetchAllData();
-        showToast('DDS Encerrado! Ata arquivada com sucesso.', 'success');
-        setConfirmDialog(null);
+    setIsReviewingClose(true);
+  };
+
+  const handleConfirmCloseDds = async () => {
+    try {
+      if (activeMeeting && activeMeeting.attendees && activeMeeting.attendees.length > 0) {
+        await handleDownloadActivePdf();
       }
-    });
+      await fetch('/api/reuniao', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingId: activeMeeting?.id })
+      });
+      setIsLiveMode(false);
+      setIsReviewingClose(false);
+      setActiveMeeting(null);
+      setTeamPhotos([]);
+      fetchAllData();
+      showToast('DDS Encerrado! Ata arquivada com sucesso.', 'success');
+    } catch (e) {
+      showToast('Erro ao encerrar DDS.', 'error');
+    }
   };
 
   const handleLogout = () => {
@@ -395,7 +418,7 @@ export default function AdminPanel() {
         {/* EDIT MODAL */}
         {editingMeeting && (
           <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-            <div className="bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-3xl max-w-md w-full max-h-[90dvh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-3xl max-w-xl w-full max-h-[92dvh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between mb-4 sticky top-0 bg-slate-900/90 backdrop-blur-md pb-2 z-10 border-b border-slate-800">
                 <h2 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
                   <span className="text-emerald-400">✏️</span>
@@ -406,7 +429,7 @@ export default function AdminPanel() {
                 </button>
               </div>
               
-              <form onSubmit={handleSaveEditMeeting} className="space-y-3.5">
+              <form onSubmit={handleSaveEditMeeting} className="space-y-4">
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Tipo de Conteúdo</label>
@@ -479,12 +502,89 @@ export default function AdminPanel() {
                     />
                   </div>
                 </div>
+
+                {/* Gestão de Anexos no Modal de Edição */}
+                <div className="pt-2 border-t border-slate-800">
+                  <AttachmentManager
+                    attachments={editAttachments}
+                    onChange={setEditAttachments}
+                  />
+                </div>
                 
                 <div className="flex gap-2.5 pt-3">
                   <button type="button" onClick={() => setEditingMeeting(null)} className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-colors min-h-[44px]">Cancelar</button>
                   <button type="submit" className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all min-h-[44px]">Salvar Alterações</button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Revisão & Fechamento Oficial do DDS */}
+        {isReviewingClose && activeMeeting && (
+          <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-3xl max-w-lg w-full max-h-[92dvh] overflow-y-auto shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <ShieldCheck size={22} />
+                  <h2 className="text-base font-extrabold text-white">Revisão & Fechamento do DDS</h2>
+                </div>
+                <button onClick={() => setIsReviewingClose(false)} className="text-slate-400 hover:text-white p-1 rounded-lg">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1.5">
+                  <p className="text-slate-300">Tema: <strong className="text-white">{activeMeeting.topic}</strong></p>
+                  <p className="text-slate-300">Local: <strong className="text-white">{activeMeeting.farm}</strong></p>
+                  <p className="text-slate-300">Total de Participantes: <strong className="text-emerald-400 font-bold">{activeMeeting.attendees?.length || 0} colaboradores</strong></p>
+                  <p className="text-slate-300">Foto da Equipe: <strong className={teamPhotos.length > 0 || activeMeeting.groupPhoto ? "text-emerald-400" : "text-amber-400"}>
+                    {teamPhotos.length > 0 || activeMeeting.groupPhoto ? "✓ Registrada" : "Não registrada"}
+                  </strong></p>
+                </div>
+
+                {/* Resumo de Evidências */}
+                <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-200">Evidências / Material Apresentado:</span>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
+                      {(activeMeeting.attachments?.length || 0)} anexo(s)
+                    </span>
+                  </div>
+                  {(!activeMeeting.attachments || activeMeeting.attachments.length === 0) ? (
+                    <p className="text-[11px] text-slate-500 italic">Nenhum anexo adicional foi incluído nesta sessão.</p>
+                  ) : (
+                    <ul className="space-y-1 max-h-32 overflow-y-auto">
+                      {activeMeeting.attachments.map((att: any, i: number) => (
+                        <li key={i} className="text-[11px] text-slate-300 flex items-center gap-1.5 truncate">
+                          <span className="text-emerald-400 font-mono">#{i+1}</span>
+                          <span className="truncate">{att.displayName || att.fileName}</span>
+                          <span className="text-slate-500 text-[10px]">({att.mimeType === 'application/pdf' ? 'PDF' : 'Imagem'})</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleDownloadActivePdf}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-slate-700 transition-all min-h-[44px]"
+                >
+                  <Download size={15} />
+                  <span>Baixar Ata em PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmCloseDds}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all min-h-[44px]"
+                >
+                  Confirmar Encerramento
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -665,6 +765,22 @@ export default function AdminPanel() {
                   isAdmin={true}
                 />
               )}
+
+              {/* Seção de Evidências e Material Apresentado na Sala Ativa */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl">
+                <AttachmentManager
+                  attachments={activeMeeting.attachments || []}
+                  onChange={(updated) => setActiveMeeting((prev: any) => ({ ...prev, attachments: updated }))}
+                  onSaveToMeeting={async (updated) => {
+                    await fetch('/api/reuniao', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ meetingId: activeMeeting.id, attachments: updated })
+                    });
+                    showToast('Evidências atualizadas no DDS!', 'success');
+                  }}
+                />
+              </div>
             </div>
 
             <div className="lg:col-span-5 space-y-4">
@@ -1143,6 +1259,14 @@ export default function AdminPanel() {
                   />
                 </div>
 
+              {/* Seção de Anexos / Evidências do Novo DDS */}
+              <div className="pt-2 border-t border-slate-800/80">
+                <AttachmentManager
+                  attachments={newAttachments}
+                  onChange={setNewAttachments}
+                />
+              </div>
+
               {/* Botão de Iniciar */}
               <button
                 type="submit"
@@ -1226,6 +1350,11 @@ export default function AdminPanel() {
                           <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                             {m.type === 'PRESENTIAL' ? 'Presencial' : 'Remoto'}
                           </span>
+                          {m.attachments && m.attachments.length > 0 && (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shrink-0">
+                              <ShieldCheck size={10} /> {m.attachments.length} {m.attachments.length === 1 ? 'anexo' : 'anexos'}
+                            </span>
+                          )}
                         </div>
                         <p className="text-[11px] text-slate-400 mt-0.5 break-words">
                           📍 {m.farm} • {new Date(m.createdAt).toLocaleDateString('pt-BR')} às {new Date(m.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • <strong className="text-emerald-400">{m.attendees?.length || 0} presenças</strong>
@@ -1250,6 +1379,7 @@ export default function AdminPanel() {
                       <button
                         onClick={() => {
                           setEditingMeeting(m);
+                          setEditAttachments(m.attachments || []);
                           setEditForm({
                             createdAt: formatDatetimeLocal(m.createdAt),
                             endedAt: m.endedAt ? formatDatetimeLocal(m.endedAt) : '',

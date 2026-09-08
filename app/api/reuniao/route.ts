@@ -11,6 +11,26 @@ async function ensureDbColumns() {
     await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "instructorName" TEXT;');
     await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "classification" TEXT DEFAULT \'DDS\';');
     await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "groupPhoto" TEXT;');
+    
+    // Cria tabela de anexos e evidências se não existir
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "MeetingAttachment" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "meetingId" TEXT NOT NULL,
+        "fileName" TEXT NOT NULL,
+        "displayName" TEXT,
+        "description" TEXT,
+        "mimeType" TEXT NOT NULL,
+        "fileSize" INTEGER NOT NULL,
+        "fileData" TEXT NOT NULL,
+        "pageCount" INTEGER DEFAULT 1,
+        "order" INTEGER DEFAULT 0,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "MeetingAttachment_meetingId_fkey" FOREIGN KEY ("meetingId") REFERENCES "Meeting"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "MeetingAttachment_meetingId_idx" ON "MeetingAttachment"("meetingId");`);
+    
     dbInitialized = true;
   } catch (e) {
     console.error("ensureDbColumns error:", e);
@@ -33,6 +53,9 @@ export async function GET(req: Request) {
         include: {
           attendees: {
             orderBy: { createdAt: 'desc' }
+          },
+          attachments: {
+            orderBy: { order: 'asc' }
           },
           organizer: {
             select: { name: true, position: true, company: true }
@@ -57,6 +80,9 @@ export async function GET(req: Request) {
           attendees: {
             orderBy: { createdAt: 'desc' }
           },
+          attachments: {
+            orderBy: { order: 'asc' }
+          },
           organizer: {
             select: { name: true, position: true, company: true }
           }
@@ -73,6 +99,9 @@ export async function GET(req: Request) {
         include: {
           attendees: {
             orderBy: { createdAt: 'asc' }
+          },
+          attachments: {
+            orderBy: { order: 'asc' }
           },
           organizer: {
             select: { name: true, position: true, company: true }
@@ -96,7 +125,7 @@ export async function POST(req: Request) {
   try {
     await ensureDbColumns();
     const body = await req.json();
-    const { topic, farm, organizerId, email, groupPhoto, type, classification, objective, programmaticContent } = body;
+    const { topic, farm, organizerId, email, groupPhoto, type, classification, objective, programmaticContent, attachments } = body;
 
     let user = null;
 
@@ -130,7 +159,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // Cria a nova sala com identificação, tipo, isolamento e foto em grupo
+    // Cria a nova sala com identificação, tipo, isolamento, foto em grupo e anexos
     const newMeeting = await prisma.meeting.create({
       data: {
         topic: topic || 'DDS de Segurança',
@@ -142,10 +171,25 @@ export async function POST(req: Request) {
         status: 'LIVE',
         organizerId: user ? user.id : null,
         companyId: user?.companyId || null,
-        groupPhoto: groupPhoto || null
+        groupPhoto: groupPhoto || null,
+        attachments: Array.isArray(attachments) && attachments.length > 0 ? {
+          create: attachments.map((att: any, idx: number) => ({
+            fileName: att.fileName || `anexo_${idx+1}`,
+            displayName: att.displayName || att.fileName || `Anexo ${idx+1}`,
+            description: att.description ? String(att.description).trim() : null,
+            mimeType: att.mimeType || 'application/pdf',
+            fileSize: Number(att.fileSize) || 0,
+            fileData: att.fileData || '',
+            pageCount: Number(att.pageCount) || 1,
+            order: typeof att.order === 'number' ? att.order : idx
+          }))
+        } : undefined
       },
       include: {
-        attendees: true
+        attendees: true,
+        attachments: {
+          orderBy: { order: 'asc' }
+        }
       }
     });
     
@@ -156,12 +200,15 @@ export async function POST(req: Request) {
   }
 }
 
-// 3. PUT: Atualiza a reunião (anexa foto em grupo ou encerra a reunião)
+// 3. PUT: Atualiza a reunião (anexa foto em grupo, sincroniza anexos ou encerra a reunião)
 export async function PUT(req: Request) {
   try {
     await ensureDbColumns();
     const body = await req.json().catch(() => ({}));
-    const { meetingId, organizerId, groupPhoto, status, createdAt, endedAt, instructorName, classification, objective, programmaticContent } = body;
+    const { 
+      meetingId, organizerId, groupPhoto, status, createdAt, endedAt, 
+      instructorName, classification, objective, programmaticContent, attachments 
+    } = body;
 
     if (meetingId) {
       const updateData: any = {};
@@ -176,12 +223,33 @@ export async function PUT(req: Request) {
         updateData.programmaticContent = programmaticContent ? programmaticContent.trim() : null;
       }
 
-      // Se nenhum status específico foi passado e não é apenas foto, o padrão é encerrar (ENDED)
-      // Mas NÃO encerra se estamos apenas editando campos como instructorName/classification/objective/programmaticContent
-      const isJustEditing = !status && groupPhoto === undefined && 
+      // Se nenhum status específico foi passado e não é apenas foto/anexos, o padrão é encerrar (ENDED)
+      const isJustEditing = !status && groupPhoto === undefined && attachments === undefined && 
         (instructorName !== undefined || classification !== undefined || objective !== undefined || programmaticContent !== undefined || createdAt || endedAt !== undefined);
-      if (!status && groupPhoto === undefined && !isJustEditing) {
+      if (!status && groupPhoto === undefined && attachments === undefined && !isJustEditing) {
         updateData.status = 'ENDED';
+      }
+
+      // Sincroniza anexos se fornecidos
+      if (Array.isArray(attachments)) {
+        await prisma.meetingAttachment.deleteMany({
+          where: { meetingId }
+        });
+        if (attachments.length > 0) {
+          await prisma.meetingAttachment.createMany({
+            data: attachments.map((att: any, idx: number) => ({
+              meetingId,
+              fileName: att.fileName || `anexo_${idx+1}`,
+              displayName: att.displayName || att.fileName || `Anexo ${idx+1}`,
+              description: att.description ? String(att.description).trim() : null,
+              mimeType: att.mimeType || 'application/pdf',
+              fileSize: Number(att.fileSize) || 0,
+              fileData: att.fileData || '',
+              pageCount: Number(att.pageCount) || 1,
+              order: typeof att.order === 'number' ? att.order : idx
+            }))
+          });
+        }
       }
 
       const updated = await prisma.meeting.update({
@@ -190,6 +258,9 @@ export async function PUT(req: Request) {
         include: {
           attendees: {
             orderBy: { createdAt: 'desc' }
+          },
+          attachments: {
+            orderBy: { order: 'asc' }
           },
           organizer: {
             select: { name: true, position: true, company: true }
@@ -216,6 +287,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ success: false, error: 'Erro ao atualizar reunião' }, { status: 500 });
   }
 }
+
 // 4. DELETE: Exclui reuniões específicas
 export async function DELETE(req: Request) {
   try {
@@ -225,6 +297,13 @@ export async function DELETE(req: Request) {
     if (!meetingIds || !Array.isArray(meetingIds) || meetingIds.length === 0) {
       return NextResponse.json({ success: false, error: 'Nenhum ID de reunião fornecido para exclusão' }, { status: 400 });
     }
+
+    // Deleta anexos vinculados
+    await prisma.meetingAttachment.deleteMany({
+      where: {
+        meetingId: { in: meetingIds }
+      }
+    }).catch(() => {});
 
     // Deleta primeiro as presenças (attendees) para evitar erro de chave estrangeira
     await prisma.attendance.deleteMany({
