@@ -1605,9 +1605,12 @@ export default function AdminPanel() {
         )}
 
         {/* Rodapé Administrativo & Governança */}
-        <footer className="mt-14 pt-6 border-t border-slate-800/80 text-center space-y-2 text-xs text-slate-500 pb-4">
-          <p>© {new Date().getFullYear()} <strong>DDS ON</strong> • Ecossistema Integrado DDS Master • Todos os direitos reservados.</p>
-          <div className="flex items-center justify-center gap-3 text-[11px]">
+        <footer className="mt-14 pt-6 border-t border-slate-800/80 text-center space-y-1.5 text-xs text-slate-500 pb-4">
+          <p>© 2026 <strong>AM TST</strong>. Todos os direitos reservados.</p>
+          <p className="text-[11px] text-slate-400 font-medium">
+            <strong>DDS ON</strong> é uma plataforma da <strong>AM TST</strong> • Integrada ao DDS Master.
+          </p>
+          <div className="flex items-center justify-center gap-3 text-[11px] pt-0.5">
             <Link href="/termos" target="_blank" className="text-slate-400 hover:text-emerald-400 underline underline-offset-2 transition-colors">
               Termos de Uso
             </Link>

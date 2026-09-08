@@ -216,7 +216,10 @@ export default function PrivacidadePage() {
 
         {/* Footer links */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-800/60 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} DDS ON • Todos os direitos reservados.</p>
+          <div>
+            <p>© 2026 <strong>AM TST</strong>. Todos os direitos reservados.</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">DDS ON é uma plataforma da AM TST.</p>
+          </div>
           <div className="flex items-center gap-4">
             <Link href="/termos" className="text-emerald-400 hover:underline">
               Termos de Uso

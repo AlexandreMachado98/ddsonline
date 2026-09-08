@@ -425,7 +425,7 @@ export default function DdsReportPreviewModal({
             <div className="pt-4 mt-auto border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-500 gap-1 font-sans">
               <div>
                 <p>Documento de registro e evidência de SST emitido pelo <strong>DDS ON</strong></p>
-                <p className="text-[9px] text-slate-400">Código de Verificação: {verificationCode}</p>
+                <p className="text-[9px] text-slate-400">© 2026 AM TST • DDS ON é uma plataforma da AM TST • Código: {verificationCode}</p>
               </div>
               <div className="text-right">
                 <p className="font-bold">Página 1 de {totalEstimatedPages}</p>
@@ -540,6 +540,7 @@ export default function DdsReportPreviewModal({
               <div className="pt-4 mt-auto border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-500 gap-1 font-sans">
                 <div>
                   <p>Documento de registro e evidência de SST emitido pelo <strong>DDS ON</strong></p>
+                  <p className="text-[9px] text-slate-400">© 2026 AM TST • DDS ON é uma plataforma da AM TST</p>
                 </div>
                 <div className="text-right">
                   <p className="font-bold">Página 2 de {totalEstimatedPages}</p>

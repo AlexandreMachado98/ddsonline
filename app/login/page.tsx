@@ -230,11 +230,14 @@ export default function LoginPage() {
         </div>
 
         {/* Rodapé Oficial DDS ON */}
-        <footer className="pt-4 border-t border-slate-800/80 text-center space-y-2">
+        <footer className="pt-4 border-t border-slate-800/80 text-center space-y-1.5">
           <p className="text-[10px] text-slate-400">
-            © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
+            © 2026 <strong>AM TST</strong>. Todos os direitos reservados.
           </p>
-          <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500">
+          <p className="text-[10px] text-slate-400 font-medium">
+            <strong>DDS ON</strong> é uma plataforma da <strong>AM TST</strong>.
+          </p>
+          <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500 pt-0.5">
             <Link href="/termos" className="text-slate-400 hover:text-emerald-400 underline underline-offset-2 transition-colors">
               Termos de Uso
             </Link>
@@ -244,7 +247,7 @@ export default function LoginPage() {
             </Link>
           </div>
           <div className="flex items-center justify-center gap-1 text-[10px] text-slate-500">
-            <span>Desenvolvido e Auditado por</span>
+            <span>Desenvolvido por</span>
             <a 
               href="https://amtst.vercel.app" 
               target="_blank" 

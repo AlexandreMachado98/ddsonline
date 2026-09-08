@@ -549,10 +549,13 @@ function PresencialContent() {
         {/* Rodapé */}
         <footer className="pt-4 text-center space-y-1">
           <p className="text-[10px] sm:text-xs text-slate-400">
-            © {new Date().getFullYear()} <strong>DDS ON</strong> • Todos os direitos reservados.
+            © 2026 <strong>AM TST</strong>. Todos os direitos reservados.
           </p>
-          <div className="flex items-center justify-center gap-1 text-[10px] sm:text-xs text-slate-500">
-            <span>Desenvolvido e Auditado por</span>
+          <p className="text-[10px] sm:text-xs text-slate-400 font-medium">
+            <strong>DDS ON</strong> é uma plataforma da <strong>AM TST</strong>.
+          </p>
+          <div className="flex items-center justify-center gap-1 text-[10px] sm:text-xs text-slate-500 pt-0.5">
+            <span>Desenvolvido por</span>
             <a
               href="https://amtst.vercel.app"
               target="_blank"
