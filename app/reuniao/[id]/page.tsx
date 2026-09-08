@@ -160,7 +160,7 @@ export default function MeetingRoom() {
     }
 
     if (!savedSelfie) {
-      toast.warning('Biometria Facial Pendente', 'Por favor, tire sua foto facial ou selecione do aparelho.');
+      toast.warning('Foto Facial Pendente', 'Por favor, tire sua foto facial ou selecione do aparelho.');
       return;
     }
 
@@ -309,7 +309,7 @@ export default function MeetingRoom() {
             DDS Encerrado pelo Organizador
           </h1>
           <p className="text-xs text-slate-300 leading-relaxed max-w-xs mx-auto">
-            Este Diálogo Diário de Segurança foi concluído pelo técnico de segurança. As presenças e biometrias coletadas foram arquivadas na ata oficial.
+            Este Diálogo Diário de Segurança foi concluído pelo responsável. As presenças e fotos coletadas foram registradas na ata.
           </p>
 
           <Link href="/">
@@ -414,7 +414,7 @@ export default function MeetingRoom() {
                 {objective && <p className="text-slate-400 break-words">Objetivo: <strong className="text-emerald-400 break-words">{objective}</strong></p>}
                 {programmaticContent && <p className="text-slate-400 break-words whitespace-pre-line">Conteúdo: <strong className="text-teal-300 break-words">{programmaticContent}</strong></p>}
                 <p className="text-slate-400">Data/Hora: <strong className="text-white">{new Date().toLocaleString('pt-BR')}</strong></p>
-                <p className="text-slate-400">Status: <strong className="text-emerald-400">Biometria e Assinatura Auditadas (NRs)</strong></p>
+                <p className="text-slate-400">Status: <strong className="text-emerald-400">Foto e Assinatura Registradas com Sucesso</strong></p>
               </div>
 
               <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2 max-w-md mx-auto">
@@ -615,7 +615,7 @@ export default function MeetingRoom() {
           </div>
         </section>
 
-        {/* PASSO 2: BIOMETRIA FACIAL */}
+        {/* PASSO 2: FOTO FACIAL DE COMPROVAÇÃO */}
         <section className="bg-slate-900/90 backdrop-blur-md p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-xl space-y-3.5">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">

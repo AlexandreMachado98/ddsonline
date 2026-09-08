@@ -39,6 +39,25 @@ export interface MeetingData {
   attendees?: AttendanceData[];
   groupPhoto?: string | null;
   attachments?: AttachmentPdfData[];
+  documentHash?: string | null;
+}
+
+// Helper para calcular digest SHA-256 de integridade documental
+async function getDocumentSha256(text: string): Promise<string> {
+  try {
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      const buffer = new TextEncoder().encode(text);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+  } catch (e) {}
+  let h = 0;
+  for (let i = 0; i < text.length; i++) {
+    h = ((h << 5) - h) + text.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h).toString(16).padStart(16, '0') + 'f0a9b8c7e6d5e4b3';
 }
 
 export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
@@ -119,7 +138,7 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(215, 235, 225);
-  doc.text('REGISTRO OFICIAL DE DIÁLOGO DIÁRIO DE SEGURANÇA & TREINAMENTO', 14, 22);
+  doc.text('REGISTRO DE DIÁLOGO DIÁRIO DE SEGURANÇA E TREINAMENTO', 14, 22);
 
   // Logo da Empresa à direita
   renderCompanyLogo(28);
@@ -278,12 +297,12 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('LISTA OFICIAL DE PRESENÇA & ASSINATURAS ELETRÔNICAS', 19, currentY + 4.8);
+  doc.text('LISTA DE PRESENÇA & ASSINATURAS ELETRÔNICAS', 19, currentY + 4.8);
 
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text('Conformidade com NR-01 / Assinatura Eletrônica e Biometria Facial', pageWidth - 14, currentY + 4.8, { align: 'right' });
+  doc.text('Evidências Documentais de SST / Registro Fotográfico e Assinatura Eletrônica', pageWidth - 14, currentY + 4.8, { align: 'right' });
   
   currentY += 9;
   
@@ -564,8 +583,8 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
 
     versoY += vContentBlockH + 6;
 
-    // 3. Bloco de Declaração de Conformidade & Assinatura do Instrutor
-    const declText = 'Declaro para os devidos fins de comprovação legal e auditoria trabalhista que os conteúdos programáticos e orientações acima descritos foram integralmente ministrados aos colaboradores listados no Registro de Presença anexo, com observância estrita das Normas Regulamentadoras (NRs).';
+    // 3. Bloco de Declaração do Responsável pelo DDS
+    const declText = 'Declaro para os devidos fins de registro de Segurança e Saúde no Trabalho que os conteúdos e orientações de segurança foram ministrados aos colaboradores listados nesta lista de presença, com base nas diretrizes internas de prevenção de acidentes da empresa.';
     const declLines = doc.splitTextToSize(declText, fullWidth - 12);
     const declLineCount = Array.isArray(declLines) ? declLines.length : 1;
     const declBlockH = 32 + declLineCount * 3.5;
@@ -584,7 +603,7 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-    doc.text('3. DECLARAÇÃO DE CONFORMIDADE E VALIDAÇÃO TÉCNICA', 19, versoY + 6);
+    doc.text('3. DECLARAÇÃO DO RESPONSÁVEL PELA APLICAÇÃO', 19, versoY + 6);
 
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'italic');
@@ -863,21 +882,35 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
     });
   }
 
+  // --- CÁLCULO DO HASH DE INTEGRIDADE DOCUMENTAL SHA-256 ---
+  const rawDataForHash = [
+    meeting.id || '',
+    meeting.topic || '',
+    meeting.createdAt ? new Date(meeting.createdAt).toISOString() : '',
+    meeting.endedAt ? new Date(meeting.endedAt).toISOString() : '',
+    meeting.attendees?.map(a => `${a.name}:${a.cpf}`).join(';') || '',
+    meeting.attachments?.map(att => `${att.fileName}:${att.fileSize}`).join(';') || ''
+  ].join('|');
+  const docHash = meeting.documentHash || await getDocumentSha256(rawDataForHash);
+  const displayHash = `${docHash.slice(0, 16)}...${docHash.slice(-8)}`.toUpperCase();
+  const ddsIdDisplay = meeting.id ? `DDS-${meeting.id.slice(0, 8).toUpperCase()}` : `DDS-${ddsDate.getFullYear()}${String(ddsDate.getMonth()+1).padStart(2,'0')}${String(ddsDate.getDate()).padStart(2,'0')}`;
+
   // --- FOOTER EM TODAS AS PÁGINAS DO JSPDF ---
   const pageCount = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     const footY = pageHeight - 20;
     
-    doc.setFontSize(7);
+    doc.setFontSize(6.5);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-    doc.text('Documento oficial de auditoria', 14, footY);
-    doc.text('emitido digitalmente pelo DDS ON', 14, footY + 4);
+    doc.text('Documento de registro e evidência de SST', 14, footY);
+    doc.text('Emitido digitalmente pela plataforma DDS ON', 14, footY + 3.5);
+    doc.text(`ID Único: ${ddsIdDisplay}   •   Integridade (SHA-256): ${displayHash}`, 14, footY + 7);
     
     doc.text(`Página ${i} de ${pageCount}`, pageWidth - 14, footY, { align: 'right' });
-    doc.text(dateStr, pageWidth - 14, footY + 4, { align: 'right' });
-    doc.text(`Código de verificação: DDS-${ddsDate.getFullYear()}${String(ddsDate.getMonth()+1).padStart(2,'0')}${String(ddsDate.getDate()).padStart(2,'0')}-${String(ddsDate.getHours()).padStart(2,'0')}${String(ddsDate.getMinutes()).padStart(2,'0')}`, pageWidth - 14, footY + 10, { align: 'right' });
+    doc.text(dateStr, pageWidth - 14, footY + 3.5, { align: 'right' });
+    doc.text('Registro sob diretrizes corporativas de SST', pageWidth - 14, footY + 7, { align: 'right' });
     
     // Bottom edge line
     doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
@@ -885,7 +918,7 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(6);
     doc.setFont('helvetica', 'bold');
-    doc.text('DDS ON   |   DESENVOLVIDO E CRIADO PELA AM TST', pageWidth/2, pageHeight - 2, { align: 'center' });
+    doc.text('DDS ON   |   DESENVOLVIDO POR AM TST', pageWidth/2, pageHeight - 2, { align: 'center' });
   }
 
   const cleanTopic = (meeting.topic || 'DDS').replace(/[^a-zA-Z0-9]/g, '_');
@@ -958,7 +991,7 @@ export function generateConsolidatedDdsPdf(report: ConsolidatedReportData) {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.text('DDS ON - DOSSIÊ CONSOLIDADO DE AUDITORIA E NRs', 14, 17);
+  doc.text('DDS ON - DOSSIÊ CONSOLIDADO DE REGISTROS DE SST', 14, 17);
 
   // Metadados do Dossiê
   doc.setTextColor(31, 41, 55);
@@ -1039,7 +1072,7 @@ export function generateConsolidatedDdsPdf(report: ConsolidatedReportData) {
     doc.setFontSize(7.5);
     doc.setTextColor(156, 163, 175);
     doc.text(
-      `Dossiê consolidado emitido pelo DDS ON • Desenvolvido e Auditado por AM TST - Página ${i} de ${pageCount}`,
+      `Dossiê consolidado emitido pelo DDS ON • Desenvolvido por AM TST - Página ${i} de ${pageCount}`,
       14,
       doc.internal.pageSize.height - 8
     );

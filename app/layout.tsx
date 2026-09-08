@@ -17,10 +17,10 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://ddsonline-phi.vercel.app"),
-  title: "DDS ON • Diálogo Diário de Segurança & Auditoria Digital",
-  description: "Plataforma oficial de Diálogo Diário de Segurança (DDS ON) com Biometria Facial, Assinatura Digital, Modo Presencial e Transmissão em Conformidade com as NRs.",
+  title: "DDS ON • Diálogo Diário de Segurança & Gestão Digital de SST",
+  description: "Plataforma de Diálogo Diário de Segurança (DDS ON) com Registro Fotográfico, Assinatura Eletrônica, Modo Presencial e Gestão de Evidências em SST.",
   applicationName: "DDS ON",
-  authors: [{ name: "AM TST", url: "https://amtst.vercel.app" }],
+  authors: [{ name: "DDS Master", url: "https://ddsonline-phi.vercel.app" }],
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "DDS ON • Diálogo Diário de Segurança",
-    description: "Acesse o DDS de hoje, valide sua presença com biometria facial e assinatura digital ou gerencie relatórios de conformidade.",
+    description: "Acesse o DDS do dia, registre sua presença com foto facial e assinatura eletrônica ou gerencie relatórios de comprovação em SST.",
     url: "https://ddsonline-phi.vercel.app",
     siteName: "DDS ON",
     images: [
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
         url: "/icon.svg",
         width: 512,
         height: 512,
-        alt: "DDS ON - Plataforma de Segurança do Trabalho e Auditoria Digital",
+        alt: "DDS ON - Plataforma de Segurança do Trabalho e Gestão de DDS",
       },
     ],
     locale: "pt_BR",
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary",
     title: "DDS ON • Diálogo Diário de Segurança",
-    description: "Plataforma oficial de Diálogo Diário de Segurança com Biometria Facial, Assinatura Digital e Conformidade com as NRs.",
+    description: "Plataforma de Diálogo Diário de Segurança com Registro Fotográfico, Assinatura Eletrônica e Gestão de Evidências.",
     images: ["/icon.svg"],
   },
 };

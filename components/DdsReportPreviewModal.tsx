@@ -177,35 +177,63 @@ export default function DdsReportPreviewModal({
             <ShieldCheck size={20} className="text-emerald-400 shrink-0" />
             <div>
               <p className="font-bold text-white text-xs sm:text-sm">Documento de Auditoria Pronto para Conferência</p>
-              <p className="text-[11px] text-slate-400">
-                Esta é a representação fiel da Ata Oficial emitida pelo DDS ON. Confira os participantes, assinaturas e materiais antes de emitir o PDF definitivo.
+              <p className="text-xs text-slate-400 mt-1">
+                Esta é a visualização da ata gerada pelo DDS ON. Confira os participantes, assinaturas e materiais antes de emitir o PDF definitivo.
               </p>
             </div>
+            
+            <button 
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors shrink-0"
+              title="Fechar Prévia"
+            >
+              <X size={20} />
+            </button>
           </div>
-          <span className="hidden sm:inline-block text-[10px] font-mono text-emerald-300 font-bold bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-500/30 shrink-0">
-            {verificationCode}
-          </span>
+
+          <div className="p-4 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-slate-300">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Visualizando <strong>{totalEstimatedPages} {totalEstimatedPages === 1 ? 'página' : 'páginas'}</strong></span>
+              <span className="text-slate-500">•</span>
+              <span>{attendeesList.length} presenças registradas</span>
+              {attachmentsList.length > 0 && (
+                <>
+                  <span className="text-slate-500">•</span>
+                  <span>{attachmentsList.length} anexo(s)</span>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={handleGeneratePdf}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-950/40 transition-all cursor-pointer text-xs"
+            >
+              <Download size={14} />
+              <span>Baixar Ata em PDF</span>
+            </button>
+          </div>
         </div>
 
         {/* =================================================================== */}
-        {/* PÁGINA 1: FRENTE - REGISTRO DE PRESENÇA OFICIAL                     */}
+        {/* PÁGINA 1: FRENTE - REGISTRO DE PRESENÇA                             */}
         {/* =================================================================== */}
         <div 
           className={`w-full max-w-[210mm] bg-white text-slate-900 shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 transition-all flex flex-col ${
             viewMode === 'A4_PAGES' ? 'min-h-[297mm]' : ''
           }`}
         >
-          {/* Header Banner Verde Escuro */}
-          <div style={{ backgroundColor: darkGreen }} className="p-4 sm:p-5 text-white flex items-center justify-between gap-4">
+          {/* Header Faixa Verde */}
+          <div style={{ backgroundColor: darkGreen }} className="p-4 sm:p-6 text-white flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-2xl sm:text-3xl font-black tracking-tight">DDS ON</span>
-                <span className="text-[10px] bg-white/20 text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Auditado
+                <span className="text-2xl font-black tracking-tight">DDS ON</span>
+                <span className="text-[10px] uppercase font-bold tracking-widest bg-emerald-500/30 px-2 py-0.5 rounded-md border border-emerald-400/30">
+                  {meeting.classification || 'DDS'}
                 </span>
               </div>
-              <p className="text-[10px] sm:text-xs text-emerald-100 font-medium mt-0.5">
-                Plataforma de registro de presença online • AM TST
+              <p className="text-[11px] text-emerald-100/90 font-light mt-0.5">
+                Plataforma de registro de presença e evidências de SST
               </p>
             </div>
 
@@ -216,8 +244,8 @@ export default function DdsReportPreviewModal({
               </div>
             ) : (
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-white">REGISTRO OFICIAL</p>
-                <p className="text-[10px] text-emerald-200">Em conformidade com NRs</p>
+                <p className="text-xs font-bold text-white">REGISTRO DE DDS</p>
+                <p className="text-[10px] text-emerald-200">Segurança do Trabalho</p>
               </div>
             )}
           </div>
@@ -285,11 +313,11 @@ export default function DdsReportPreviewModal({
               </div>
             )}
 
-            {/* Tabela de Presença Oficial */}
+            {/* Tabela de Presença */}
             <div className="space-y-1.5 pt-1">
               <div className="bg-slate-100/90 border-l-4 border-l-emerald-800 px-3.5 py-2 rounded-r-lg text-slate-900 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
-                <span>Lista Oficial de Presença & Assinaturas Eletrônicas</span>
-                <span className="text-[10px] font-medium text-slate-500 lowercase">Conformidade NR-01</span>
+                <span>Lista de Presença & Assinaturas Eletrônicas</span>
+                <span className="text-[10px] font-medium text-slate-500 lowercase">Diretrizes de SST</span>
               </div>
 
               {attendeesList.length === 0 ? (
@@ -306,7 +334,7 @@ export default function DdsReportPreviewModal({
                         <th className="p-2">Função</th>
                         <th className="p-2 text-center">Entrada</th>
                         <th className="p-2 text-center">Status / Saída</th>
-                        <th className="p-2 text-center w-16">Biometria</th>
+                        <th className="p-2 text-center w-16">Foto Facial</th>
                         <th className="p-2 text-center w-28">Assinatura</th>
                       </tr>
                     </thead>
@@ -378,7 +406,7 @@ export default function DdsReportPreviewModal({
             {meeting.groupPhoto && meeting.groupPhoto.length > 50 && (
               <div className="pt-2 text-center space-y-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">
-                  Foto da Equipe (Evidência Oficial)
+                  Foto da Equipe (Registro Fotográfico de Campo)
                 </span>
                 <div 
                   onClick={() => setZoomImage(meeting.groupPhoto || null)}
@@ -393,11 +421,11 @@ export default function DdsReportPreviewModal({
               </div>
             )}
 
-            {/* Rodapé Oficial da Página 1 */}
+            {/* Rodapé da Página 1 */}
             <div className="pt-4 mt-auto border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-500 gap-1 font-sans">
               <div>
-                <p>Documento oficial de auditoria emitido digitalmente pelo <strong>DDS ON</strong></p>
-                <p className="text-[9px] text-slate-400">Código: {verificationCode}</p>
+                <p>Documento de registro e evidência de SST emitido pelo <strong>DDS ON</strong></p>
+                <p className="text-[9px] text-slate-400">Código de Verificação: {verificationCode}</p>
               </div>
               <div className="text-right">
                 <p className="font-bold">Página 1 de {totalEstimatedPages}</p>
@@ -486,14 +514,14 @@ export default function DdsReportPreviewModal({
                 </p>
               </div>
 
-              {/* 3. Declaração de Conformidade & Linha de Assinatura */}
+              {/* 3. Declaração do Responsável & Linha de Assinatura */}
               <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-50/50 space-y-4">
                 <div>
                   <h3 style={{ color: darkGreen }} className="text-xs font-bold uppercase tracking-wider">
-                    3. DECLARAÇÃO DE CONFORMIDADE E VALIDAÇÃO TÉCNICA
+                    3. DECLARAÇÃO DO RESPONSÁVEL PELA APLICAÇÃO
                   </h3>
                   <p className="text-[11px] text-slate-600 italic mt-1 leading-relaxed">
-                    Declaro para os devidos fins de comprovação legal e auditoria trabalhista que os conteúdos programáticos e orientações acima descritos foram integralmente ministrados aos colaboradores listados no Registro de Presença anexo, com observância estrita das Normas Regulamentadoras (NRs).
+                    Declaro para os devidos fins de registro de Segurança e Saúde no Trabalho que os conteúdos e orientações de segurança foram ministrados aos colaboradores listados nesta lista de presença, com base nas diretrizes internas de prevenção de acidentes da empresa.
                   </p>
                 </div>
 
@@ -503,7 +531,7 @@ export default function DdsReportPreviewModal({
                     {meeting.instructorName || meeting.organizer?.name || 'Responsável Técnico / Instrutor'}
                   </p>
                   <p className="text-[10px] text-slate-500">
-                    Instrutor / Responsável pelo Treinamento
+                    Responsável pela Aplicação do DDS
                   </p>
                 </div>
               </div>
@@ -511,7 +539,7 @@ export default function DdsReportPreviewModal({
               {/* Rodapé Página 2 */}
               <div className="pt-4 mt-auto border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-500 gap-1 font-sans">
                 <div>
-                  <p>Documento oficial de auditoria emitido digitalmente pelo <strong>DDS ON</strong></p>
+                  <p>Documento de registro e evidência de SST emitido pelo <strong>DDS ON</strong></p>
                 </div>
                 <div className="text-right">
                   <p className="font-bold">Página 2 de {totalEstimatedPages}</p>

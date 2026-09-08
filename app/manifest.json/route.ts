@@ -7,7 +7,7 @@ export async function GET() {
   const manifestData = {
     name: "DDS ON - Diálogo Diário de Segurança",
     short_name: "DDS ON",
-    description: "Plataforma Digital de SST, Biometria Facial e Lista de Presença",
+    description: "Plataforma Digital de SST, Registro Fotográfico e Lista de Presença",
     start_url: "/",
     scope: "/",
     id: "/",

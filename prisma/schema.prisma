@@ -70,6 +70,7 @@ model Meeting {
   endedAt             DateTime?
   instructorName      String?
   classification      String?      @default("DDS")
+  documentHash        String?
   attendees           Attendance[]
   attachments         MeetingAttachment[]
 }

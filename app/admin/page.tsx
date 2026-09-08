@@ -852,7 +852,7 @@ export default function AdminPanel() {
                       <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
                         <Smartphone size={16} className="text-emerald-400" /> Coleta de Presença em Campo
                       </h3>
-                      <p className="text-[11px] text-slate-400 mt-0.5">Passe o celular para os colaboradores assinarem com biometria facial.</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Passe o dispositivo para os colaboradores registrarem presença com foto facial e assinatura eletrônica.</p>
                     </div>
 
                     <Link href={`/presencial?id=${activeMeeting.id}`}>
@@ -1603,6 +1603,20 @@ export default function AdminPanel() {
             )}
           </div>
         )}
+
+        {/* Rodapé Administrativo & Governança */}
+        <footer className="mt-14 pt-6 border-t border-slate-800/80 text-center space-y-2 text-xs text-slate-500 pb-4">
+          <p>© {new Date().getFullYear()} <strong>DDS ON</strong> • Ecossistema Integrado DDS Master • Todos os direitos reservados.</p>
+          <div className="flex items-center justify-center gap-3 text-[11px]">
+            <Link href="/termos" target="_blank" className="text-slate-400 hover:text-emerald-400 underline underline-offset-2 transition-colors">
+              Termos de Uso
+            </Link>
+            <span>•</span>
+            <Link href="/privacidade" target="_blank" className="text-slate-400 hover:text-emerald-400 underline underline-offset-2 transition-colors">
+              Aviso de Privacidade (LGPD)
+            </Link>
+          </div>
+        </footer>
       </div>
 
       {/* Modal de Pré-Visualização de Documento e Lista de Presença */}

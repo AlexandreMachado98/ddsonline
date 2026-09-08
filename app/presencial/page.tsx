@@ -156,7 +156,7 @@ function PresencialContent() {
     }
 
     if (!savedSelfie) {
-      toast.warning('Biometria Facial Pendente', 'Por favor, tire sua foto facial ou envie uma foto.');
+      toast.warning('Foto Facial Pendente', 'Por favor, tire sua foto facial ou envie uma foto.');
       return;
     }
 
@@ -208,7 +208,7 @@ function PresencialContent() {
       if (data.success) {
         setIsOfflineSubmitted(false);
         setHasAdmitted(true);
-        toast.success('Presença Presencial Confirmada!', 'Seus dados e biometria foram arquivados com sucesso.');
+        toast.success('Presença Presencial Confirmada!', 'Seus dados e foto facial foram registrados com sucesso.');
       } else {
         toast.error('Erro ao Registrar', data.error || 'Não foi possível registrar a presença.');
       }
@@ -269,7 +269,7 @@ function PresencialContent() {
             DDS Encerrado pelo Organizador
           </h1>
           <p className="text-xs text-slate-300 leading-relaxed max-w-xs mx-auto">
-            Este Diálogo Diário de Segurança foi finalizado pelo técnico. As presenças e biometrias coletadas foram arquivadas com sucesso na ata oficial.
+            Este Diálogo Diário de Segurança foi finalizado pelo técnico. As presenças e fotos faciais coletadas foram arquivadas com sucesso no registro do DDS.
           </p>
 
           <Link href="/">
@@ -327,7 +327,7 @@ function PresencialContent() {
               {isOfflineSubmitted ? 'Presença Gravada no Aparelho!' : 'Presença Confirmada!'}
             </h2>
             <p className="text-xs text-slate-300">
-              Obrigado, <strong className="text-white">{name}</strong>. Sua assinatura e biometria facial foram salvas para o DDS de hoje.
+              Obrigado, <strong className="text-white">{name}</strong>. Sua assinatura e foto facial foram salvas para o DDS de hoje.
             </p>
           </div>
 
@@ -337,7 +337,7 @@ function PresencialContent() {
                 <span>⚡ Modo Campo Ativo:</span>
               </p>
               <p className="text-amber-200/90 leading-relaxed">
-                Os dados e biometria estão armazenados com segurança na memória deste celular. Assim que você reconectar ao Wi-Fi ou 4G, a sincronização com o banco de dados ocorrerá automaticamente.
+                Os dados e fotos estão armazenados com segurança na memória deste dispositivo. Assim que você reconectar ao Wi-Fi ou 4G, a sincronização com o banco de dados ocorrerá automaticamente.
               </p>
             </div>
           )}
@@ -488,11 +488,11 @@ function PresencialContent() {
           </div>
         </section>
 
-        {/* PASSO 2: BIOMETRIA FACIAL */}
+        {/* PASSO 2: FOTO FACIAL DE PRESENÇA */}
         <section className="bg-slate-900/90 backdrop-blur-md p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-xl space-y-3.5">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Camera size={16} className="text-emerald-400" /> 2. Biometria Facial
+              <Camera size={16} className="text-emerald-400" /> 2. Foto Facial de Presença
             </h2>
             {savedSelfie ? (
               <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md flex items-center gap-1">

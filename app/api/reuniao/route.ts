@@ -11,6 +11,7 @@ async function ensureDbColumns() {
     await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "instructorName" TEXT;');
     await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "classification" TEXT DEFAULT \'DDS\';');
     await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "groupPhoto" TEXT;');
+    await prisma.$executeRawUnsafe('ALTER TABLE "Meeting" ADD COLUMN IF NOT EXISTS "documentHash" TEXT;');
     
     // Cria tabela de anexos e evidências se não existir
     await prisma.$executeRawUnsafe(`
@@ -104,6 +105,7 @@ export async function GET(req: Request) {
           objective: true,
           programmaticContent: true,
           status: true,
+          documentHash: true,
           createdAt: true,
           endedAt: true,
           instructorName: true,
@@ -186,6 +188,7 @@ export async function GET(req: Request) {
           programmaticContent: true,
           groupPhoto: true, // Necessário apenas na reunião ativa
           status: true,
+          documentHash: true,
           createdAt: true,
           endedAt: true,
           instructorName: true,
@@ -240,6 +243,7 @@ export async function GET(req: Request) {
           objective: true,
           programmaticContent: true,
           status: true,
+          documentHash: true,
           createdAt: true,
           endedAt: true,
           instructorName: true,
@@ -395,6 +399,29 @@ export async function PUT(req: Request) {
         (instructorName !== undefined || classification !== undefined || objective !== undefined || programmaticContent !== undefined || createdAt || endedAt !== undefined);
       if (!status && groupPhoto === undefined && attachments === undefined && !isJustEditing) {
         updateData.status = 'ENDED';
+      }
+
+      // Ao encerrar o DDS, gera e congela o hash SHA-256 de integridade documental
+      if (status === 'ENDED' || updateData.status === 'ENDED') {
+        const crypto = await import('crypto');
+        const currentMeeting = await prisma.meeting.findUnique({
+          where: { id: meetingId },
+          include: {
+            attendees: { select: { id: true, name: true, cpf: true, createdAt: true } },
+            attachments: { select: { id: true, fileName: true, fileSize: true } }
+          }
+        });
+        const endTimestamp = updateData.endedAt ? new Date(updateData.endedAt).toISOString() : new Date().toISOString();
+        const rawDigest = [
+          meetingId,
+          currentMeeting?.topic || '',
+          currentMeeting?.createdAt?.toISOString() || '',
+          endTimestamp,
+          currentMeeting?.attendees?.map(a => `${a.id}:${a.name}:${a.cpf}`).join(';') || '',
+          currentMeeting?.attachments?.map(att => `${att.id}:${att.fileName}`).join(';') || ''
+        ].join('|');
+        updateData.documentHash = crypto.createHash('sha256').update(rawDigest).digest('hex');
+        if (!updateData.endedAt) updateData.endedAt = new Date();
       }
 
       // Sincroniza anexos se fornecidos preservando fileData se já existirem
