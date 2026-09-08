@@ -53,7 +53,8 @@ export async function POST(req: Request) {
         role: user.role,
         position: user.position,
         company: user.company || user.companyRel?.name || '',
-        companyId: user.companyId
+        companyId: user.companyId,
+        photoURL: user.photoURL || null
       }
     });
   } catch (error) {

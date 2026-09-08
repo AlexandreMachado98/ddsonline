@@ -43,6 +43,7 @@ model User {
   status     Status    @default(ACTIVE)
   position   String?   @default("Técnico em Segurança do Trabalho")
   company    String?
+  photoURL   String?
   createdAt  DateTime  @default(now())
   
   companyId  String?

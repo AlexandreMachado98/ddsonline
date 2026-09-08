@@ -13,11 +13,13 @@ import GroupPhotoCapture from '@/components/GroupPhotoCapture';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
 import AttachmentManager, { DdsAttachment } from '@/components/AttachmentManager';
 import DdsReportPreviewModal from '@/components/DdsReportPreviewModal';
+import UserProfileModal from '@/components/UserProfileModal';
 import OfflineSyncBadge from '@/components/OfflineSyncBadge';
 import { cacheMeetingData } from '@/lib/offlineStorage';
 
 export default function AdminPanel() {
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'NEW_DDS' | 'HISTORY'>('NEW_DDS');
   const [isLiveMode, setIsLiveMode] = useState(false);
@@ -656,9 +658,33 @@ export default function AdminPanel() {
                 }} />
               </label>
 
-              <span className="text-xs text-slate-400 hidden sm:inline">
-                Técnico: <strong className="text-white">{currentUser?.name}</strong>
-              </span>
+              <button
+                type="button"
+                onClick={() => setIsProfileOpen(true)}
+                className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-800 transition-colors text-left cursor-pointer"
+                title="Abrir Meu Perfil"
+              >
+                <div className="w-7 h-7 rounded-full bg-slate-800 ring-2 ring-emerald-500/40 p-0.5 shrink-0 flex items-center justify-center overflow-hidden shadow-sm">
+                  {currentUser?.photoURL ? (
+                    <img
+                      src={currentUser.photoURL}
+                      alt={currentUser.name}
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white text-[10px] font-black select-none">
+                      {currentUser?.name ? (
+                        currentUser.name.split(' ').length > 1
+                          ? (currentUser.name.split(' ')[0][0] + currentUser.name.split(' ')[currentUser.name.split(' ').length - 1][0]).toUpperCase()
+                          : currentUser.name.slice(0, 2).toUpperCase()
+                      ) : 'TST'}
+                    </div>
+                  )}
+                </div>
+                <span className="text-xs text-slate-400 hidden sm:inline">
+                  Técnico: <strong className="text-white hover:text-emerald-300 transition-colors">{currentUser?.name}</strong>
+                </span>
+              </button>
               <button 
                 onClick={() => setIsLiveMode(false)} 
                 className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-colors border border-slate-700 flex items-center gap-1.5 cursor-pointer"
@@ -915,6 +941,19 @@ export default function AdminPanel() {
             onDownloadPdf={() => handleDownloadActivePdf()}
           />
         )}
+
+        {/* Modal de Meu Perfil (na Sala Ativa) */}
+        {currentUser && (
+          <UserProfileModal
+            user={currentUser}
+            isOpen={isProfileOpen}
+            onClose={() => setIsProfileOpen(false)}
+            onProfileUpdated={(updated) => {
+              setCurrentUser((prev: any) => ({ ...prev, ...updated }));
+              showToast('Perfil atualizado com sucesso!', 'success');
+            }}
+          />
+        )}
       </main>
     );
   }
@@ -1046,27 +1085,53 @@ export default function AdminPanel() {
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-emerald-950/40 shrink-0 mt-0.5 sm:mt-0">
                 <ShieldCheck size={22} />
               </div>
-              <div className="min-w-0 flex-1 overflow-hidden">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-lg sm:text-xl font-black text-white tracking-tight">
-                    <span>DDS</span>
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
-                  </h1>
-                  <span className="text-[10px] font-extrabold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700 shrink-0">
-                    Painel TST
-                  </span>
+              <button
+                type="button"
+                onClick={() => setIsProfileOpen(true)}
+                className="flex items-center gap-2.5 min-w-0 p-1.5 -ml-1.5 rounded-2xl hover:bg-slate-800/80 transition-colors text-left group cursor-pointer"
+                title="Abrir Meu Perfil"
+              >
+                {/* Avatar Circular com Foto ou Iniciais */}
+                <div className="w-9 h-9 rounded-full bg-slate-800 ring-2 ring-emerald-500/30 group-hover:ring-emerald-400 p-0.5 shrink-0 flex items-center justify-center overflow-hidden transition-all shadow-md">
+                  {currentUser?.photoURL ? (
+                    <img
+                      src={currentUser.photoURL}
+                      alt={currentUser.name}
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white text-xs font-black select-none">
+                      {currentUser?.name ? (
+                        currentUser.name.split(' ').length > 1
+                          ? (currentUser.name.split(' ')[0][0] + currentUser.name.split(' ')[currentUser.name.split(' ').length - 1][0]).toUpperCase()
+                          : currentUser.name.slice(0, 2).toUpperCase()
+                      ) : 'TST'}
+                    </div>
+                  )}
                 </div>
-                
-                {/* Nome de usuário e empresa com contenção rigorosa e quebra limpa */}
-                <div className="text-[11px] text-slate-400 mt-0.5 leading-snug overflow-hidden">
-                  <p className="truncate sm:break-words font-medium">
-                    <span className="text-slate-200 font-semibold">{currentUser?.name || 'Técnico de Segurança'}</span>
-                    <span className="text-slate-400 block sm:inline sm:before:content-['•'] sm:before:mx-1.5 truncate">
-                      {currentUser?.company || 'AM TST'}
+
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                      <span>DDS</span>
+                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
+                    </h1>
+                    <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 shrink-0 group-hover:bg-emerald-500/20 transition-colors">
+                      Meu Perfil
                     </span>
-                  </p>
+                  </div>
+                  
+                  {/* Nome de usuário e empresa com contenção rigorosa e quebra limpa */}
+                  <div className="text-[11px] text-slate-400 mt-0.5 leading-snug overflow-hidden">
+                    <p className="truncate sm:break-words font-medium">
+                      <span className="text-slate-200 font-semibold group-hover:text-emerald-300 transition-colors">{currentUser?.name || 'Técnico de Segurança'}</span>
+                      <span className="text-slate-400 block sm:inline sm:before:content-['•'] sm:before:mx-1.5 truncate">
+                        {currentUser?.company || 'AM TST'}
+                      </span>
+                    </p>
+                  </div>
                 </div>
-              </div>
+              </button>
             </div>
 
             <div className="flex items-center gap-2 shrink-0 self-end sm:self-center border-t border-slate-800/60 sm:border-0 pt-2 sm:pt-0 w-full sm:w-auto justify-end">
@@ -1499,6 +1564,19 @@ export default function AdminPanel() {
           }}
           onClose={() => setPreviewMeeting(null)}
           onDownloadPdf={() => handleDownloadHistoryPdf(previewMeeting)}
+        />
+      )}
+
+      {/* Modal de Meu Perfil */}
+      {currentUser && (
+        <UserProfileModal
+          user={currentUser}
+          isOpen={isProfileOpen}
+          onClose={() => setIsProfileOpen(false)}
+          onProfileUpdated={(updated) => {
+            setCurrentUser((prev: any) => ({ ...prev, ...updated }));
+            showToast('Perfil atualizado com sucesso!', 'success');
+          }}
         />
       )}
     </main>

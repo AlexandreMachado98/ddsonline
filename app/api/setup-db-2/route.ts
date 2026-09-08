@@ -32,5 +32,11 @@ export async function GET() {
     console.error('programmaticContent error', error);
   }
 
+  try {
+    await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "photoURL" TEXT;');
+  } catch (error) {
+    console.error('User photoURL error', error);
+  }
+
   return NextResponse.json({ success: true, message: 'Schema updated successfully.' });
 }
