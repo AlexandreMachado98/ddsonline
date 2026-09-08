@@ -5,13 +5,14 @@ import {
   Play, Users, FileText, CheckCircle2, 
   Smartphone, Download, Copy, Check, LogOut, 
   History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet,
-  Camera, Image as ImageIcon, Trash2, Target, ExternalLink, Info, CheckSquare, Square, ShieldCheck, MapPin, Sparkles, ChevronRight
+  Camera, Image as ImageIcon, Trash2, Target, ExternalLink, Info, CheckSquare, Square, ShieldCheck, MapPin, Sparkles, ChevronRight, Eye
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
 import GroupPhotoCapture from '@/components/GroupPhotoCapture';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
 import AttachmentManager, { DdsAttachment } from '@/components/AttachmentManager';
+import DdsReportPreviewModal from '@/components/DdsReportPreviewModal';
 
 export default function AdminPanel() {
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -42,6 +43,7 @@ export default function AdminPanel() {
   const [activeMeeting, setActiveMeeting] = useState<any>(null);
   const [editAttachments, setEditAttachments] = useState<DdsAttachment[]>([]);
   const [isReviewingClose, setIsReviewingClose] = useState(false);
+  const [previewMeeting, setPreviewMeeting] = useState<any | null>(null);
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
@@ -571,6 +573,18 @@ export default function AdminPanel() {
               <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
                 <button
                   type="button"
+                  onClick={() => setPreviewMeeting({
+                    ...activeMeeting,
+                    groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : activeMeeting.groupPhoto,
+                    attachments: activeMeeting.attachments || newAttachments || []
+                  })}
+                  className="flex-1 py-3 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-emerald-700/60 transition-all min-h-[44px]"
+                >
+                  <Eye size={15} />
+                  <span>Prévia da Lista</span>
+                </button>
+                <button
+                  type="button"
                   onClick={handleDownloadActivePdf}
                   className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-slate-700 transition-all min-h-[44px]"
                 >
@@ -695,6 +709,18 @@ export default function AdminPanel() {
               >
                 {copiedLink ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
                 <span>{copiedLink ? 'Copiado!' : 'Copiar Link'}</span>
+              </button>
+              <button 
+                onClick={() => setPreviewMeeting({
+                  ...activeMeeting,
+                  groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : activeMeeting.groupPhoto,
+                  attachments: activeMeeting.attachments || newAttachments || []
+                })} 
+                className="px-3.5 py-2.5 bg-emerald-950/80 hover:bg-emerald-900/90 border border-emerald-500/50 text-emerald-300 rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-sm text-xs cursor-pointer min-h-[40px]"
+                title="Pré-visualizar Lista de Presença e Dossiê Completo"
+              >
+                <Eye size={16} />
+                <span>Prévia</span>
               </button>
               <button 
                 onClick={handleDownloadActivePdf} 
@@ -1369,6 +1395,15 @@ export default function AdminPanel() {
 
                     <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto pt-2 sm:pt-0 border-t border-slate-900 sm:border-0 w-full sm:w-auto justify-end">
                       <button
+                        onClick={() => setPreviewMeeting(m)}
+                        className="px-3.5 py-2 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-emerald-200 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-700/60 cursor-pointer min-h-[38px] transition-all shadow-sm"
+                        title="Pré-visualizar Lista de Presença e Dossiê Completo"
+                      >
+                        <Eye size={13} />
+                        <span>Visualizar Lista</span>
+                      </button>
+
+                      <button
                         onClick={() => handleDownloadHistoryPdf(m)}
                         className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-700 cursor-pointer min-h-[38px]"
                       >
@@ -1410,6 +1445,29 @@ export default function AdminPanel() {
           </div>
         )}
       </div>
+
+      {/* Modal de Pré-Visualização de Documento e Lista de Presença */}
+      {previewMeeting && (
+        <DdsReportPreviewModal
+          meeting={{
+            topic: previewMeeting.topic,
+            farm: previewMeeting.farm,
+            type: previewMeeting.type,
+            classification: previewMeeting.classification,
+            instructorName: previewMeeting.instructorName,
+            endedAt: previewMeeting.endedAt,
+            organizer: previewMeeting.organizer,
+            objective: previewMeeting.objective,
+            programmaticContent: previewMeeting.programmaticContent,
+            groupPhoto: previewMeeting.groupPhoto,
+            createdAt: previewMeeting.createdAt,
+            attendees: previewMeeting.attendees || [],
+            attachments: previewMeeting.attachments || []
+          }}
+          onClose={() => setPreviewMeeting(null)}
+          onDownloadPdf={() => handleDownloadHistoryPdf(previewMeeting)}
+        />
+      )}
     </main>
   );
 }
