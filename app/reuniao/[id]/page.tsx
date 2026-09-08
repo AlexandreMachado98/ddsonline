@@ -447,10 +447,10 @@ export default function MeetingRoom() {
           {/* Rodapé Oficial DDS ON */}
           <footer className="pt-4 text-center space-y-1">
             <p className="text-[10px] text-slate-500">
-              © {new Date().getFullYear()} <strong>DDS ON</strong> • Desenvolvido e Auditado por{' '}
-              <a href="https://amtst.vercel.app" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 font-bold underline">
-                AM TST
-              </a>
+              © 2026 <strong>AM TST</strong>. Todos os direitos reservados.
+            </p>
+            <p className="text-[10px] text-slate-500 font-medium">
+              <strong>DDS ON</strong> é uma plataforma da <strong>AM TST</strong>.
             </p>
           </footer>
 

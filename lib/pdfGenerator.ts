@@ -916,9 +916,9 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
     doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
     doc.rect(0, pageHeight - 6, pageWidth, 6, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(5.5);
+    doc.setFontSize(5.8);
     doc.setFont('helvetica', 'bold');
-    doc.text('© 2026 AM TST   •   DDS ON É UMA PLATAFORMA DA AM TST', pageWidth/2, pageHeight - 2, { align: 'center' });
+    doc.text('© 2026 AM TST. Todos os direitos reservados. DDS ON é uma plataforma da AM TST.', pageWidth/2, pageHeight - 2, { align: 'center' });
   }
 
   const cleanTopic = (meeting.topic || 'DDS').replace(/[^a-zA-Z0-9]/g, '_');
@@ -1072,7 +1072,7 @@ export function generateConsolidatedDdsPdf(report: ConsolidatedReportData) {
     doc.setFontSize(7.5);
     doc.setTextColor(156, 163, 175);
     doc.text(
-      `Dossiê consolidado emitido pelo DDS ON • Desenvolvido por AM TST - Página ${i} de ${pageCount}`,
+      `Dossiê Consolidado • © 2026 AM TST. Todos os direitos reservados. DDS ON é uma plataforma da AM TST. - Página ${i} de ${pageCount}`,
       14,
       doc.internal.pageSize.height - 8
     );
