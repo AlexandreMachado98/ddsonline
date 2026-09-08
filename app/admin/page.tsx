@@ -892,6 +892,29 @@ export default function AdminPanel() {
             </div>
           </div>
         </div>
+
+        {/* Modal de Pré-Visualização de Documento e Lista de Presença na Sala Ativa */}
+        {previewMeeting && (
+          <DdsReportPreviewModal
+            meeting={{
+              topic: previewMeeting.topic,
+              farm: previewMeeting.farm,
+              type: previewMeeting.type,
+              classification: previewMeeting.classification,
+              instructorName: previewMeeting.instructorName,
+              endedAt: previewMeeting.endedAt,
+              organizer: previewMeeting.organizer,
+              objective: previewMeeting.objective,
+              programmaticContent: previewMeeting.programmaticContent,
+              groupPhoto: previewMeeting.groupPhoto,
+              createdAt: previewMeeting.createdAt,
+              attendees: previewMeeting.attendees || [],
+              attachments: previewMeeting.attachments || []
+            }}
+            onClose={() => setPreviewMeeting(null)}
+            onDownloadPdf={() => handleDownloadActivePdf()}
+          />
+        )}
       </main>
     );
   }
