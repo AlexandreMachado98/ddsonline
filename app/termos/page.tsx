@@ -68,6 +68,7 @@ export default function TermosPage() {
                   <li>Conteúdo programático e adequação às NRs aplicáveis.</li>
                   <li>Habilitação legal e qualificação técnica do instrutor.</li>
                   <li>Veracidade das informações, nomes e funções declaradas.</li>
+                  <li>Download, guarda, arquivamento e custódia documental dos relatórios em PDF.</li>
                   <li>Conformidade com a legislação trabalhista e fiscalizações.</li>
                 </ul>
               </div>
@@ -79,7 +80,7 @@ export default function TermosPage() {
                 <ul className="list-disc list-inside text-slate-400 space-y-1 text-xs">
                   <li>Disponibilidade e desempenho da infraestrutura tecnológica.</li>
                   <li>Integridade criptográfica dos registros (cálculo de SHA-256).</li>
-                  <li>Geração de PDFs padronizados e guarda eletrônica.</li>
+                  <li>Geração e disponibilização imediata dos relatórios em PDF.</li>
                   <li>Mecanismos de contingência e coleta de presença offline.</li>
                 </ul>
               </div>
@@ -102,11 +103,19 @@ export default function TermosPage() {
           <section className="space-y-3">
             <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
               <span className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-400 inline-flex items-center justify-center text-xs">4</span>
-              Imutabilidade e Encerramento de Reuniões
+              Imutabilidade, Encerramento e Isenção de Custódia Documental
             </h2>
             <p>
               Uma vez finalizada a reunião pelo organizador, o registro entra no estado <code>ENDED</code>. Nesse momento, o sistema gera o resumo criptográfico SHA-256 definitivo do documento. Alterações posteriores no corpo da ata, na lista de participantes ou no conteúdo programático são estritamente bloqueadas para assegurar a inviolabilidade documental.
             </p>
+            <div className="p-4 rounded-2xl bg-slate-950 border border-amber-500/30 space-y-2">
+              <p className="text-amber-300 font-bold text-xs">
+                ⚠️ Responsabilidade Exclusiva de Guarda pelo Usuário / Empresa Contratante:
+              </p>
+              <p className="text-slate-300 text-xs leading-relaxed">
+                A plataforma DDS Online tem a função exclusiva de viabilizar a realização, assinatura e emissão dos relatórios de DDS em formato PDF. <strong>A plataforma não possui qualquer obrigação ou responsabilidade pelo armazenamento contínuo, guarda de longo prazo ou custódia regulamentar desses dados</strong>. Uma vez emitido o relatório em PDF com as assinaturas, <strong>a responsabilidade pela sua retenção, download, backup e custódia documental perante auditorias e órgãos fiscalizadores é inteira e exclusivamente do usuário / empresa contratante</strong>.
+              </p>
+            </div>
           </section>
 
           <section className="space-y-3">

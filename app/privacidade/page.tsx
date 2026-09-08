@@ -180,13 +180,21 @@ export default function PrivacidadePage() {
           <section className="space-y-3">
             <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
               <span className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-400 inline-flex items-center justify-center text-xs">6</span>
-              Tempo de Retenção dos Dados
+              Retenção, Custódia e Responsabilidade pelos Documentos
             </h2>
             <p>
-              Os registros de atas e listas de presença são retidos pelo período regulamentar determinado pela legislação trabalhista e previdenciária aplicável às obrigações de Segurança e Saúde no Trabalho (SST) do seu empregador (em regra, até 5 anos para comprovações perante o MTE e eSocial, ou prazos maiores para riscos específicos estabelecidos nas NRs).
+              A plataforma <strong>DDS Online atua estritamente como ferramenta tecnológica de coleta e emissão de atas e relatórios de assinaturas em PDF</strong>.
             </p>
-            <p>
-              Logs de conexão a aplicações na internet são mantidos pelo prazo estrito de 6 (seis) meses, conforme o Artigo 15 da Lei nº 12.965/2014 (Marco Civil da Internet).
+            <div className="p-4 rounded-2xl bg-slate-950 border border-amber-500/30 space-y-2">
+              <p className="text-amber-300 font-bold text-xs">
+                ⚠️ Responsabilidade Exclusiva do Usuário pelo Armazenamento e Guarda:
+              </p>
+              <p className="text-slate-300 text-xs leading-relaxed">
+                A plataforma <strong>não tem responsabilidade por armazenar indefinidamente esses dados ou fazer a guarda regulamentar de longo prazo</strong>. Uma vez emitido o relatório de assinaturas e evidências em PDF, <strong>a responsabilidade pelo download, custódia, arquivamento, backup e guarda física/digital perante a fiscalização do trabalho, previdência ou auditorias é inteiramente do usuário e da empresa contratante</strong>.
+              </p>
+            </div>
+            <p className="text-xs text-slate-400">
+              Registros estritos de logs de conexão a aplicações na internet são mantidos apenas pelo prazo legal de 6 (seis) meses em cumprimento exclusivo ao Artigo 15 da Lei nº 12.965/2014 (Marco Civil da Internet).
             </p>
           </section>
 
