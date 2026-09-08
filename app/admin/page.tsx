@@ -868,111 +868,122 @@ export default function AdminPanel() {
 
       <div className="max-w-6xl w-full mx-auto space-y-4 sm:space-y-6">
         {/* Topbar do Painel */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-3xl shadow-xl overflow-hidden max-w-full">
-          <div className="flex items-center gap-3 min-w-0 max-w-full">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-emerald-950/40 shrink-0">
-              <ShieldCheck size={22} />
+        <header className="w-full bg-slate-900 border border-slate-800 p-3.5 sm:p-5 rounded-3xl shadow-xl overflow-hidden max-w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0 max-w-full">
+            <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1 overflow-hidden">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-emerald-950/40 shrink-0 mt-0.5 sm:mt-0">
+                <ShieldCheck size={22} />
+              </div>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                    <span>DDS</span>
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
+                  </h1>
+                  <span className="text-[10px] font-extrabold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700 shrink-0">
+                    Painel TST
+                  </span>
+                </div>
+                
+                {/* Nome de usuário e empresa com contenção rigorosa e quebra limpa */}
+                <div className="text-[11px] text-slate-400 mt-0.5 leading-snug overflow-hidden">
+                  <p className="truncate sm:break-words font-medium">
+                    <span className="text-slate-200 font-semibold">{currentUser?.name || 'Técnico de Segurança'}</span>
+                    <span className="text-slate-400 block sm:inline sm:before:content-['•'] sm:before:mx-1.5 truncate">
+                      {currentUser?.company || 'AM TST'}
+                    </span>
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="min-w-0 max-w-full overflow-hidden">
-              <h1 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2 flex-wrap">
-                <span>DDS</span>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
-                <span className="text-[10px] font-extrabold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
-                  Painel TST
-                </span>
-              </h1>
-              <p className="text-[11px] text-slate-400 break-words leading-tight mt-0.5">
-                {currentUser?.name} • {currentUser?.company || 'AM TST'}
-              </p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto">
-            {activeMeeting && (
-              <button
-                onClick={() => setIsLiveMode(true)}
-                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 animate-pulse cursor-pointer"
-              >
-                <Radio size={14} /> DDS em Aberto
-              </button>
-            )}
-
-            <div className="flex items-center gap-1">
-              <label className="p-2 text-slate-400 hover:text-emerald-400 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-2" title={companyLogo ? "Substituir Logo da Empresa" : "Adicionar Logo da Empresa ao PDF"}>
-                {companyLogo ? (
-                  <img src={companyLogo} alt="Logo" className="h-5 w-auto rounded-sm object-contain bg-white" />
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-                )}
-                <span className="text-xs font-bold">{companyLogo ? 'Mudar Logo' : 'Logo PDF'}</span>
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      const img = new Image();
-                      img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 400;
-                        const MAX_HEIGHT = 200;
-                        let width = img.width;
-                        let height = img.height;
-
-                        if (width > height) {
-                          if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
-                          }
-                        } else {
-                          if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
-                          }
-                        }
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx?.drawImage(img, 0, 0, width, height);
-                        
-                        const base64 = canvas.toDataURL('image/png', 0.8);
-                        try {
-                          localStorage.setItem('dds_company_logo', base64);
-                          setCompanyLogo(base64);
-                          showToast('Logo atualizada com sucesso!', 'success');
-                        } catch (err) {
-                          console.error(err);
-                          showToast('Erro: Imagem muito grande.', 'error');
-                        }
-                      };
-                      img.src = reader.result as string;
-                    };
-                    reader.readAsDataURL(file);
-                  }
-                }} />
-              </label>
-              
-              {companyLogo && (
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center border-t border-slate-800/60 sm:border-0 pt-2 sm:pt-0 w-full sm:w-auto justify-end">
+              {activeMeeting && (
                 <button
-                  onClick={() => {
-                    localStorage.removeItem('dds_company_logo');
-                    setCompanyLogo(null);
-                    showToast('Logo removida.', 'info');
-                  }}
-                  className="p-2 text-slate-500 hover:text-red-400 rounded-xl hover:bg-slate-800 transition-colors"
-                  title="Remover Logo"
+                  onClick={() => setIsLiveMode(true)}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 animate-pulse cursor-pointer min-h-[38px]"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                  <Radio size={14} /> DDS em Aberto
                 </button>
               )}
-            </div>
 
-            <button
-              onClick={handleLogout}
-              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Sair do Painel"
-            >
-              <LogOut size={18} />
-            </button>
+              <div className="flex items-center gap-1">
+                <label className="p-2 text-slate-400 hover:text-emerald-400 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1.5 border border-slate-800 hover:border-slate-700 min-h-[38px]" title={companyLogo ? "Substituir Logo da Empresa" : "Adicionar Logo da Empresa ao PDF"}>
+                  {companyLogo ? (
+                    <img src={companyLogo} alt="Logo" className="h-5 w-auto rounded-sm object-contain bg-white" />
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                  )}
+                  <span className="text-xs font-bold">{companyLogo ? 'Mudar Logo' : 'Logo PDF'}</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        const img = new Image();
+                        img.onload = () => {
+                          const canvas = document.createElement('canvas');
+                          const MAX_WIDTH = 400;
+                          const MAX_HEIGHT = 200;
+                          let width = img.width;
+                          let height = img.height;
+
+                          if (width > height) {
+                            if (width > MAX_WIDTH) {
+                              height *= MAX_WIDTH / width;
+                              width = MAX_WIDTH;
+                            }
+                          } else {
+                            if (height > MAX_HEIGHT) {
+                              width *= MAX_HEIGHT / height;
+                              height = MAX_HEIGHT;
+                            }
+                          }
+                          canvas.width = width;
+                          canvas.height = height;
+                          const ctx = canvas.getContext('2d');
+                          ctx?.drawImage(img, 0, 0, width, height);
+                          
+                          const base64 = canvas.toDataURL('image/png', 0.8);
+                          try {
+                            localStorage.setItem('dds_company_logo', base64);
+                            setCompanyLogo(base64);
+                            showToast('Logo atualizada com sucesso!', 'success');
+                          } catch (err) {
+                            console.error(err);
+                            showToast('Erro: Imagem muito grande.', 'error');
+                          }
+                        };
+                        img.src = reader.result as string;
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }} />
+                </label>
+                
+                {companyLogo && (
+                  <button
+                    onClick={() => {
+                      localStorage.removeItem('dds_company_logo');
+                      setCompanyLogo(null);
+                      showToast('Logo removida.', 'info');
+                    }}
+                    className="p-2 text-slate-500 hover:text-red-400 rounded-xl hover:bg-slate-800 transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
+                    title="Remover Logo"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={handleLogout}
+                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer min-h-[38px] min-w-[38px] flex items-center justify-center"
+                title="Sair do Painel"
+              >
+                <LogOut size={18} />
+              </button>
+            </div>
           </div>
         </header>
 
