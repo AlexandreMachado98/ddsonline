@@ -1,77 +1,113 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { ShieldCheck } from 'lucide-react';
 
 interface DdsLogoProps {
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   showSubtitle?: boolean;
+  showText?: boolean;
   clickable?: boolean;
   href?: string;
   className?: string;
+  theme?: 'dark' | 'light';
 }
 
 export default function DdsLogo({
   size = 'md',
   showSubtitle = true,
+  showText = true,
   clickable = false,
   href = '/',
-  className = ''
+  className = '',
+  theme = 'dark'
 }: DdsLogoProps) {
+  const logoSources = ['/logo.png', '/icon-512x512.png', '/icon-192x192.png'];
+  const [sourceIndex, setSourceIndex] = useState(0);
+
   const sizeMap = {
+    xs: {
+      badge: 'w-7 h-7 sm:w-8 sm:h-8',
+      pixelSize: 32,
+      text: 'text-base sm:text-lg',
+      pill: 'text-[9px] px-1.5 py-0.5',
+      sub: 'text-[8px]',
+      gap: 'gap-2'
+    },
     sm: {
-      iconSize: 15,
-      text: 'text-lg',
+      badge: 'w-8 h-8 sm:w-9 sm:h-9',
+      pixelSize: 36,
+      text: 'text-lg sm:text-xl',
       pill: 'text-[10px] px-1.5 py-0.5',
-      badge: 'w-7 h-7 rounded-lg',
-      dot: 'w-1.5 h-1.5',
-      sub: 'text-[9px]'
+      sub: 'text-[9px]',
+      gap: 'gap-2.5'
     },
     md: {
-      iconSize: 18,
+      badge: 'w-10 h-10 sm:w-11 sm:h-11',
+      pixelSize: 44,
       text: 'text-xl sm:text-2xl',
       pill: 'text-xs px-2 py-0.5',
-      badge: 'w-9 h-9 rounded-xl',
-      dot: 'w-2 h-2',
-      sub: 'text-[11px]'
+      sub: 'text-[11px]',
+      gap: 'gap-3'
     },
     lg: {
-      iconSize: 22,
+      badge: 'w-12 h-12 sm:w-14 sm:h-14',
+      pixelSize: 56,
       text: 'text-2xl sm:text-3xl',
       pill: 'text-xs sm:text-sm px-2.5 py-0.5',
-      badge: 'w-11 h-11 rounded-2xl',
-      dot: 'w-2.5 h-2.5',
-      sub: 'text-xs'
+      sub: 'text-xs',
+      gap: 'gap-3.5'
     },
     xl: {
-      iconSize: 28,
+      badge: 'w-16 h-16 sm:w-20 sm:h-20',
+      pixelSize: 80,
       text: 'text-3xl sm:text-4xl',
       pill: 'text-sm sm:text-base px-3 py-1',
-      badge: 'w-13 h-13 sm:w-14 sm:h-14 rounded-2xl',
-      dot: 'w-3 h-3',
-      sub: 'text-xs sm:text-sm'
+      sub: 'text-xs sm:text-sm',
+      gap: 'gap-4'
     }
   };
 
   const currentSize = sizeMap[size] || sizeMap.md;
+  const isLight = theme === 'light';
+
+  // Emblema com a Logo Oficial do DDS Online (Capacete + Botão ON)
+  const logoBadge = (
+    <div className={`${currentSize.badge} shrink-0 relative flex items-center justify-center rounded-xl sm:rounded-2xl border border-emerald-500/30 bg-slate-950/80 shadow-md shadow-emerald-950/40 p-0.5 overflow-hidden transition-transform group-hover:scale-105 duration-200`}>
+      <img
+        src={logoSources[sourceIndex] || '/logo.png'}
+        alt="DDS ON - Logo Oficial"
+        width={currentSize.pixelSize}
+        height={currentSize.pixelSize}
+        className="w-full h-full object-contain rounded-[10px] sm:rounded-[14px] select-none pointer-events-none"
+        loading="eager"
+        onError={() => {
+          setSourceIndex((prev) => (prev < logoSources.length - 1 ? prev + 1 : prev));
+        }}
+      />
+    </div>
+  );
+
+  // Modo apenas ícone / marca
+  if (!showText) {
+    if (clickable) {
+      return (
+        <Link href={href} className={`hover:opacity-90 transition-opacity inline-flex group ${className}`}>
+          {logoBadge}
+        </Link>
+      );
+    }
+    return logoBadge;
+  }
 
   const content = (
-    <div className={`inline-flex items-center gap-2.5 sm:gap-3 font-sans select-none max-w-full ${className}`}>
-      
-      {/* Ícone / Emblema Oficial DDS ON */}
-      <div className={`${currentSize.badge} bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600 border border-emerald-400/40 flex items-center justify-center text-slate-950 shadow-lg shadow-emerald-500/25 shrink-0 relative overflow-hidden group`}>
-        <ShieldCheck size={currentSize.iconSize} className="text-slate-950 stroke-[2.5]" />
-        <span className="absolute top-1 right-1 flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-200"></span>
-        </span>
-      </div>
+    <div className={`inline-flex items-center ${currentSize.gap} font-sans select-none max-w-full group ${className}`}>
+      {logoBadge}
 
-      {/* Tipografia da Marca */}
+      {/* Tipografia Oficial da Marca DDS ON */}
       <div className="flex flex-col text-left min-w-0">
         <div className="flex items-center gap-1.5 leading-none">
-          <span className={`font-black text-white tracking-tight ${currentSize.text}`}>
+          <span className={`font-black tracking-tight ${isLight ? 'text-slate-900' : 'text-white'} ${currentSize.text}`}>
             DDS
           </span>
           <span className={`font-black bg-gradient-to-r from-emerald-400 to-teal-400 text-slate-950 rounded-lg shadow-md font-mono ${currentSize.pill}`}>
@@ -80,12 +116,11 @@ export default function DdsLogo({
         </div>
         
         {showSubtitle && (
-          <span className={`text-slate-400 font-medium tracking-wide mt-1 break-words ${currentSize.sub}`}>
+          <span className={`font-medium tracking-wide mt-1 break-words ${isLight ? 'text-slate-600' : 'text-slate-400'} ${currentSize.sub}`}>
             Segurança do Trabalho &amp; NRs
           </span>
         )}
       </div>
-
     </div>
   );
 

@@ -16,6 +16,7 @@ import DdsReportPreviewModal from '@/components/DdsReportPreviewModal';
 import UserProfileModal from '@/components/UserProfileModal';
 import OfflineSyncBadge from '@/components/OfflineSyncBadge';
 import { cacheMeetingData } from '@/lib/offlineStorage';
+import DdsLogo from '@/components/DdsLogo';
 
 export default function AdminPanel() {
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -707,11 +708,8 @@ export default function AdminPanel() {
 
           {/* Header Superior */}
           <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-3xl shadow-xl">
-            <div className="flex items-center gap-2">
-              <span className="text-xl sm:text-2xl font-black tracking-tight">
-                <span className="text-white">DDS </span>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
-              </span>
+            <div className="flex items-center gap-2.5">
+              <DdsLogo size="sm" showSubtitle={false} clickable href="/admin" />
               <span className="text-[10px] bg-slate-800 text-slate-300 font-bold px-2 py-0.5 rounded-lg border border-slate-700 ml-1">
                 {isPresential ? '📍 Presencial' : '💻 EAD'}
               </span>

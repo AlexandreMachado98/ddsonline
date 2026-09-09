@@ -225,16 +225,21 @@ export default function DdsReportPreviewModal({
         >
           {/* Header Faixa Verde */}
           <div style={{ backgroundColor: darkGreen }} className="p-4 sm:p-6 text-white flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-black tracking-tight">DDS ON</span>
-                <span className="text-[10px] uppercase font-bold tracking-widest bg-emerald-500/30 px-2 py-0.5 rounded-md border border-emerald-400/30">
-                  {meeting.classification || 'DDS'}
-                </span>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-950/40 border border-white/20 p-0.5 shrink-0 flex items-center justify-center">
+                <img src="/logo.png" alt="DDS ON" className="w-full h-full object-contain rounded-lg" />
               </div>
-              <p className="text-[11px] text-emerald-100/90 font-light mt-0.5">
-                Plataforma de registro de presença e evidências de SST
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-black tracking-tight">DDS ON</span>
+                  <span className="text-[10px] uppercase font-bold tracking-widest bg-emerald-500/30 px-2 py-0.5 rounded-md border border-emerald-400/30">
+                    {meeting.classification || 'DDS'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-100/90 font-light mt-0.5">
+                  Plataforma de registro de presença e evidências de SST
+                </p>
+              </div>
             </div>
 
             {/* Logo da Empresa */}
@@ -446,16 +451,21 @@ export default function DdsReportPreviewModal({
           >
             {/* Header Banner do Verso */}
             <div style={{ backgroundColor: darkGreen }} className="p-4 sm:p-5 text-white flex items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl sm:text-2xl font-black tracking-tight">DDS ON</span>
-                  <span className="text-[9px] bg-white/20 text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    Plano Pedagógico
-                  </span>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-950/40 border border-white/20 p-0.5 shrink-0 flex items-center justify-center">
+                  <img src="/logo.png" alt="DDS ON" className="w-full h-full object-contain rounded-lg" />
                 </div>
-                <p className="text-[10px] text-emerald-100 font-medium mt-0.5">
-                  PROGRAMAÇÃO E CONTEÚDO PROGRAMÁTICO DO TREINAMENTO
-                </p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl sm:text-2xl font-black tracking-tight">DDS ON</span>
+                    <span className="text-[9px] bg-white/20 text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Plano Pedagógico
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-emerald-100 font-medium mt-0.5">
+                    PROGRAMAÇÃO E CONTEÚDO PROGRAMÁTICO DO TREINAMENTO
+                  </p>
+                </div>
               </div>
               {companyLogo && (
                 <div className="bg-white p-1 rounded-xl max-w-[120px] max-h-[40px] flex items-center justify-center">
@@ -563,11 +573,16 @@ export default function DdsReportPreviewModal({
                 }`}
               >
                 <div style={{ backgroundColor: darkGreen }} className="p-4 sm:p-5 text-white flex items-center justify-between gap-4">
-                  <div>
-                    <span className="text-xl sm:text-2xl font-black tracking-tight">DDS ON</span>
-                    <p className="text-[10px] text-emerald-100 font-medium mt-0.5">
-                      DOSSIÊ DE EVIDÊNCIAS & MATERIAIS APRESENTADOS
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-950/40 border border-white/20 p-0.5 shrink-0 flex items-center justify-center">
+                      <img src="/logo.png" alt="DDS ON" className="w-full h-full object-contain rounded-lg" />
+                    </div>
+                    <div>
+                      <span className="text-xl sm:text-2xl font-black tracking-tight">DDS ON</span>
+                      <p className="text-[10px] text-emerald-100 font-medium mt-0.5">
+                        DOSSIÊ DE EVIDÊNCIAS & MATERIAIS APRESENTADOS
+                      </p>
+                    </div>
                   </div>
                   <span className="text-xs bg-white/20 px-3 py-1 rounded-full font-bold">
                     {attachmentsList.length} anexos

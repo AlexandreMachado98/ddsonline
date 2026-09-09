@@ -24,11 +24,12 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
       { url: "/favicon.svg", type: "image/svg+xml" }
     ],
-    shortcut: "/icon.svg",
-    apple: "/icon.svg",
+    shortcut: "/icon-192x192.png",
+    apple: "/apple-touch-icon.png",
   },
   openGraph: {
     title: "DDS ON • Diálogo Diário de Segurança",
@@ -37,7 +38,7 @@ export const metadata: Metadata = {
     siteName: "DDS ON",
     images: [
       {
-        url: "/icon.svg",
+        url: "/logo.png",
         width: 512,
         height: 512,
         alt: "DDS ON - Plataforma de Segurança do Trabalho e Gestão de DDS",
@@ -50,7 +51,7 @@ export const metadata: Metadata = {
     card: "summary",
     title: "DDS ON • Diálogo Diário de Segurança",
     description: "Plataforma de Diálogo Diário de Segurança com Registro Fotográfico, Assinatura Eletrônica e Gestão de Evidências.",
-    images: ["/icon.svg"],
+    images: ["/logo.png"],
   },
 };
 
