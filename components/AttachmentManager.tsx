@@ -7,6 +7,7 @@ import {
   MoveUp, MoveDown, ZoomIn, ZoomOut, Maximize2, Minimize2,
   Sparkles, ScrollText, ArrowDown
 } from 'lucide-react';
+import MediaLightbox from '@/components/MediaLightbox';
 
 export interface DdsAttachment {
   id?: string;
@@ -48,16 +49,18 @@ export default function AttachmentManager({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const [previewItem, setPreviewItem] = useState<DdsAttachment | null>(null);
-  const [zoomScale, setZoomScale] = useState<number>(1);
-  const [fitMode, setFitMode] = useState<'width' | 'contain'>('width');
+  const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number>(0);
   const [editingDescriptionIndex, setEditingDescriptionIndex] = useState<number | null>(null);
   const [tempDescription, setTempDescription] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoadingFile, setIsLoadingFile] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const openPreview = async (att: DdsAttachment) => {
+  const openPreview = async (index: number) => {
+    const att = attachments[index];
+    if (!att) return;
+
     // Se o anexo veio sem fileData (otimização de tráfego de rede), busca sob demanda
     if (!att.fileData && att.id) {
       try {
@@ -66,6 +69,9 @@ export default function AttachmentManager({
         const data = await res.json();
         if (data.success && data.attachment?.fileData) {
           att.fileData = data.attachment.fileData;
+          const updated = [...attachments];
+          updated[index] = { ...att };
+          onChange(updated);
         }
       } catch (e) {
         console.error("Erro ao carregar dados do anexo:", e);
@@ -73,9 +79,8 @@ export default function AttachmentManager({
         setIsLoadingFile(false);
       }
     }
-    setPreviewItem(att);
-    setZoomScale(1);
-    setFitMode('width');
+    setLightboxIndex(index);
+    setIsLightboxOpen(true);
   };
 
   // Formata tamanho em KB ou MB
@@ -406,7 +411,7 @@ export default function AttachmentManager({
                   {/* Thumbnail / Ícone */}
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <div 
-                      onClick={() => openPreview(att)}
+                      onClick={() => openPreview(index)}
                       className="w-12 h-12 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0 cursor-pointer hover:border-emerald-500/60 transition-colors group relative"
                       title="Clique para visualizar em tela cheia"
                     >
@@ -463,7 +468,7 @@ export default function AttachmentManager({
                     {/* Botão Visualizar */}
                     <button
                       type="button"
-                      onClick={() => openPreview(att)}
+                      onClick={() => openPreview(index)}
                       disabled={isLoadingFile}
                       className="px-2.5 py-1.5 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-emerald-800/60 flex items-center gap-1 min-h-[36px]"
                       title="Visualizar documento / imagem completa"
@@ -512,24 +517,34 @@ export default function AttachmentManager({
 
                 {/* Pré-visualização Inline em destaque no modo ReadOnly (Colaborador Assinando) */}
                 {readOnly && !isPdf && (
-                  <div 
-                    onClick={() => openPreview(att)}
-                    className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-900 cursor-pointer group hover:border-emerald-500/60 transition-all"
-                  >
-                    <img 
-                      src={att.fileData} 
-                      alt={att.fileName} 
-                      className="w-full max-h-56 object-cover object-top group-hover:scale-[1.01] transition-transform" 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-bold text-white flex items-center gap-1.5 drop-shadow-md">
-                          <Eye size={13} className="text-emerald-400" /> Tocar para ver comunicado inteiro e dar zoom
-                        </span>
-                        <span className="px-2 py-0.5 bg-emerald-600 text-white rounded-lg text-[10px] font-bold shadow-md">
-                          Abrir Imagem
-                        </span>
+                  <div className="space-y-1.5">
+                    <div 
+                      onClick={() => openPreview(index)}
+                      className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950/80 cursor-zoom-in group hover:border-emerald-500/60 transition-all shadow-lg flex flex-col items-center justify-center"
+                      title="Toque ou clique para ampliar em tela cheia com zoom"
+                    >
+                      {/* Imagem em proporção natural sem cortes (width: 100%, height: auto, object-fit: contain) */}
+                      <div className="w-full flex items-center justify-center p-2 sm:p-3 bg-slate-950/60 min-h-[180px]">
+                        <img 
+                          src={att.fileData} 
+                          alt={att.displayName || att.fileName} 
+                          className="w-full h-auto max-h-[360px] sm:max-h-[460px] object-contain rounded-xl group-hover:scale-[1.008] transition-transform" 
+                        />
                       </div>
+
+                      {/* Badge Discreta e Intuitiva: Toque para ampliar */}
+                      <div className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-10 pointer-events-none">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-950/90 text-white text-xs font-bold border border-emerald-500/40 shadow-xl backdrop-blur-md group-hover:bg-slate-900 group-hover:border-emerald-400 group-hover:scale-105 transition-all">
+                          <ZoomIn size={14} className="text-emerald-400 shrink-0" />
+                          <span>Toque para ampliar</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Texto informativo discreto para reforçar acessibilidade */}
+                    <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 text-center px-1">
+                      <ZoomIn size={12} className="text-emerald-400 shrink-0" />
+                      <span>Toque ou clique na imagem para visualizar em tela ampliada com controles de zoom.</span>
                     </div>
                   </div>
                 )}
@@ -593,163 +608,20 @@ export default function AttachmentManager({
         </div>
       )}
 
-      {/* Modal de Visualização Preview em Alta Resolução e Sem Cortes */}
-      {previewItem && (
-        <div className="fixed inset-0 z-[99999] flex flex-col bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
-          {/* Topbar Fixa do Preview */}
-          <header className="h-16 bg-slate-950 border-b border-slate-800 px-3 sm:px-6 flex items-center justify-between gap-2 shrink-0 shadow-2xl z-20">
-            <div className="min-w-0 flex-1">
-              <h3 className="text-xs sm:text-sm font-bold text-white truncate" title={previewItem.displayName || previewItem.fileName}>
-                {previewItem.displayName || previewItem.fileName}
-              </h3>
-              <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
-                {previewItem.mimeType === 'application/pdf' ? 'Documento PDF' : 'Imagem de Evidência'} • <span className="text-emerald-400 font-mono">{formatFileSize(previewItem.fileSize)}</span>
-              </p>
-            </div>
-
-            {/* Controles de Zoom e Modos de Ajuste (apenas para Imagens) */}
-            {previewItem.mimeType !== 'application/pdf' && (
-              <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl shrink-0">
-                {/* Botão de Modo: Rolar Tudo vs Ajustar */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFitMode(prev => prev === 'width' ? 'contain' : 'width');
-                    setZoomScale(1);
-                  }}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                    fitMode === 'width' 
-                      ? 'bg-emerald-600 text-white shadow-sm' 
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                  title={fitMode === 'width' ? "Modo Rolar Página Inteira (Sem Cortes)" : "Modo Ajustar à Tela"}
-                >
-                  {fitMode === 'width' ? (
-                    <>
-                      <ScrollText size={13} />
-                      <span className="hidden sm:inline">Rolar Tudo</span>
-                    </>
-                  ) : (
-                    <>
-                      <Maximize2 size={13} />
-                      <span className="hidden sm:inline">Ajustar</span>
-                    </>
-                  )}
-                </button>
-
-                <div className="h-4 w-px bg-slate-800 mx-0.5 hidden sm:block" />
-
-                {/* Zoom Out */}
-                <button
-                  type="button"
-                  onClick={() => setZoomScale(prev => Math.max(0.6, prev - 0.25))}
-                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                  title="Diminuir Zoom"
-                >
-                  <ZoomOut size={15} />
-                </button>
-
-                {/* Indicador / Reset de Zoom */}
-                <button
-                  type="button"
-                  onClick={() => setZoomScale(1)}
-                  className="px-1.5 py-0.5 text-[10px] font-mono text-slate-300 hover:text-emerald-400 hover:bg-slate-800 rounded transition-colors"
-                  title="Resetar Zoom para 100%"
-                >
-                  {Math.round(zoomScale * 100)}%
-                </button>
-
-                {/* Zoom In */}
-                <button
-                  type="button"
-                  onClick={() => setZoomScale(prev => Math.min(3.0, prev + 0.25))}
-                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                  title="Aumentar Zoom"
-                >
-                  <ZoomIn size={15} />
-                </button>
-              </div>
-            )}
-
-            {/* Ações: Baixar e Fechar */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <a
-                href={previewItem.fileData}
-                download={previewItem.fileName}
-                className="p-2 sm:px-3 sm:py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors border border-slate-800 hover:border-slate-700 min-h-[38px] min-w-[38px] justify-center"
-                title="Baixar arquivo original"
-              >
-                <Download size={15} />
-                <span className="hidden md:inline">Baixar</span>
-              </a>
-
-              <button
-                type="button"
-                onClick={() => setPreviewItem(null)}
-                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 border border-slate-800 transition-colors cursor-pointer min-h-[38px] min-w-[38px] flex items-center justify-center"
-                title="Fechar Visualização"
-              >
-                <X size={18} />
-              </button>
-            </div>
-          </header>
-
-          {/* Área de Visualização com Rolagem e Zoom Total */}
-          <div className="flex-1 overflow-y-auto overflow-x-auto p-3 sm:p-6 bg-slate-950 flex flex-col items-center justify-start min-h-0 touch-pan-x touch-pan-y space-y-4">
-            {previewItem.mimeType === 'application/pdf' ? (
-              <div className="w-full max-w-4xl h-[80dvh] flex flex-col items-center justify-center gap-3 bg-slate-900 rounded-2xl p-2 border border-slate-800">
-                <iframe 
-                  src={previewItem.fileData} 
-                  title={previewItem.fileName}
-                  className="w-full h-full rounded-xl border border-slate-800"
-                />
-                <a
-                  href={previewItem.fileData}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-emerald-400 hover:underline font-semibold flex items-center gap-1 py-1"
-                >
-                  <Eye size={13} /> Abrir PDF em tela cheia / nova aba
-                </a>
-              </div>
-            ) : (
-              <div className="w-full flex flex-col items-center justify-start min-h-full py-2">
-                <div 
-                  className="transition-transform duration-150 origin-top flex items-center justify-center max-w-full"
-                  style={{ transform: zoomScale !== 1 ? `scale(${zoomScale})` : undefined }}
-                >
-                  <img 
-                    src={previewItem.fileData} 
-                    alt={previewItem.fileName} 
-                    className={`${
-                      fitMode === 'width' 
-                        ? 'w-full max-w-2xl h-auto object-contain' 
-                        : 'max-w-full max-h-[80dvh] object-contain'
-                    } rounded-2xl shadow-2xl border border-slate-800 bg-white/5 transition-all`}
-                  />
-                </div>
-
-                {/* Dica de usabilidade para rolagem do comunicado completo */}
-                <div className="mt-4 px-3.5 py-2 bg-slate-900/90 border border-slate-800 rounded-xl text-[11px] text-slate-400 flex items-center gap-2 max-w-md text-center shadow-lg">
-                  <ArrowDown size={14} className="text-emerald-400 shrink-0 animate-bounce" />
-                  <span>Role verticalmente para conferir todo o comunicado de segurança e detalhes da imagem.</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Rodapé com Descrição do Anexo se houver */}
-          {previewItem.description && (
-            <footer className="p-3.5 bg-slate-950 border-t border-slate-800 text-xs text-slate-300 flex items-center gap-2 shrink-0">
-              <FileCheck2 size={16} className="text-emerald-400 shrink-0" />
-              <div className="truncate">
-                <strong className="text-emerald-400 font-semibold">Observação: </strong>
-                <span className="italic">{previewItem.description}</span>
-              </div>
-            </footer>
-          )}
-        </div>
-      )}
+      {/* Lightbox / Modal de Visualização Ampliada da Mídia do DDS */}
+      <MediaLightbox
+        isOpen={isLightboxOpen}
+        onClose={() => setIsLightboxOpen(false)}
+        initialIndex={lightboxIndex}
+        items={attachments.map(att => ({
+          id: att.id,
+          url: att.fileData,
+          title: att.displayName || att.fileName,
+          description: att.description,
+          mimeType: att.mimeType,
+          fileSize: att.fileSize
+        }))}
+      />
     </div>
   );
 }
