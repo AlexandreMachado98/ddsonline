@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { 
   X, Download, Eye, FileText, CheckCircle2, 
-  MapPin, Calendar, Users, ShieldCheck, 
+  MapPin, Calendar, Users, FileCheck2, 
   Printer, ArrowLeft, Loader2, Sparkles, 
   Check, FileSpreadsheet, LayoutList, FileImage, 
   AlertCircle, ExternalLink, Image as ImageIcon
@@ -174,7 +174,7 @@ export default function DdsReportPreviewModal({
         {/* Banner Informativo de Pré-visualização */}
         <div className="w-full max-w-[210mm] bg-emerald-950/60 border border-emerald-500/30 rounded-2xl p-3 sm:p-4 text-xs text-slate-200 flex items-center justify-between gap-3 shadow-md">
           <div className="flex items-center gap-2.5">
-            <ShieldCheck size={20} className="text-emerald-400 shrink-0" />
+            <FileCheck2 size={20} className="text-emerald-400 shrink-0" />
             <div>
               <p className="font-bold text-white text-xs sm:text-sm">Documento de Auditoria Pronto para Conferência</p>
               <p className="text-xs text-slate-400 mt-1">

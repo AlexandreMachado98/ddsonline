@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   X, Camera, Image as ImageIcon, Trash2, Check, 
-  ShieldCheck, Loader2, AlertTriangle, Lock, User, 
+  Loader2, AlertTriangle, Lock, User, 
   Mail, Building2, Briefcase, Sparkles
 } from 'lucide-react';
 

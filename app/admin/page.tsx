@@ -5,7 +5,7 @@ import {
   Play, Users, FileText, CheckCircle2, 
   Smartphone, Download, Copy, Check, LogOut, 
   History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet,
-  Camera, Image as ImageIcon, Trash2, Target, ExternalLink, Info, CheckSquare, Square, ShieldCheck, MapPin, Sparkles, ChevronRight, Eye
+  Camera, Image as ImageIcon, Trash2, Target, ExternalLink, Info, CheckSquare, Square, MapPin, Sparkles, ChevronRight, Eye
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
@@ -615,7 +615,7 @@ export default function AdminPanel() {
             <div className="bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-3xl max-w-lg w-full max-h-[92dvh] overflow-y-auto shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2 text-emerald-400">
-                  <ShieldCheck size={22} />
+                  <CheckCircle2 size={22} />
                   <h2 className="text-base font-extrabold text-white">Revisão & Fechamento do DDS</h2>
                 </div>
                 <button onClick={() => setIsReviewingClose(false)} className="text-slate-400 hover:text-white p-1 rounded-lg">
@@ -1152,9 +1152,7 @@ export default function AdminPanel() {
         <header className="w-full bg-slate-900 border border-slate-800 p-3.5 sm:p-5 rounded-3xl shadow-xl overflow-hidden max-w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0 max-w-full">
             <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1 overflow-hidden">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-emerald-950/40 shrink-0 mt-0.5 sm:mt-0">
-                <ShieldCheck size={22} />
-              </div>
+              <DdsLogo size="md" showText={false} clickable href="/admin" />
               <button
                 type="button"
                 onClick={() => setIsProfileOpen(true)}
@@ -1546,7 +1544,7 @@ export default function AdminPanel() {
                           </span>
                           {m.attachments && m.attachments.length > 0 && (
                             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shrink-0">
-                              <ShieldCheck size={10} /> {m.attachments.length} {m.attachments.length === 1 ? 'anexo' : 'anexos'}
+                              <FileText size={10} /> {m.attachments.length} {m.attachments.length === 1 ? 'anexo' : 'anexos'}
                             </span>
                           )}
                         </div>

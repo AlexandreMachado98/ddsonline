@@ -5,7 +5,7 @@ import CacheBusterButton from '@/components/CacheBuster';
 import { 
   Video, VideoOff, Mic, MicOff, Monitor, MonitorOff, 
   FlipHorizontal, Maximize2, Minimize2, RefreshCw, 
-  ShieldCheck, AlertCircle, Users, Radio, 
+  AlertCircle, Users, Radio, 
   Volume2, VolumeX, Eye, Laptop, CheckCircle2, Play, Lock, HelpCircle
 } from 'lucide-react';
 

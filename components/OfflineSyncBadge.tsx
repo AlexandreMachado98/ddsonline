@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Wifi, WifiOff, RefreshCw, CheckCircle2, UploadCloud, ShieldAlert, Sparkles, Loader2 } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw, CheckCircle2, UploadCloud, Sparkles, Loader2 } from 'lucide-react';
 import { getPendingAttendances, syncOfflineQueue, OfflineAttendance } from '@/lib/offlineStorage';
 
 interface OfflineSyncBadgeProps {

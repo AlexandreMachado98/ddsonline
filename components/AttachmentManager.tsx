@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { 
   FileText, Camera, Trash2, Eye, AlertCircle, CheckCircle2, 
-  X, Download, Plus, Loader2, FileCheck2, ShieldCheck, 
+  X, Download, Plus, Loader2, FileCheck2, 
   MoveUp, MoveDown, ZoomIn, ZoomOut, Maximize2, Minimize2,
   Sparkles, ScrollText, ArrowDown
 } from 'lucide-react';
@@ -291,7 +291,7 @@ export default function AttachmentManager({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <div className="flex items-center gap-2">
-            <ShieldCheck size={16} className="text-emerald-400" />
+            <FileCheck2 size={16} className="text-emerald-400" />
             <h4 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
               Evidências & Material Apresentado
             </h4>
@@ -741,7 +741,7 @@ export default function AttachmentManager({
           {/* Rodapé com Descrição do Anexo se houver */}
           {previewItem.description && (
             <footer className="p-3.5 bg-slate-950 border-t border-slate-800 text-xs text-slate-300 flex items-center gap-2 shrink-0">
-              <ShieldCheck size={16} className="text-emerald-400 shrink-0" />
+              <FileCheck2 size={16} className="text-emerald-400 shrink-0" />
               <div className="truncate">
                 <strong className="text-emerald-400 font-semibold">Observação: </strong>
                 <span className="italic">{previewItem.description}</span>

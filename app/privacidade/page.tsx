@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ShieldCheck, Lock, Eye, Database, Server, Mail, UserCheck, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Lock, Eye, Database, Server, Mail, UserCheck, AlertCircle } from 'lucide-react';
 import DdsLogo from '@/components/DdsLogo';
 import { Metadata } from 'next';
 
@@ -156,7 +156,7 @@ export default function PrivacidadePage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
               <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
                 <p className="font-bold text-white text-xs flex items-center gap-1">
-                  <ShieldCheck size={14} className="text-emerald-400" /> Criptografia Forte
+                  <Lock size={14} className="text-emerald-400" /> Criptografia Forte
                 </p>
                 <p className="text-[11px] text-slate-400">Trânsito com TLS 1.3 e repouso com padrão AES-256 no banco de dados.</p>
               </div>

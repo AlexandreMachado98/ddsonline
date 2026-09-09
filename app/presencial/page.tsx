@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { 
-  Users, CheckCircle2, ShieldAlert, Sparkles, LogOut, 
+  Users, CheckCircle2, Sparkles, LogOut, 
   Building2, Calendar, AlertTriangle, ArrowRight, User, 
   Camera, PenTool, Check, Smartphone, Loader2, ExternalLink, RefreshCw, QrCode
 } from 'lucide-react';

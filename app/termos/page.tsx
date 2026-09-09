@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ShieldCheck, Scale, Building2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, Scale, Building2 } from 'lucide-react';
 import DdsLogo from '@/components/DdsLogo';
 import { Metadata } from 'next';
 
@@ -75,7 +75,7 @@ export default function TermosPage() {
 
               <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-2">
                 <p className="font-bold text-teal-400 flex items-center gap-1.5">
-                  <ShieldCheck size={16} /> Plataforma DDS Online (DDS ON)
+                  <Sparkles size={16} /> Plataforma DDS Online (DDS ON)
                 </p>
                 <ul className="list-disc list-inside text-slate-400 space-y-1 text-xs">
                   <li>Disponibilidade e desempenho da infraestrutura tecnológica.</li>
