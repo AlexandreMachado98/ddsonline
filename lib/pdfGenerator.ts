@@ -102,30 +102,11 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
   // PÁGINA 1: FRENTE - REGISTRO DE PRESENÇA OFICIAL
   // =========================================================================
 
-  // --- HEADER BANNER ---
-  doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-  doc.rect(0, 0, pageWidth, 30, 'F');
-  
-  // Logo "DDS ON"
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(22);
-  doc.setFont('helvetica', 'bold');
-  doc.text('DDS ON', 14, 18);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(230, 240, 235);
-  doc.text('Plataforma de registro de presença online', 14, 24);
-
-  // Logo da Empresa
-  renderCompanyLogo(30);
-  
-  currentY = 43;
-
   // --- HEADER PRINCIPAL / FAIXA INSTITUCIONAL ---
   doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
   doc.rect(0, 0, pageWidth, 28, 'F');
   
-  // Linha dourada/verde clara de acento institucional
+  // Linha verde clara de acento institucional
   doc.setFillColor(74, 163, 122);
   doc.rect(0, 27, pageWidth, 1, 'F');
 
