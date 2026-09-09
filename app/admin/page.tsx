@@ -53,6 +53,49 @@ export default function AdminPanel() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 
+  // Recupera rascunho de novo DDS em elaboração salvo no dispositivo
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const draft = localStorage.getItem('dds_draft_meeting');
+      if (draft) {
+        const parsed = JSON.parse(draft);
+        if (parsed.topic) setTopic(parsed.topic);
+        if (parsed.farm) setFarm(parsed.farm);
+        if (parsed.objective) setObjective(parsed.objective);
+        if (parsed.programmaticContent) setProgrammaticContent(parsed.programmaticContent);
+        if (parsed.classification) setClassification(parsed.classification);
+        if (parsed.meetingType) setMeetingType(parsed.meetingType);
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar rascunho de DDS:', e);
+    }
+  }, []);
+
+  // Salva rascunho automaticamente a cada alteração com debounce
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const timeout = setTimeout(() => {
+      try {
+        if (topic || farm || objective || programmaticContent) {
+          localStorage.setItem('dds_draft_meeting', JSON.stringify({
+            topic,
+            farm,
+            objective,
+            programmaticContent,
+            classification,
+            meetingType,
+            savedAt: new Date().toISOString()
+          }));
+        }
+      } catch (e) {
+        console.warn('Erro ao salvar rascunho:', e);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [topic, farm, objective, programmaticContent, classification, meetingType]);
+
   const formatDatetimeLocal = (dateStr: string) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
@@ -191,6 +234,7 @@ export default function AdminPanel() {
 
   const handleStartNewMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCreatingMeeting) return;
     if (!topic.trim() || !farm.trim()) {
       showToast('Por favor, preencha o Tema e o Local.', 'error');
       return;
@@ -219,6 +263,9 @@ export default function AdminPanel() {
       const data = await res.json();
       
       if (res.ok && data.success && data.meeting) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('dds_draft_meeting');
+        }
         setActiveMeeting(data.meeting);
         cacheMeetingData(data.meeting);
         setIsLiveMode(true);
@@ -237,24 +284,71 @@ export default function AdminPanel() {
     }
   };
 
+  const compressImage = (dataUrl: string, callback: (compressed: string) => void) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      const maxDimension = 1280;
+
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        callback(canvas.toDataURL('image/jpeg', 0.82));
+      } else {
+        callback(dataUrl);
+      }
+    };
+    img.onerror = () => callback(dataUrl);
+    img.src = dataUrl;
+  };
+
   const handleAddTeamPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      const updatedPhotos = [...teamPhotos, base64];
-      setTeamPhotos(updatedPhotos);
+    reader.onloadend = () => {
+      const rawBase64 = reader.result as string;
+      compressImage(rawBase64, async (compressed) => {
+        const updatedPhotos = [...teamPhotos, compressed];
+        setTeamPhotos(updatedPhotos);
 
-      if (activeMeeting?.id) {
-        await fetch('/api/reuniao', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ meetingId: activeMeeting.id, groupPhoto: updatedPhotos.length > 0 ? updatedPhotos[0] : null })
-        });
-      }
-      showToast('Foto adicionada com sucesso!', 'success');
+        if (activeMeeting?.id) {
+          try {
+            const res = await fetch('/api/reuniao', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ meetingId: activeMeeting.id, groupPhoto: updatedPhotos.length > 0 ? updatedPhotos[0] : null })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+              showToast('Erro ao sincronizar foto com o servidor.', 'error');
+              return;
+            }
+          } catch (err) {
+            console.error('Erro ao enviar foto da equipe:', err);
+            showToast('Erro de conexão ao salvar foto.', 'error');
+            return;
+          }
+        }
+        showToast('Foto da equipe adicionada com sucesso!', 'success');
+      });
     };
     reader.readAsDataURL(file);
   };

@@ -144,6 +144,7 @@ function PresencialContent() {
   // Submissão de Presença Presencial com Suporte Total a Offline-First
   const handleAdmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     if (!name.trim()) {
       toast.warning('Campo Obrigatório', 'Por favor, informe seu nome completo.');

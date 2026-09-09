@@ -11,11 +11,39 @@ interface SignaturePadProps {
 
 export default function SignaturePad({ onSave, onConfirm }: SignaturePadProps) {
   const notifyChange = (dataUrl: string | null) => {
+    lastSignatureRef.current = dataUrl;
     if (onSave) onSave(dataUrl);
     if (onConfirm) onConfirm(dataUrl);
   };
   const sigCanvas = useRef<SignatureCanvas>(null);
   const [hasDrawn, setHasDrawn] = useState(false);
+  const lastSignatureRef = useRef<string | null>(null);
+
+  // Protege a assinatura contra limpeza acidental em caso de rotação de tela no celular
+  useEffect(() => {
+    const handleResize = () => {
+      if (lastSignatureRef.current && sigCanvas.current) {
+        const saved = lastSignatureRef.current;
+        setTimeout(() => {
+          if (sigCanvas.current && sigCanvas.current.isEmpty()) {
+            try {
+              sigCanvas.current.fromDataURL(saved);
+              setHasDrawn(true);
+            } catch (e) {
+              console.warn('Erro ao restaurar assinatura após rotação:', e);
+            }
+          }
+        }, 150);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
 
   const clearCanvas = () => {
     sigCanvas.current?.clear();
@@ -23,14 +51,35 @@ export default function SignaturePad({ onSave, onConfirm }: SignaturePadProps) {
     notifyChange(null);
   };
 
-  // Salva automaticamente assim que o usuário termina o traço
+  // Salva automaticamente assim que o usuário termina o traço com proteção contra falhas de recorte
   const handleStrokeEnd = () => {
-    if (!sigCanvas.current?.isEmpty()) {
-      const dataUrl = sigCanvas.current?.getTrimmedCanvas().toDataURL('image/png');
-      if (dataUrl) {
-        setHasDrawn(true);
-        notifyChange(dataUrl);
+    if (!sigCanvas.current || sigCanvas.current.isEmpty()) return;
+
+    try {
+      const trimmed = sigCanvas.current.getTrimmedCanvas();
+      if (trimmed && trimmed.width > 0 && trimmed.height > 0) {
+        const dataUrl = trimmed.toDataURL('image/png');
+        if (dataUrl) {
+          setHasDrawn(true);
+          notifyChange(dataUrl);
+          return;
+        }
       }
+    } catch (err) {
+      console.warn('Falha no recorte getTrimmedCanvas, utilizando fallback completo:', err);
+    }
+
+    try {
+      const rawCanvas = sigCanvas.current.getCanvas();
+      if (rawCanvas) {
+        const dataUrl = rawCanvas.toDataURL('image/png');
+        if (dataUrl) {
+          setHasDrawn(true);
+          notifyChange(dataUrl);
+        }
+      }
+    } catch (err2) {
+      console.error('Falha ao serializar assinatura:', err2);
     }
   };
 

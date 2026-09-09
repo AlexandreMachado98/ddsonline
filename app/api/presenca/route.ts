@@ -23,26 +23,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Reunião não encontrada ou link expirado' }, { status: 404 });
     }
 
-    // Evita duplicidade de presença para o mesmo NOME na mesma reunião
+    // Evita sobrescrita indevida de homônimos: verifica se é a mesma pessoa (mesmo nome E mesma função)
+    const trimmedName = name.trim();
+    const trimmedCpf = cpf.trim();
+
     const existing = await prisma.attendance.findFirst({
       where: {
         meetingId: meeting.id,
-        name: { equals: name.trim(), mode: 'insensitive' }
+        name: { equals: trimmedName, mode: 'insensitive' },
+        cpf: { equals: trimmedCpf, mode: 'insensitive' }
       }
     });
 
     if (existing) {
-      // Atualiza os dados do colaborador existente (caso refaça a assinatura)
+      // Se for exatamente o mesmo colaborador reenviando na mesma sessão, atualiza os dados
       const updated = await prisma.attendance.update({
         where: { id: existing.id },
         data: {
-          name: name.trim(),
-          cpf: cpf.trim(), // Guarda a função / cargo
+          name: trimmedName,
+          cpf: trimmedCpf,
           selfie: savedSelfie || existing.selfie,
           signature: savedSignature || existing.signature
         }
       });
-      return NextResponse.json({ success: true, data: updated, meetingId: meeting.id });
+      return NextResponse.json({ success: true, data: updated, meetingId: meeting.id, updated: true });
     }
 
     // Salva a presença atrelada estritamente à reunião correta

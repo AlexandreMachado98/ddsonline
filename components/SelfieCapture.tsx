@@ -22,12 +22,48 @@ export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
     facingMode: facingMode
   };
 
-  // Captura foto da webcam
+  // Comprime a selfie para no máximo 640px em JPEG (evita estourar limite do Vercel/Next e cota offline)
+  const compressSelfie = (dataUrl: string, callback: (compressed: string) => void) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      const maxDimension = 640;
+
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#000000';
+        ctx.drawImage(img, 0, 0, width, height);
+        callback(canvas.toDataURL('image/jpeg', 0.82));
+      } else {
+        callback(dataUrl);
+      }
+    };
+    img.onerror = () => callback(dataUrl);
+    img.src = dataUrl;
+  };
+
+  // Captura foto da webcam com compressão
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
     if (imageSrc) {
-      setCapturedImage(imageSrc);
-      onConfirm(imageSrc);
+      compressSelfie(imageSrc, (compressed) => {
+        setCapturedImage(compressed);
+        onConfirm(compressed);
+      });
     }
   }, [webcamRef, onConfirm]);
 
@@ -42,15 +78,17 @@ export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
     setFacingMode((prev) => (prev === 'user' ? 'environment' : 'user'));
   };
 
-  // Fallback para envio de foto da galeria ou câmera nativa do celular
+  // Fallback para envio de foto da galeria ou câmera nativa com compressão imediata
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
-        setCapturedImage(result);
-        onConfirm(result);
+        compressSelfie(result, (compressed) => {
+          setCapturedImage(compressed);
+          onConfirm(compressed);
+        });
       };
       reader.readAsDataURL(file);
     }

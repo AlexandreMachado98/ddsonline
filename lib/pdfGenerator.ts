@@ -392,18 +392,24 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
           }
         }
 
-        // Selfie
+        // Selfie com detecção dinâmica de formato
         if (data.column.index === 5 && attendee.selfie) {
           try {
-            doc.addImage(attendee.selfie, 'JPEG', data.cell.x + 6, data.cell.y + 1.5, 14, 14);
-          } catch (e) {}
+            const format = attendee.selfie.includes('image/png') ? 'PNG' : 'JPEG';
+            doc.addImage(attendee.selfie, format, data.cell.x + 6, data.cell.y + 1.5, 14, 14);
+          } catch (e) {
+            console.warn('Aviso: selfie não pôde ser renderizada no PDF:', e);
+          }
         }
 
-        // Signature
+        // Signature com detecção dinâmica de formato
         if (data.column.index === 6 && attendee.signature) {
           try {
-            doc.addImage(attendee.signature, 'PNG', data.cell.x + 2, data.cell.y + 2.5, 29, 12);
-          } catch (e) {}
+            const format = attendee.signature.includes('image/jpeg') ? 'JPEG' : 'PNG';
+            doc.addImage(attendee.signature, format, data.cell.x + 2, data.cell.y + 2.5, 29, 12);
+          } catch (e) {
+            console.warn('Aviso: assinatura não pôde ser renderizada no PDF:', e);
+          }
         }
       }
     }

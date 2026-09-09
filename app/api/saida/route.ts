@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       const updated = await prisma.attendance.update({
         where: { id: attendance.id },
         data: {
-          name: `${cleanName} (Saída: ${exitReason || 'Antecipada'})`,
+          name: cleanName,
           exitReason: exitReason || 'Não informado',
           exitSignature: exitSignature || null,
           leftAt: new Date()
