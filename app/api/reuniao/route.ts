@@ -157,6 +157,7 @@ export async function GET(req: Request) {
               description: true,
               mimeType: true,
               fileSize: true,
+              fileData: true,
               pageCount: true,
               order: true,
               createdAt: true

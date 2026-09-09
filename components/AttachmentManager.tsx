@@ -525,11 +525,20 @@ export default function AttachmentManager({
                     >
                       {/* Imagem em proporção natural sem cortes (width: 100%, height: auto, object-fit: contain) */}
                       <div className="w-full flex items-center justify-center p-2 sm:p-3 bg-slate-950/60 min-h-[180px]">
-                        <img 
-                          src={att.fileData} 
-                          alt={att.displayName || att.fileName} 
-                          className="w-full h-auto max-h-[360px] sm:max-h-[460px] object-contain rounded-xl group-hover:scale-[1.008] transition-transform" 
-                        />
+                        {att.fileData ? (
+                          <img 
+                            src={att.fileData} 
+                            alt={att.displayName || att.fileName} 
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-auto max-h-[360px] sm:max-h-[460px] object-contain rounded-xl group-hover:scale-[1.008] transition-transform" 
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-8 text-slate-500 gap-2">
+                            <Camera size={32} className="text-slate-600 animate-pulse" />
+                            <span className="text-xs">Mídia do DDS (Toque para visualizar)</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Badge Discreta e Intuitiva: Toque para ampliar */}

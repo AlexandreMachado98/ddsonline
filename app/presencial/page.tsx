@@ -441,7 +441,9 @@ function PresencialContent() {
           <div className="bg-slate-900/90 backdrop-blur-md p-4 sm:p-5 rounded-3xl border border-slate-800 shadow-xl">
             <AttachmentManager
               attachments={meeting.attachments}
-              onChange={() => {}}
+              onChange={(updated) => {
+                setMeeting((prev: any) => prev ? { ...prev, attachments: updated } : prev);
+              }}
               readOnly={true}
             />
           </div>
