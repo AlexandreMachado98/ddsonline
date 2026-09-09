@@ -22,6 +22,27 @@ html {
   overflow-x: hidden;
 }
 
+/* Previne que o teclado mobile feche abruptamente devido a colisão de scroll ao focar em inputs */
+@media (max-width: 768px) {
+  html:focus-within {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Evita auto-zoom e perda de foco involuntária em dispositivos iOS/Android quando o teclado abre */
+@media (max-width: 640px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="search"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 body {
   background-color: #020617;
   color: #f1f5f9;

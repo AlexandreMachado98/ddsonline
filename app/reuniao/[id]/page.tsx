@@ -40,7 +40,7 @@ export default function MeetingRoom() {
   const [isLoadingMeeting, setIsLoadingMeeting] = useState(true);
   const [meetingNotFound, setMeetingNotFound] = useState(false);
 
-  // Estados do Formulário do Colaborador
+  // Estados do Formulário do Colaborador com persistência de rascunho
   const [name, setName] = useState('');
   const [funcao, setFuncao] = useState('');
   const [savedSelfie, setSavedSelfie] = useState<string | null>(null);
@@ -48,6 +48,32 @@ export default function MeetingRoom() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAdmitted, setHasAdmitted] = useState(false);
   const [isOfflineSubmitted, setIsOfflineSubmitted] = useState(false);
+
+  // Restaura rascunho de preenchimento caso o celular recarregue a aba
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('dds_participant_draft');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.name) setName(parsed.name);
+        if (parsed.funcao) setFuncao(parsed.funcao);
+      }
+    } catch {}
+  }, []);
+
+  const handleNameChange = (val: string) => {
+    setName(val);
+    try {
+      sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name: val, funcao }));
+    } catch {}
+  };
+
+  const handleFuncaoChange = (val: string) => {
+    setFuncao(val);
+    try {
+      sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name, funcao: val }));
+    } catch {}
+  };
 
   // Estados do Modal de Saída Antecipada
   const [showExitModal, setShowExitModal] = useState(false);
@@ -212,6 +238,7 @@ export default function MeetingRoom() {
       if (data.success) {
         setIsOfflineSubmitted(false);
         setHasAdmitted(true);
+        try { sessionStorage.removeItem('dds_participant_draft'); } catch {}
         toast.success('Presença Validada!', 'Sua presença foi registrada com sucesso.');
       } else {
         toast.error('Erro ao Registrar', data.error || 'Não foi possível salvar sua presença.');
@@ -228,6 +255,7 @@ export default function MeetingRoom() {
         });
         setIsOfflineSubmitted(true);
         setHasAdmitted(true);
+        try { sessionStorage.removeItem('dds_participant_draft'); } catch {}
         toast.info('Salvo no Celular', 'A internet oscilou. Os dados foram salvos com segurança no aparelho.');
       } catch {
         toast.error('Falha de Conexão', 'Verifique sua internet e tente novamente.');
@@ -591,9 +619,13 @@ export default function MeetingRoom() {
               <input 
                 type="text" 
                 value={name} 
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="Ex: João da Silva"
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[44px]"
+                autoComplete="name"
+                autoCapitalize="words"
+                spellCheck={false}
+                enterKeyHint="next"
+                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-base sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[48px]"
               />
             </div>
 
@@ -603,13 +635,15 @@ export default function MeetingRoom() {
                 <input 
                   type="text" 
                   value={funcao} 
-                  onChange={(e) => setFuncao(e.target.value)}
+                  onChange={(e) => handleFuncaoChange(e.target.value)}
                   placeholder="Ex: Operador de Máquina"
-                  
-                  className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[44px]"
+                  autoComplete="organization-title"
+                  autoCapitalize="sentences"
+                  enterKeyHint="done"
+                  className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-base sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[48px]"
                 />
                 {funcao.trim().length > 1 && (
-                  <Check size={18} className="absolute right-3.5 text-emerald-400" />
+                  <Check size={18} className="absolute right-3.5 text-emerald-400 pointer-events-none" />
                 )}
               </div>
             </div>

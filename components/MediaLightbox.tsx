@@ -59,6 +59,9 @@ export default function MediaLightbox({
   // Swipe para próxima foto
   const touchStartSwipeRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
+  // Timestamp do último término de toque para suprimir cliques sintéticos do navegador
+  const touchEndTimeRef = useRef<number>(0);
+
   // Flag para controle do histórico (Android Back Button)
   const pushedHistoryRef = useRef(false);
 
@@ -381,11 +384,16 @@ export default function MediaLightbox({
       }
     }
     touchStartSwipeRef.current = null;
+    touchEndTimeRef.current = Date.now();
   };
 
-  // Alterna zoom ao clicar diretamente na imagem no desktop
+  // Alterna zoom ao clicar diretamente na imagem com mouse no desktop
   const handleImageClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Descarta cliques sintéticos disparados por navegadores mobile após toques/pinch
+    if (Date.now() - touchEndTimeRef.current < 500) {
+      return;
+    }
     if (zoom === MIN_ZOOM) {
       setZoom(2.0);
     } else {

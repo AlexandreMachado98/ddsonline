@@ -38,7 +38,7 @@ function PresencialContent() {
   const [isMeetingEnded, setIsMeetingEnded] = useState(false);
   const [noMeetingFound, setNoMeetingFound] = useState(false);
 
-  // Estados do Formulário do Colaborador
+  // Estados do Formulário do Colaborador com persistência de rascunho
   const [name, setName] = useState('');
   const [funcao, setFuncao] = useState('');
   const [savedSelfie, setSavedSelfie] = useState<string | null>(null);
@@ -46,6 +46,32 @@ function PresencialContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAdmitted, setHasAdmitted] = useState(false);
   const [isOfflineSubmitted, setIsOfflineSubmitted] = useState(false);
+
+  // Restaura rascunho de preenchimento caso o celular recarregue a aba (ex: ao abrir a câmera)
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('dds_participant_draft');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.name) setName(parsed.name);
+        if (parsed.funcao) setFuncao(parsed.funcao);
+      }
+    } catch {}
+  }, []);
+
+  const handleNameChange = (val: string) => {
+    setName(val);
+    try {
+      sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name: val, funcao }));
+    } catch {}
+  };
+
+  const handleFuncaoChange = (val: string) => {
+    setFuncao(val);
+    try {
+      sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name, funcao: val }));
+    } catch {}
+  };
 
   // 1. Busca a reunião presencial ativa ou pelo ID (com suporte a Cache Offline)
   useEffect(() => {
@@ -209,6 +235,7 @@ function PresencialContent() {
       if (data.success) {
         setIsOfflineSubmitted(false);
         setHasAdmitted(true);
+        try { sessionStorage.removeItem('dds_participant_draft'); } catch {}
         toast.success('Presença Presencial Confirmada!', 'Seus dados e foto facial foram registrados com sucesso.');
       } else {
         toast.error('Erro ao Registrar', data.error || 'Não foi possível registrar a presença.');
@@ -225,6 +252,7 @@ function PresencialContent() {
         });
         setIsOfflineSubmitted(true);
         setHasAdmitted(true);
+        try { sessionStorage.removeItem('dds_participant_draft'); } catch {}
         toast.info('Salvo no Aparelho', 'A internet oscilou. Os dados foram salvos com segurança na memória do celular.');
       } catch {
         toast.error('Falha de Conexão', 'Verifique sua internet e tente novamente.');
@@ -241,6 +269,7 @@ function PresencialContent() {
     setSavedSignature(null);
     setIsOfflineSubmitted(false);
     setHasAdmitted(false);
+    try { sessionStorage.removeItem('dds_participant_draft'); } catch {}
   };
 
   // 1. CARREGANDO
@@ -466,9 +495,13 @@ function PresencialContent() {
               <input 
                 type="text" 
                 value={name} 
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="Ex: João da Silva"
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[44px]"
+                autoComplete="name"
+                autoCapitalize="words"
+                spellCheck={false}
+                enterKeyHint="next"
+                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-base sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[48px]"
               />
             </div>
 
@@ -478,13 +511,15 @@ function PresencialContent() {
                 <input 
                   type="text" 
                   value={funcao} 
-                  onChange={(e) => setFuncao(e.target.value)}
+                  onChange={(e) => handleFuncaoChange(e.target.value)}
                   placeholder="Ex: Operador de Máquina"
-                  
-                  className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[44px]"
+                  autoComplete="organization-title"
+                  autoCapitalize="sentences"
+                  enterKeyHint="done"
+                  className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-base sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[48px]"
                 />
                 {funcao.trim().length > 1 && (
-                  <Check size={18} className="absolute right-3.5 text-emerald-400" />
+                  <Check size={18} className="absolute right-3.5 text-emerald-400 pointer-events-none" />
                 )}
               </div>
             </div>

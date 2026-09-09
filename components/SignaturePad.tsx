@@ -18,10 +18,18 @@ export default function SignaturePad({ onSave, onConfirm }: SignaturePadProps) {
   const sigCanvas = useRef<SignatureCanvas>(null);
   const [hasDrawn, setHasDrawn] = useState(false);
   const lastSignatureRef = useRef<string | null>(null);
+  const lastWidthRef = useRef<number>(typeof window !== 'undefined' ? window.innerWidth : 0);
 
   // Protege a assinatura contra limpeza acidental em caso de rotação de tela no celular
   useEffect(() => {
     const handleResize = () => {
+      const currentWidth = typeof window !== 'undefined' ? window.innerWidth : 0;
+      // Se apenas a altura mudou (abertura do teclado virtual do celular), ignora para não roubar foco nem re-renderizar
+      if (Math.abs(currentWidth - lastWidthRef.current) < 15) {
+        return;
+      }
+      lastWidthRef.current = currentWidth;
+
       if (lastSignatureRef.current && sigCanvas.current) {
         const saved = lastSignatureRef.current;
         setTimeout(() => {
