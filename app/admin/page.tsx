@@ -152,23 +152,41 @@ export default function AdminPanel() {
   };
 
   useEffect(() => {
-    const auth = localStorage.getItem('dds_admin_auth');
-    if (!auth) {
-      window.location.replace('/');
-      return;
-    }
-    try {
-      const user = JSON.parse(auth);
-      if (user && user.id) {
-        setCurrentUser(user);
-      } else {
-        localStorage.removeItem('dds_admin_auth');
-        window.location.replace('/');
+    let isMounted = true;
+    const verifySession = async () => {
+      // 1. Tenta validar com o servidor via sessão HttpOnly
+      try {
+        const res = await fetch('/api/auth');
+        const data = await res.json();
+        if (isMounted && data.success && data.user) {
+          setCurrentUser(data.user);
+          localStorage.setItem('dds_admin_auth', JSON.stringify(data.user));
+          return;
+        }
+      } catch {}
+
+      // 2. Fallback de contingência local se estiver offline
+      const auth = localStorage.getItem('dds_admin_auth');
+      if (!auth) {
+        if (isMounted) window.location.replace('/');
+        return;
       }
-    } catch {
-      localStorage.removeItem('dds_admin_auth');
-      window.location.replace('/');
-    }
+      try {
+        const user = JSON.parse(auth);
+        if (user && user.id) {
+          if (isMounted) setCurrentUser(user);
+        } else {
+          localStorage.removeItem('dds_admin_auth');
+          if (isMounted) window.location.replace('/');
+        }
+      } catch {
+        localStorage.removeItem('dds_admin_auth');
+        if (isMounted) window.location.replace('/');
+      }
+    };
+
+    verifySession();
+    return () => { isMounted = false; };
   }, []);
 
   // Busca de Dados com Smart Diffing
@@ -185,6 +203,12 @@ export default function AdminPanel() {
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
       });
       
+      if (res.status === 401) {
+        localStorage.removeItem('dds_admin_auth');
+        window.location.replace('/');
+        return;
+      }
+
       if (!res.ok) return;
 
       const data = await res.json();
@@ -583,8 +607,16 @@ export default function AdminPanel() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout' })
+      });
+    } catch {}
     localStorage.removeItem('dds_admin_auth');
+    localStorage.removeItem('dds_organizer_profile');
     window.location.replace('/');
   };
 

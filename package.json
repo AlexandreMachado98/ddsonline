@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.344.0",
@@ -24,6 +25,7 @@
     "react-webcam": "^7.2.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

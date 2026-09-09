@@ -1,5 +1,10 @@
+// app/api/reuniao/route.ts
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getAuthenticatedUser, logSecurityEvent } from '@/lib/auth';
+import { purgeExpiredOperationalData, purgeMeetingOperationalDataImmediate } from '@/lib/retention';
+
+export const dynamic = 'force-dynamic';
 
 let dbInitialized = false;
 async function ensureDbColumns() {
@@ -38,18 +43,16 @@ async function ensureDbColumns() {
   }
 }
 
-// 1. GET: Busca reunião por ID específico ou busca reunião e histórico ISOLADOS do organizador
+// 1. GET: Busca reunião por ID específico ou busca reunião e histórico do organizador autenticado
 export async function GET(req: Request) {
   try {
     await ensureDbColumns();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const attachmentId = searchParams.get('attachmentId');
-    const organizerId = searchParams.get('organizerId');
-    const email = searchParams.get('email')?.trim().toLowerCase();
     const isFull = searchParams.get('full') === 'true' || searchParams.get('includeFiles') === 'true';
 
-    // Cenário 0: Download sob demanda de um anexo específico (evita transferir megabytes em polling)
+    // Cenário 0: Download sob demanda de um anexo específico
     if (attachmentId) {
       const attachment = await prisma.meetingAttachment.findUnique({
         where: { id: attachmentId },
@@ -72,10 +75,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, attachment });
     }
 
-    // Cenário A: Colaborador acessando reunião específica ou visualização completa com 'full=true'
+    // Cenário A: Acesso a uma reunião específica por ID
     if (id) {
+      // Se solicitado modo full (para gerar PDF com assinaturas e anexos)
       if (isFull) {
-        // Carga completa sob demanda (para gerar PDF de Ata Oficial ou Abrir Prévia Completa)
+        const sessionUser = await getAuthenticatedUser(req);
         const meeting = await prisma.meeting.findUnique({
           where: { id },
           include: {
@@ -90,10 +94,30 @@ export async function GET(req: Request) {
             }
           }
         });
+
+        if (!meeting) {
+          return NextResponse.json({ success: false, error: 'Reunião não encontrada' }, { status: 404 });
+        }
+
+        // Proteção IDOR: Apenas o organizador dono da reunião ou Super Admin pode ver dados completos
+        const isOwner = sessionUser && (sessionUser.id === meeting.organizerId || sessionUser.role === 'SUPER_ADMIN');
+        if (!isOwner) {
+          logSecurityEvent('FORBIDDEN_ACCESS', {
+            userId: sessionUser?.id,
+            path: `/api/reuniao?id=${id}&full=true`,
+            reason: 'IDOR_PREVENTED_ON_FULL_MEETING'
+          });
+          return NextResponse.json({ 
+            success: false, 
+            error: 'Acesso restrito: somente o organizador responsável pode carregar a ata completa com dados operacionais.' 
+          }, { status: 403 });
+        }
+
         return NextResponse.json({ success: true, meeting });
       }
 
-      // Projeção ultraleve para polling da sala de DDS (evita transferir selfies, assinaturas e PDFs a cada 20s)
+      // Projeção ultraleve para participantes (QR Code / tela do colaborador):
+      // Protege privacidade: omite selfies, assinaturas e arquivos pesados dos outros colaboradores
       const meeting = await prisma.meeting.findUnique({
         where: { id },
         select: {
@@ -141,219 +165,192 @@ export async function GET(req: Request) {
           }
         }
       });
+
       return NextResponse.json({ success: true, meeting });
     }
 
-    // Cenário B: Painel Admin do Organizador buscando seus próprios DDS
-    if (organizerId || email) {
-      const whereOrganizer = organizerId 
-        ? { organizerId } 
-        : { organizer: { email: email } };
-
-      // Se solicitado modo full para o admin (sob demanda)
-      if (isFull) {
-        const meeting = await prisma.meeting.findFirst({
-          where: {
-            status: 'LIVE',
-            ...whereOrganizer
-          },
-          include: {
-            attendees: {
-              orderBy: { createdAt: 'desc' }
-            },
-            attachments: {
-              orderBy: { order: 'asc' }
-            },
-            organizer: {
-              select: { name: true, position: true, company: true }
-            }
-          }
-        });
-        return NextResponse.json({ success: true, meeting });
-      }
-
-      // Polling padrão: Projeção ultraleve (reduz payload de ~30MB para ~15KB)
-      const meeting = await prisma.meeting.findFirst({
-        where: {
-          status: 'LIVE',
-          ...whereOrganizer
-        },
-        select: {
-          id: true,
-          topic: true,
-          farm: true,
-          type: true,
-          classification: true,
-          objective: true,
-          programmaticContent: true,
-          groupPhoto: true, // Necessário apenas na reunião ativa
-          status: true,
-          documentHash: true,
-          createdAt: true,
-          endedAt: true,
-          instructorName: true,
-          organizerId: true,
-          companyId: true,
-          organizer: {
-            select: { name: true, position: true, company: true }
-          },
-          attendees: {
-            select: {
-              id: true,
-              name: true,
-              cpf: true,
-              selfie: true, // Necessário para o avatar do card ao vivo
-              createdAt: true,
-              leftAt: true,
-              exitReason: true
-            },
-            orderBy: { createdAt: 'desc' }
-          },
-          attachments: {
-            select: {
-              id: true,
-              fileName: true,
-              displayName: true,
-              description: true,
-              mimeType: true,
-              fileSize: true,
-              pageCount: true,
-              order: true,
-              createdAt: true
-            },
-            orderBy: { order: 'asc' }
-          }
-        }
-      });
-
-      // Histórico de DDS concluídos: Omite estritamente groupPhoto, assinaturas e fileData pesados
-      const history = await prisma.meeting.findMany({
-        where: {
-          status: 'ENDED',
-          ...whereOrganizer
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-        select: {
-          id: true,
-          topic: true,
-          farm: true,
-          type: true,
-          classification: true,
-          objective: true,
-          programmaticContent: true,
-          status: true,
-          documentHash: true,
-          createdAt: true,
-          endedAt: true,
-          instructorName: true,
-          organizerId: true,
-          companyId: true,
-          organizer: {
-            select: { name: true, position: true, company: true }
-          },
-          attendees: {
-            select: {
-              id: true,
-              name: true,
-              cpf: true,
-              createdAt: true,
-              leftAt: true,
-              exitReason: true
-            },
-            orderBy: { createdAt: 'asc' }
-          },
-          attachments: {
-            select: {
-              id: true,
-              fileName: true,
-              displayName: true,
-              description: true,
-              mimeType: true,
-              fileSize: true,
-              pageCount: true,
-              order: true,
-              createdAt: true
-            },
-            orderBy: { order: 'asc' }
-          }
-        }
-      });
-
-      return NextResponse.json({ success: true, meeting, history });
+    // Cenário B: Painel Admin do Organizador buscando suas reuniões e histórico
+    // AUTORIZAÇÃO BASEADA EM SESSÃO: Valida usuário autenticado no servidor
+    const sessionUser = await getAuthenticatedUser(req);
+    if (!sessionUser) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Sessão inválida ou expirada. Faça login novamente.',
+        meeting: null, 
+        history: [] 
+      }, { status: 401 });
     }
 
-    // Cenário C: Acesso sem identificador - Retorna vazio para não vazar reuniões de outros usuários
-    return NextResponse.json({ success: true, meeting: null, history: [] });
+    // Executa purga automática de dados operacionais expirados deste organizador
+    purgeExpiredOperationalData(sessionUser.id).catch(() => {});
+
+    // Polling padrão da reunião ativa do organizador autenticado
+    const activeMeeting = await prisma.meeting.findFirst({
+      where: {
+        status: 'LIVE',
+        organizerId: sessionUser.id
+      },
+      select: {
+        id: true,
+        topic: true,
+        farm: true,
+        type: true,
+        classification: true,
+        objective: true,
+        programmaticContent: true,
+        groupPhoto: true,
+        status: true,
+        documentHash: true,
+        createdAt: true,
+        endedAt: true,
+        instructorName: true,
+        organizerId: true,
+        companyId: true,
+        organizer: {
+          select: { name: true, position: true, company: true }
+        },
+        attendees: {
+          select: {
+            id: true,
+            name: true,
+            cpf: true,
+            selfie: true,
+            createdAt: true,
+            leftAt: true,
+            exitReason: true
+          },
+          orderBy: { createdAt: 'desc' }
+        },
+        attachments: {
+          select: {
+            id: true,
+            fileName: true,
+            displayName: true,
+            description: true,
+            mimeType: true,
+            fileSize: true,
+            pageCount: true,
+            order: true,
+            createdAt: true
+          },
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    // Histórico de DDS concluídos: Omite estritamente groupPhoto, assinaturas e fileData pesados
+    const history = await prisma.meeting.findMany({
+      where: {
+        status: 'ENDED',
+        organizerId: sessionUser.id
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        topic: true,
+        farm: true,
+        type: true,
+        classification: true,
+        objective: true,
+        programmaticContent: true,
+        status: true,
+        documentHash: true,
+        createdAt: true,
+        endedAt: true,
+        instructorName: true,
+        organizerId: true,
+        companyId: true,
+        organizer: {
+          select: { name: true, position: true, company: true }
+        },
+        attendees: {
+          select: {
+            id: true,
+            name: true,
+            cpf: true,
+            createdAt: true,
+            leftAt: true,
+            exitReason: true
+          },
+          orderBy: { createdAt: 'asc' }
+        },
+        attachments: {
+          select: {
+            id: true,
+            fileName: true,
+            displayName: true,
+            description: true,
+            mimeType: true,
+            fileSize: true,
+            pageCount: true,
+            order: true,
+            createdAt: true
+          },
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    return NextResponse.json({ success: true, meeting: activeMeeting, history });
+
   } catch (error) {
     console.error("Erro no GET /api/reuniao:", error);
     return NextResponse.json({ success: false, error: 'Erro ao buscar dados da reunião' }, { status: 500 });
   }
 }
 
-// 2. POST: Abre uma nova sala de DDS vinculada estritamente ao organizador
+// 2. POST: Abre uma nova sala de DDS vinculada estritamente ao organizador autenticado
 export async function POST(req: Request) {
   try {
     await ensureDbColumns();
-    const body = await req.json();
-    const { topic, farm, organizerId, email, groupPhoto, type, classification, objective, programmaticContent, attachments } = body;
 
-    let user = null;
-
-    if (organizerId) {
-      user = await prisma.user.findUnique({ where: { id: organizerId } });
-    }
-    if (!user && email) {
-      user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+    const sessionUser = await getAuthenticatedUser(req);
+    if (!sessionUser) {
+      logSecurityEvent('UNAUTHORIZED_ACCESS', { path: 'POST /api/reuniao', reason: 'NO_SESSION' });
+      return NextResponse.json({ success: false, error: 'Sessão expirada. Faça login novamente.' }, { status: 401 });
     }
 
-    // Se o usuário ainda não existir no banco, cria o usuário padrão
-    if (!user && email) {
-      user = await prisma.user.create({
-        data: {
-          email: email.trim().toLowerCase(),
-          name: email.split('@')[0],
-          password: 'demo',
-          role: 'ORGANIZER'
-        }
-      });
-    }
+    const body = await req.json().catch(() => ({}));
+    const { topic, farm, groupPhoto, type, classification, objective, programmaticContent, attachments } = body;
 
-    // Encerra apenas as reuniões antigas DESTE organizador específico
-    if (user) {
-      await prisma.meeting.updateMany({
-        where: {
-          status: 'LIVE',
-          organizerId: user.id
-        },
-        data: { status: 'ENDED' }
-      });
-    }
+    // Encerra apenas as reuniões ativas deste organizador autenticado
+    await prisma.meeting.updateMany({
+      where: {
+        status: 'LIVE',
+        organizerId: sessionUser.id
+      },
+      data: { status: 'ENDED' }
+    });
 
-    // Cria a nova sala com identificação, tipo, isolamento, foto em grupo e anexos
+    // Sanitização e Whitelist dos Anexos
+    const sanitizedAttachments = Array.isArray(attachments)
+      ? attachments.slice(0, 10).map((att: any, idx: number) => ({
+          fileName: String(att.fileName || `anexo_${idx+1}`).slice(0, 100),
+          displayName: String(att.displayName || att.fileName || `Anexo ${idx+1}`).slice(0, 100),
+          description: att.description ? String(att.description).slice(0, 500) : null,
+          mimeType: String(att.mimeType || 'application/pdf').slice(0, 50),
+          fileSize: Number(att.fileSize) || 0,
+          fileData: typeof att.fileData === 'string' ? att.fileData : '',
+          pageCount: Number(att.pageCount) || 1,
+          order: typeof att.order === 'number' ? att.order : idx
+        }))
+      : [];
+
     const newMeeting = await prisma.meeting.create({
       data: {
-        topic: topic || 'DDS de Segurança',
-        farm: farm || 'Unidade Rural',
-        type: type || 'REMOTE',
-        classification: classification || 'DDS',
-        objective: objective ? objective.trim() : null,
-        programmaticContent: programmaticContent ? programmaticContent.trim() : null,
+        topic: String(topic || 'DDS de Segurança').slice(0, 200).trim(),
+        farm: String(farm || 'Unidade Operacional').slice(0, 150).trim(),
+        type: type === 'REMOTE' ? 'REMOTE' : 'PRESENTIAL',
+        classification: classification === 'Treinamento' ? 'Treinamento' : 'DDS',
+        objective: objective ? String(objective).slice(0, 1000).trim() : null,
+        programmaticContent: programmaticContent ? String(programmaticContent).slice(0, 3000).trim() : null,
         status: 'LIVE',
-        organizerId: user ? user.id : null,
-        companyId: user?.companyId || null,
-        groupPhoto: groupPhoto || null,
-        attachments: Array.isArray(attachments) && attachments.length > 0 ? {
-          create: attachments.map((att: any, idx: number) => ({
-            fileName: att.fileName || `anexo_${idx+1}`,
-            displayName: att.displayName || att.fileName || `Anexo ${idx+1}`,
-            description: att.description ? String(att.description).trim() : null,
-            mimeType: att.mimeType || 'application/pdf',
-            fileSize: Number(att.fileSize) || 0,
-            fileData: att.fileData || '',
-            pageCount: Number(att.pageCount) || 1,
-            order: typeof att.order === 'number' ? att.order : idx
-          }))
+        organizerId: sessionUser.id,
+        companyId: sessionUser.companyId || null,
+        groupPhoto: typeof groupPhoto === 'string' && groupPhoto.length > 50 ? groupPhoto : null,
+        attachments: sanitizedAttachments.length > 0 ? {
+          create: sanitizedAttachments
         } : undefined
       },
       include: {
@@ -363,164 +360,229 @@ export async function POST(req: Request) {
         }
       }
     });
-    
+
+    logSecurityEvent('ADMIN_ACTION', {
+      userId: sessionUser.id,
+      reason: `MEETING_CREATED: ${newMeeting.id} (${newMeeting.topic})`
+    });
+
     return NextResponse.json({ success: true, meeting: newMeeting });
+
   } catch (error) {
     console.error("Erro no POST /api/reuniao:", error);
-    return NextResponse.json({ success: false, error: 'Erro ao criar nova reunião: ' + ((error as any).message || error) }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Erro ao criar nova reunião' }, { status: 500 });
   }
 }
 
-// 3. PUT: Atualiza a reunião (anexa foto em grupo, sincroniza anexos ou encerra a reunião)
+// 3. PUT: Atualiza a reunião (anexa foto em grupo, sincroniza anexos ou encerra a reunião com congelamento SHA-256)
 export async function PUT(req: Request) {
   try {
     await ensureDbColumns();
+
+    const sessionUser = await getAuthenticatedUser(req);
+    if (!sessionUser) {
+      logSecurityEvent('UNAUTHORIZED_ACCESS', { path: 'PUT /api/reuniao', reason: 'NO_SESSION' });
+      return NextResponse.json({ success: false, error: 'Sessão expirada. Faça login novamente.' }, { status: 401 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const { 
-      meetingId, organizerId, groupPhoto, status, createdAt, endedAt, 
+      action, meetingId, groupPhoto, status, createdAt, endedAt, 
       instructorName, classification, objective, programmaticContent, attachments 
     } = body;
 
-    if (meetingId) {
-      const updateData: any = {};
-      if (status) updateData.status = status;
-      if (groupPhoto !== undefined) updateData.groupPhoto = groupPhoto;
-      if (createdAt) updateData.createdAt = new Date(createdAt);
-      if (endedAt !== undefined) updateData.endedAt = endedAt ? new Date(endedAt) : null;
-      if (instructorName !== undefined) updateData.instructorName = instructorName;
-      if (classification !== undefined) updateData.classification = classification;
-      if (objective !== undefined) updateData.objective = objective ? objective.trim() : null;
-      if (programmaticContent !== undefined) {
-        updateData.programmaticContent = programmaticContent ? programmaticContent.trim() : null;
+    // --- RECURSO: PURGA MANUAL IMEDIATA SOB DEMANDA ---
+    if (action === 'purge_operational_data' && meetingId) {
+      const purged = await purgeMeetingOperationalDataImmediate(meetingId, sessionUser.id);
+      if (purged) {
+        return NextResponse.json({ success: true, message: 'Dados operacionais (fotos e assinaturas) purgados com sucesso da nuvem.' });
       }
-
-      // Se nenhum status específico foi passado e não é apenas foto/anexos, o padrão é encerrar (ENDED)
-      const isJustEditing = !status && groupPhoto === undefined && attachments === undefined && 
-        (instructorName !== undefined || classification !== undefined || objective !== undefined || programmaticContent !== undefined || createdAt || endedAt !== undefined);
-      if (!status && groupPhoto === undefined && attachments === undefined && !isJustEditing) {
-        updateData.status = 'ENDED';
-      }
-
-      // Ao encerrar o DDS, gera e congela o hash SHA-256 de integridade documental
-      if (status === 'ENDED' || updateData.status === 'ENDED') {
-        const crypto = await import('crypto');
-        const currentMeeting = await prisma.meeting.findUnique({
-          where: { id: meetingId },
-          include: {
-            attendees: { select: { id: true, name: true, cpf: true, createdAt: true } },
-            attachments: { select: { id: true, fileName: true, fileSize: true } }
-          }
-        });
-        const endTimestamp = updateData.endedAt ? new Date(updateData.endedAt).toISOString() : new Date().toISOString();
-        const rawDigest = [
-          meetingId,
-          currentMeeting?.topic || '',
-          currentMeeting?.createdAt?.toISOString() || '',
-          endTimestamp,
-          currentMeeting?.attendees?.map(a => `${a.id}:${a.name}:${a.cpf}`).join(';') || '',
-          currentMeeting?.attachments?.map(att => `${att.id}:${att.fileName}`).join(';') || ''
-        ].join('|');
-        updateData.documentHash = crypto.createHash('sha256').update(rawDigest).digest('hex');
-        if (!updateData.endedAt) updateData.endedAt = new Date();
-      }
-
-      // Sincroniza anexos se fornecidos preservando fileData se já existirem
-      if (Array.isArray(attachments)) {
-        const existingAttachments = await prisma.meetingAttachment.findMany({
-          where: { meetingId },
-          select: { id: true, fileData: true }
-        });
-        const existingMap = new Map(existingAttachments.map(a => [a.id, a.fileData]));
-
-        await prisma.meetingAttachment.deleteMany({
-          where: { meetingId }
-        });
-        if (attachments.length > 0) {
-          await prisma.meetingAttachment.createMany({
-            data: attachments.map((att: any, idx: number) => ({
-              id: att.id && !att.id.startsWith('local_') ? att.id : undefined,
-              meetingId,
-              fileName: att.fileName || `anexo_${idx+1}`,
-              displayName: att.displayName || att.fileName || `Anexo ${idx+1}`,
-              description: att.description ? String(att.description).trim() : null,
-              mimeType: att.mimeType || 'application/pdf',
-              fileSize: Number(att.fileSize) || 0,
-              fileData: att.fileData || (att.id ? existingMap.get(att.id) || '' : ''),
-              pageCount: Number(att.pageCount) || 1,
-              order: typeof att.order === 'number' ? att.order : idx
-            }))
-          });
-        }
-      }
-
-      const updated = await prisma.meeting.update({
-        where: { id: meetingId },
-        data: updateData,
-        include: {
-          attendees: {
-            orderBy: { createdAt: 'desc' }
-          },
-          attachments: {
-            orderBy: { order: 'asc' }
-          },
-          organizer: {
-            select: { name: true, position: true, company: true }
-          }
-        }
-      });
-
-      return NextResponse.json({ success: true, meeting: updated, message: 'DDS atualizado com sucesso' });
-    } else if (organizerId) {
-      await prisma.meeting.updateMany({
-        where: { status: 'LIVE', organizerId },
-        data: { status: 'ENDED' }
-      });
-    } else {
-      await prisma.meeting.updateMany({
-        where: { status: 'LIVE' },
-        data: { status: 'ENDED' }
-      });
+      return NextResponse.json({ success: false, error: 'Reunião não elegível para purga ou não autorizada.' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, message: 'DDS encerrado com sucesso' });
+    if (!meetingId) {
+      // Encerra reuniões ativas do próprio usuário
+      await prisma.meeting.updateMany({
+        where: { status: 'LIVE', organizerId: sessionUser.id },
+        data: { status: 'ENDED' }
+      });
+      return NextResponse.json({ success: true, message: 'DDS encerrado com sucesso' });
+    }
+
+    // PROTEÇÃO IDOR: Confirma se a reunião pertence ao organizador autenticado
+    const existingMeeting = await prisma.meeting.findUnique({
+      where: { id: meetingId },
+      include: {
+        attendees: { select: { id: true, name: true, cpf: true, createdAt: true } },
+        attachments: { select: { id: true, fileName: true, fileSize: true, fileData: true } }
+      }
+    });
+
+    if (!existingMeeting) {
+      return NextResponse.json({ success: false, error: 'Reunião não encontrada' }, { status: 404 });
+    }
+
+    const isAuthorized = existingMeeting.organizerId === sessionUser.id || sessionUser.role === 'SUPER_ADMIN';
+    if (!isAuthorized) {
+      logSecurityEvent('FORBIDDEN_ACCESS', {
+        userId: sessionUser.id,
+        path: `PUT /api/reuniao (${meetingId})`,
+        reason: 'IDOR_ATTEMPT_ON_UPDATE'
+      });
+      return NextResponse.json({ success: false, error: 'Você não tem permissão para alterar esta reunião.' }, { status: 403 });
+    }
+
+    const updateData: any = {};
+    if (status) updateData.status = status;
+    if (groupPhoto !== undefined) updateData.groupPhoto = groupPhoto;
+    if (createdAt) updateData.createdAt = new Date(createdAt);
+    if (endedAt !== undefined) updateData.endedAt = endedAt ? new Date(endedAt) : null;
+    if (instructorName !== undefined) updateData.instructorName = instructorName;
+    if (classification !== undefined) updateData.classification = classification;
+    if (objective !== undefined) updateData.objective = objective ? String(objective).slice(0, 1000).trim() : null;
+    if (programmaticContent !== undefined) {
+      updateData.programmaticContent = programmaticContent ? String(programmaticContent).slice(0, 3000).trim() : null;
+    }
+
+    // Se nenhum status específico foi passado e não é apenas foto/anexos, o padrão é encerrar (ENDED)
+    const isJustEditing = !status && groupPhoto === undefined && attachments === undefined && 
+      (instructorName !== undefined || classification !== undefined || objective !== undefined || programmaticContent !== undefined || createdAt || endedAt !== undefined);
+    if (!status && groupPhoto === undefined && attachments === undefined && !isJustEditing) {
+      updateData.status = 'ENDED';
+    }
+
+    // Ao encerrar o DDS, gera e congela o hash SHA-256 de integridade documental
+    if (status === 'ENDED' || updateData.status === 'ENDED') {
+      const crypto = await import('crypto');
+      const endTimestamp = updateData.endedAt ? new Date(updateData.endedAt).toISOString() : new Date().toISOString();
+      const rawDigest = [
+        meetingId,
+        existingMeeting.topic || '',
+        existingMeeting.createdAt?.toISOString() || '',
+        endTimestamp,
+        existingMeeting.attendees?.map(a => `${a.id}:${a.name}:${a.cpf}`).join(';') || '',
+        existingMeeting.attachments?.map(att => `${att.id}:${att.fileName}`).join(';') || ''
+      ].join('|');
+      
+      updateData.documentHash = crypto.createHash('sha256').update(rawDigest).digest('hex');
+      if (!updateData.endedAt) updateData.endedAt = new Date();
+    }
+
+    // Sincroniza anexos se fornecidos preservando fileData se já existirem
+    if (Array.isArray(attachments)) {
+      const existingMap = new Map(existingMeeting.attachments.map(a => [a.id, a.fileData]));
+
+      await prisma.meetingAttachment.deleteMany({
+        where: { meetingId }
+      });
+      if (attachments.length > 0) {
+        await prisma.meetingAttachment.createMany({
+          data: attachments.slice(0, 10).map((att: any, idx: number) => ({
+            id: att.id && !att.id.startsWith('local_') ? att.id : undefined,
+            meetingId,
+            fileName: String(att.fileName || `anexo_${idx+1}`).slice(0, 100),
+            displayName: String(att.displayName || att.fileName || `Anexo ${idx+1}`).slice(0, 100),
+            description: att.description ? String(att.description).slice(0, 500).trim() : null,
+            mimeType: String(att.mimeType || 'application/pdf').slice(0, 50),
+            fileSize: Number(att.fileSize) || 0,
+            fileData: att.fileData || (att.id ? existingMap.get(att.id) || '' : ''),
+            pageCount: Number(att.pageCount) || 1,
+            order: typeof att.order === 'number' ? att.order : idx
+          }))
+        });
+      }
+    }
+
+    const updated = await prisma.meeting.update({
+      where: { id: meetingId },
+      data: updateData,
+      include: {
+        attendees: {
+          orderBy: { createdAt: 'desc' }
+        },
+        attachments: {
+          orderBy: { order: 'asc' }
+        },
+        organizer: {
+          select: { name: true, position: true, company: true }
+        }
+      }
+    });
+
+    logSecurityEvent('ADMIN_ACTION', {
+      userId: sessionUser.id,
+      reason: `MEETING_UPDATED: ${meetingId} (Status: ${updated.status})`
+    });
+
+    return NextResponse.json({ success: true, meeting: updated, message: 'DDS atualizado com sucesso' });
+
   } catch (error) {
     console.error("Erro no PUT /api/reuniao:", error);
     return NextResponse.json({ success: false, error: 'Erro ao atualizar reunião' }, { status: 500 });
   }
 }
 
-// 4. DELETE: Exclui reuniões específicas
+// 4. DELETE: Exclui reuniões específicas (Com proteção estrita de autorização IDOR)
 export async function DELETE(req: Request) {
   try {
-    const body = await req.json();
+    const sessionUser = await getAuthenticatedUser(req);
+    if (!sessionUser) {
+      logSecurityEvent('UNAUTHORIZED_ACCESS', { path: 'DELETE /api/reuniao', reason: 'NO_SESSION' });
+      return NextResponse.json({ success: false, error: 'Sessão expirada. Faça login novamente.' }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => ({}));
     const { meetingIds } = body;
 
     if (!meetingIds || !Array.isArray(meetingIds) || meetingIds.length === 0) {
       return NextResponse.json({ success: false, error: 'Nenhum ID de reunião fornecido para exclusão' }, { status: 400 });
     }
 
+    // Filtra para garantir que o usuário só consiga deletar reuniões das quais é DONO
+    const meetingsToDelete = await prisma.meeting.findMany({
+      where: {
+        id: { in: meetingIds },
+        ...(sessionUser.role === 'SUPER_ADMIN' ? {} : { organizerId: sessionUser.id })
+      },
+      select: { id: true }
+    });
+
+    const authorizedIds = meetingsToDelete.map(m => m.id);
+
+    if (authorizedIds.length === 0) {
+      logSecurityEvent('FORBIDDEN_ACCESS', {
+        userId: sessionUser.id,
+        path: 'DELETE /api/reuniao',
+        reason: 'IDOR_ATTEMPT_ON_DELETE'
+      });
+      return NextResponse.json({ success: false, error: 'Nenhuma reunião elegível ou autorizada para exclusão.' }, { status: 403 });
+    }
+
     // Deleta anexos vinculados
     await prisma.meetingAttachment.deleteMany({
-      where: {
-        meetingId: { in: meetingIds }
-      }
+      where: { meetingId: { in: authorizedIds } }
     }).catch(() => {});
 
-    // Deleta primeiro as presenças (attendees) para evitar erro de chave estrangeira
+    // Deleta presenças (attendees)
     await prisma.attendance.deleteMany({
-      where: {
-        meetingId: { in: meetingIds }
-      }
+      where: { meetingId: { in: authorizedIds } }
     });
 
-    // Em seguida, deleta as reuniões
+    // Deleta as reuniões autorizadas
     await prisma.meeting.deleteMany({
-      where: {
-        id: { in: meetingIds }
-      }
+      where: { id: { in: authorizedIds } }
     });
 
-    return NextResponse.json({ success: true, message: 'DDS excluído(s) com sucesso' });
+    logSecurityEvent('ADMIN_ACTION', {
+      userId: sessionUser.id,
+      reason: `MEETINGS_DELETED: ${authorizedIds.join(',')}`
+    });
+
+    return NextResponse.json({ 
+      success: true, 
+      message: `${authorizedIds.length} DDS excluído(s) com sucesso.` 
+    });
+
   } catch (error) {
     console.error('Erro no DELETE /api/reuniao:', error);
     return NextResponse.json({ success: false, error: 'Erro ao excluir reuniões' }, { status: 500 });

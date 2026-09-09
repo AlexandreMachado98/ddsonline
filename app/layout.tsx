@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
 import OfflineBanner from "@/components/OfflineBanner";
+import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -71,10 +72,22 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon.svg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').catch(function() {});
+                });
+              }
+            `,
+          }}
+        />
       </head>
       <body className={`${inter.className} bg-slate-950 text-slate-100 antialiased min-h-screen selection:bg-emerald-600 selection:text-white`}>
         <ToastProvider>
           <OfflineBanner />
+          <PwaInstallPrompt />
           {children}
         </ToastProvider>
       </body>

@@ -1,5 +1,7 @@
+// app/api/usuario/perfil/route.ts
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getAuthenticatedUser, logSecurityEvent } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,19 +17,31 @@ async function ensureUserColumns() {
   }
 }
 
-// 1. GET: Retorna dados do perfil do usuário autenticado
+// 1. GET: Retorna dados do perfil do usuário autenticado no servidor
 export async function GET(req: Request) {
   try {
     await ensureUserColumns();
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
 
-    if (!userId) {
-      return NextResponse.json({ success: false, error: 'Identificador do usuário ausente.' }, { status: 400 });
+    const sessionUser = await getAuthenticatedUser(req);
+    if (!sessionUser) {
+      return NextResponse.json({ success: false, error: 'Sessão expirada. Faça login novamente.' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const requestedUserId = searchParams.get('userId') || sessionUser.id;
+
+    // Proteção IDOR: Apenas o próprio usuário ou Super Admin pode ver o perfil completo
+    if (requestedUserId !== sessionUser.id && sessionUser.role !== 'SUPER_ADMIN') {
+      logSecurityEvent('FORBIDDEN_ACCESS', {
+        userId: sessionUser.id,
+        path: `GET /api/usuario/perfil (${requestedUserId})`,
+        reason: 'IDOR_ON_USER_PROFILE'
+      });
+      return NextResponse.json({ success: false, error: 'Acesso não autorizado ao perfil solicitado.' }, { status: 403 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: requestedUserId },
       select: {
         id: true,
         name: true,
@@ -53,33 +67,43 @@ export async function GET(req: Request) {
   }
 }
 
-// 2. PUT: Atualização SEGURA do perfil (somente name e photoURL)
+// 2. PUT: Atualização SEGURA do perfil (somente name e photoURL do usuário autenticado)
 export async function PUT(req: Request) {
   try {
     await ensureUserColumns();
+
+    const sessionUser = await getAuthenticatedUser(req);
+    if (!sessionUser) {
+      logSecurityEvent('UNAUTHORIZED_ACCESS', { path: 'PUT /api/usuario/perfil', reason: 'NO_SESSION' });
+      return NextResponse.json({ success: false, error: 'Sessão expirada. Faça login novamente.' }, { status: 401 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const { userId, name, photoURL, role, status, companyId, email } = body;
 
-    // REGRA DE SEGURANÇA DDS MASTER:
-    // Se o cliente enviar tentativa de alterar permissões, negar estritamente
+    // REGRA DE SEGURANÇA: Bloqueio de Mass Assignment de privilégios
     if (role !== undefined || status !== undefined || companyId !== undefined || email !== undefined) {
+      logSecurityEvent('FORBIDDEN_ACCESS', {
+        userId: sessionUser.id,
+        path: 'PUT /api/usuario/perfil',
+        reason: 'MASS_ASSIGNMENT_ROLE_ATTEMPT'
+      });
       return NextResponse.json({
         success: false,
-        error: 'Ação não permitida: Permissões, e-mail e status são controlados exclusivamente pelo DDS Master.'
+        error: 'Ação não permitida: Permissões, e-mail e status não podem ser alterados pelo cliente.'
       }, { status: 403 });
     }
 
-    if (!userId) {
-      return NextResponse.json({ success: false, error: 'Identificador do usuário ausente.' }, { status: 400 });
-    }
+    const targetUserId = userId || sessionUser.id;
 
-    // Validação de Existência
-    const existingUser = await prisma.user.findUnique({
-      where: { id: userId }
-    });
-
-    if (!existingUser) {
-      return NextResponse.json({ success: false, error: 'Usuário não encontrado.' }, { status: 404 });
+    // Proteção IDOR: Não permite alterar perfil de outro usuário
+    if (targetUserId !== sessionUser.id && sessionUser.role !== 'SUPER_ADMIN') {
+      logSecurityEvent('FORBIDDEN_ACCESS', {
+        userId: sessionUser.id,
+        path: `PUT /api/usuario/perfil (${targetUserId})`,
+        reason: 'IDOR_ATTEMPT_ON_PROFILE_UPDATE'
+      });
+      return NextResponse.json({ success: false, error: 'Você não tem permissão para alterar este perfil.' }, { status: 403 });
     }
 
     // Whitelist estrita de campos editáveis
@@ -100,9 +124,8 @@ export async function PUT(req: Request) {
     // 2. Validação da Foto de Perfil
     if (photoURL !== undefined) {
       if (photoURL === null || photoURL === '') {
-        dataToUpdate.photoURL = null; // Remoção da foto
+        dataToUpdate.photoURL = null;
       } else if (typeof photoURL === 'string') {
-        // Validação de formato DataURL seguro
         const isDataUrl = photoURL.startsWith('data:image/jpeg') || 
                           photoURL.startsWith('data:image/png') || 
                           photoURL.startsWith('data:image/webp');
@@ -127,9 +150,8 @@ export async function PUT(req: Request) {
       return NextResponse.json({ success: false, error: 'Nenhum campo válido para atualização.' }, { status: 400 });
     }
 
-    // Executa a atualização segura no PostgreSQL
     const updatedUser = await prisma.user.update({
-      where: { id: userId },
+      where: { id: targetUserId },
       data: dataToUpdate,
       select: {
         id: true,
@@ -144,11 +166,17 @@ export async function PUT(req: Request) {
       }
     });
 
+    logSecurityEvent('ADMIN_ACTION', {
+      userId: sessionUser.id,
+      reason: `PROFILE_UPDATED: ${targetUserId}`
+    });
+
     return NextResponse.json({
       success: true,
       message: 'Perfil atualizado com sucesso!',
       user: updatedUser
     });
+
   } catch (error: any) {
     console.error('Erro no PUT /api/usuario/perfil:', error);
     return NextResponse.json({ success: false, error: 'Falha ao atualizar perfil do usuário.' }, { status: 500 });
