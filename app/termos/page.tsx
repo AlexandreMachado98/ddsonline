@@ -57,17 +57,19 @@ export default function TermosPage() {
               <span>AM TST (Alexandre Machado)</span>
             </div>
             <div>
-              <span className="font-semibold text-slate-300">CNPJ:</span>{' '}
-              <span className="text-amber-400 font-mono">[PREENCHIMENTO NECESSÁRIO ANTES DA PUBLICAÇÃO: CNPJ da AM TST]</span>
-            </div>
-            <div>
               <span className="font-semibold text-slate-300">Contato de Suporte:</span>{' '}
               <a href="mailto:apoioamtst@gmail.com" className="text-emerald-400 underline font-mono">apoioamtst@gmail.com</a>
             </div>
+            {/* CAMPOS RESERVADOS PARA PREENCHIMENTO FUTURO:
+            <div>
+              <span className="font-semibold text-slate-300">CNPJ:</span>{' '}
+              <span>[CNPJ DA AM TST]</span>
+            </div>
             <div>
               <span className="font-semibold text-slate-300">Foro Eleito:</span>{' '}
-              <span className="text-amber-400 font-mono">[PREENCHIMENTO NECESSÁRIO ANTES DA PUBLICAÇÃO: Comarca da Sede]</span>
+              <span>[COMARCA DA SEDE]</span>
             </div>
+            */}
           </div>
         </div>
 
@@ -251,7 +253,8 @@ export default function TermosPage() {
               O presente contrato é regido e interpretado pelas leis da República Federativa do Brasil, em particular o Marco Civil da Internet (Lei nº 12.965/2014), a Lei Geral de Proteção de Dados (Lei nº 13.709/2018) e a Lei de Assinaturas Eletrônicas (Lei nº 14.063/2020).
             </p>
             <p className="text-slate-400 text-xs">
-              Para dirimir quaisquer litígios ou controvérsias oriundas do presente instrumento, as partes elegem o foro da Comarca de <span className="text-amber-400 font-mono">[PREENCHIMENTO NECESSÁRIO ANTES DA PUBLICAÇÃO: Comarca da Sede do Mantenedor]</span>, com expressa renúncia a qualquer outro, por mais privilegiado que seja.
+              Para dirimir quaisquer litígios ou controvérsias oriundas do presente instrumento, as partes elegem o foro da comarca da sede da empresa mantenedora, com expressa renúncia a qualquer outro, por mais privilegiado que seja.
+              {/* CAMPO RESERVADO PARA DEFINIÇÃO DA COMARCA: [COMARCA DA SEDE DO MANTENEDOR] */}
             </p>
           </section>
 

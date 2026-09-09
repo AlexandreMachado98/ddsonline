@@ -53,14 +53,6 @@ export default function PrivacidadePage() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 text-[11px] text-slate-400 border-t border-slate-800">
             <div>
-              <span className="font-semibold text-slate-300">CNPJ do Mantenedor:</span>{' '}
-              <span className="text-amber-400 font-mono">[PREENCHIMENTO NECESSÁRIO ANTES DA PUBLICAÇÃO: CNPJ da AM TST]</span>
-            </div>
-            <div>
-              <span className="font-semibold text-slate-300">Sede / Endereço:</span>{' '}
-              <span className="text-amber-400 font-mono">[PREENCHIMENTO NECESSÁRIO ANTES DA PUBLICAÇÃO: Endereço da Sede]</span>
-            </div>
-            <div>
               <span className="font-semibold text-slate-300">Canal Oficial DPO / Privacidade:</span>{' '}
               <a href="mailto:apoioamtst@gmail.com" className="text-emerald-400 underline font-mono">apoioamtst@gmail.com</a>
             </div>
@@ -68,6 +60,16 @@ export default function PrivacidadePage() {
               <span className="font-semibold text-slate-300">Encarregado de Dados (DPO):</span>{' '}
               <span>Alexandre Machado (AM TST)</span>
             </div>
+            {/* CAMPOS RESERVADOS PARA PREENCHIMENTO FUTURO:
+            <div>
+              <span className="font-semibold text-slate-300">CNPJ do Mantenedor:</span>{' '}
+              <span>[CNPJ DA AM TST]</span>
+            </div>
+            <div>
+              <span className="font-semibold text-slate-300">Sede / Endereço:</span>{' '}
+              <span>[ENDEREÇO COMERCIAL]</span>
+            </div>
+            */}
           </div>
         </div>
 
