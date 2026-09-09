@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, CheckCircle2, Sparkles, LogOut, 
   Building2, Calendar, AlertTriangle, ArrowRight, User, 
-  Camera, PenTool, Radio, Check, Smartphone, Loader2, ExternalLink, RefreshCw, QrCode
+  Camera, PenTool, Radio, Check, Smartphone, Loader2, ExternalLink, RefreshCw, QrCode, ShieldCheck
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -655,6 +655,27 @@ export default function MeetingRoom() {
 
           <SignaturePad onConfirm={(sig) => setSavedSignature(sig)} />
         </section>
+
+        {/* AVISO DE PRIVACIDADE E CIÊNCIA DO PARTICIPANTE */}
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-3.5 text-[11px] text-slate-400 space-y-1.5 leading-relaxed">
+          <p className="flex items-center gap-1.5 font-bold text-slate-300 text-[11px]">
+            <ShieldCheck size={14} className="text-emerald-400 shrink-0" />
+            Registro de Presença e Privacidade (LGPD)
+          </p>
+          <p>
+            Seus dados (nome, cargo, foto simples de presença e assinatura) são coletados para a formalização da lista de presença do DDS pelo seu empregador (Art. 7º, II da LGPD c/c NRs do MTE). As mídias permanecem em nuvem apenas temporariamente durante a consolidação da ata em PDF.
+          </p>
+          <p className="text-[10px] text-slate-500">
+            Ao confirmar, você atesta sua participação e declara ciência do{' '}
+            <Link href="/privacidade" target="_blank" className="text-emerald-400 underline hover:text-emerald-300">
+              Aviso de Privacidade
+            </Link>{' '}
+            e dos{' '}
+            <Link href="/termos" target="_blank" className="text-emerald-400 underline hover:text-emerald-300">
+              Termos de Uso
+            </Link>.
+          </p>
+        </div>
 
         {/* BOTÃO DE CONFIRMAR PRESENÇA */}
         <button 
