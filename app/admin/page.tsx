@@ -1242,78 +1242,30 @@ export default function AdminPanel() {
       )}
 
       <div className="max-w-6xl w-full mx-auto space-y-4 sm:space-y-6">
-        {/* Topbar do Painel */}
-        <header className="w-full bg-slate-900 border border-slate-800 p-3.5 sm:p-5 rounded-3xl shadow-xl overflow-hidden max-w-full">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0 max-w-full">
-            <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1 overflow-hidden">
-              <DdsLogo size="md" showText={false} clickable href="/admin" />
-              <button
-                type="button"
-                onClick={() => setIsProfileOpen(true)}
-                className="flex items-center gap-2.5 min-w-0 p-1.5 -ml-1.5 rounded-2xl hover:bg-slate-800/80 transition-colors text-left group cursor-pointer"
-                title="Abrir Meu Perfil"
-              >
-                {/* Avatar Circular com Foto ou Iniciais */}
-                <div className="w-9 h-9 rounded-full bg-slate-800 ring-2 ring-emerald-500/30 group-hover:ring-emerald-400 p-0.5 shrink-0 flex items-center justify-center overflow-hidden transition-all shadow-md">
-                  {currentUser?.photoURL ? (
-                    <img
-                      src={currentUser.photoURL}
-                      alt={currentUser.name}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full rounded-full bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white text-xs font-black select-none">
-                      {currentUser?.name ? (
-                        currentUser.name.split(' ').length > 1
-                          ? (currentUser.name.split(' ')[0][0] + currentUser.name.split(' ')[currentUser.name.split(' ').length - 1][0]).toUpperCase()
-                          : currentUser.name.slice(0, 2).toUpperCase()
-                      ) : 'TST'}
-                    </div>
-                  )}
-                </div>
+        {/* Topbar do Painel Responsiva */}
+        <header className="w-full bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-3xl shadow-xl overflow-hidden max-w-full space-y-2.5 sm:space-y-3">
+          {/* Linha 1: Marca DDS ON e Ações Rápidas */}
+          <div className="flex items-center justify-between gap-3 min-w-0">
+            <DdsLogo size="sm" showSubtitle={false} clickable href="/admin" />
 
-                <div className="min-w-0 flex-1 overflow-hidden">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-lg sm:text-xl font-black text-white tracking-tight">
-                      <span>DDS</span>
-                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">ON</span>
-                    </h1>
-                    <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 shrink-0 group-hover:bg-emerald-500/20 transition-colors">
-                      Meu Perfil
-                    </span>
-                  </div>
-                  
-                  {/* Nome de usuário e empresa com contenção rigorosa e quebra limpa */}
-                  <div className="text-[11px] text-slate-400 mt-0.5 leading-snug overflow-hidden">
-                    <p className="truncate sm:break-words font-medium">
-                      <span className="text-slate-200 font-semibold group-hover:text-emerald-300 transition-colors">{currentUser?.name || 'Técnico de Segurança'}</span>
-                      <span className="text-slate-400 block sm:inline sm:before:content-['•'] sm:before:mx-1.5 truncate">
-                        {currentUser?.company || 'AM TST'}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center border-t border-slate-800/60 sm:border-0 pt-2 sm:pt-0 w-full sm:w-auto justify-end">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {activeMeeting && (
                 <button
                   onClick={() => setIsLiveMode(true)}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 animate-pulse cursor-pointer min-h-[38px]"
+                  className="hidden sm:flex px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md items-center gap-1.5 animate-pulse cursor-pointer min-h-[36px]"
                 >
                   <Radio size={14} /> DDS em Aberto
                 </button>
               )}
 
               <div className="flex items-center gap-1">
-                <label className="p-2 text-slate-400 hover:text-emerald-400 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1.5 border border-slate-800 hover:border-slate-700 min-h-[38px]" title={companyLogo ? "Substituir Logo da Empresa" : "Adicionar Logo da Empresa ao PDF"}>
+                <label className="p-2 sm:px-3 text-slate-300 hover:text-emerald-400 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1.5 border border-slate-800 hover:border-slate-700 min-h-[36px]" title={companyLogo ? "Substituir Logo da Empresa" : "Adicionar Logo da Empresa ao PDF"}>
                   {companyLogo ? (
-                    <img src={companyLogo} alt="Logo" className="h-5 w-auto rounded-sm object-contain bg-white" />
+                    <img src={companyLogo} alt="Logo" className="h-4 sm:h-5 w-auto rounded-sm object-contain bg-white" />
                   ) : (
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                   )}
-                  <span className="text-xs font-bold">{companyLogo ? 'Mudar Logo' : 'Logo PDF'}</span>
+                  <span className="text-xs font-bold hidden sm:inline">{companyLogo ? 'Mudar Logo' : 'Logo PDF'}</span>
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
@@ -1367,23 +1319,89 @@ export default function AdminPanel() {
                       setCompanyLogo(null);
                       showToast('Logo removida.', 'info');
                     }}
-                    className="p-2 text-slate-500 hover:text-red-400 rounded-xl hover:bg-slate-800 transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
+                    className="p-2 text-slate-500 hover:text-red-400 rounded-xl hover:bg-slate-800 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
                     title="Remover Logo"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
                   </button>
                 )}
               </div>
 
               <button
                 onClick={handleLogout}
-                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer min-h-[38px] min-w-[38px] flex items-center justify-center"
+                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
                 title="Sair do Painel"
               >
-                <LogOut size={18} />
+                <LogOut size={16} />
               </button>
             </div>
           </div>
+
+          {/* Banner Chamativo em Mobile quando houver DDS em Aberto */}
+          {activeMeeting && (
+            <button
+              onClick={() => setIsLiveMode(true)}
+              className="sm:hidden w-full py-2 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-between transition-all animate-pulse cursor-pointer"
+            >
+              <span className="flex items-center gap-1.5 truncate">
+                <Radio size={14} className="shrink-0" />
+                <span className="truncate">DDS Aberto: {activeMeeting.topic}</span>
+              </span>
+              <span className="bg-black/25 px-2 py-0.5 rounded-lg text-[10px] font-mono shrink-0">
+                Acessar &rarr;
+              </span>
+            </button>
+          )}
+
+          {/* Linha 2: Cartão de Perfil do Técnico (Largura Total, Organizado e Sem Quebras Estranhas) */}
+          <button
+            type="button"
+            onClick={() => setIsProfileOpen(true)}
+            className="w-full flex items-center justify-between gap-2.5 p-2 sm:p-2.5 bg-slate-950/70 hover:bg-slate-800/80 border border-slate-800/80 rounded-2xl transition-all group cursor-pointer text-left"
+            title="Abrir Meu Perfil"
+          >
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              {/* Avatar Circular com Foto ou Iniciais */}
+              <div className="w-9 h-9 rounded-full bg-slate-800 ring-2 ring-emerald-500/30 group-hover:ring-emerald-400 p-0.5 shrink-0 flex items-center justify-center overflow-hidden transition-all shadow-md">
+                {currentUser?.photoURL ? (
+                  <img
+                    src={currentUser.photoURL}
+                    alt={currentUser.name}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white text-xs font-black select-none">
+                    {currentUser?.name ? (
+                      currentUser.name.split(' ').length > 1
+                        ? (currentUser.name.split(' ')[0][0] + currentUser.name.split(' ')[currentUser.name.split(' ').length - 1][0]).toUpperCase()
+                        : currentUser.name.slice(0, 2).toUpperCase()
+                    ) : 'TST'}
+                  </div>
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-300 transition-colors truncate">
+                    {currentUser?.name || 'Técnico de Segurança'}
+                  </span>
+                  <span className="text-[9px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 shrink-0">
+                    Meu Perfil
+                  </span>
+                </div>
+                
+                {/* Empresa */}
+                <p className="text-[10px] sm:text-xs text-slate-400 truncate mt-0.5">
+                  {currentUser?.company || 'AM TST'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 text-[11px] text-slate-500 group-hover:text-emerald-400 transition-colors shrink-0 pr-1">
+              <span className="hidden xs:inline text-[10px] font-semibold">Editar</span>
+              <ChevronRight size={15} />
+            </div>
+          </button>
         </header>
 
         {/* Badge de Sincronização e Fila Offline */}
