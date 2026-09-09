@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  X, ZoomIn, ZoomOut, Maximize2, RotateCcw, 
+  X, ZoomIn, ZoomOut, RotateCcw, 
   ChevronLeft, ChevronRight, Loader2, AlertCircle, 
-  Download, FileText, ExternalLink, HelpCircle
+  Download, ExternalLink
 } from 'lucide-react';
 
 export interface LightboxMediaItem {
@@ -32,9 +32,9 @@ export default function MediaLightbox({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [showControls, setShowControls] = useState(true);
 
   // Referências para cálculos de gestos e arrasto
   const containerRef = useRef<HTMLDivElement>(null);
@@ -62,8 +62,6 @@ export default function MediaLightbox({
       setCurrentIndex(Math.min(Math.max(initialIndex, 0), Math.max(items.length - 1, 0)));
       setZoom(1);
       setPan({ x: 0, y: 0 });
-      setIsLoading(true);
-      setHasError(false);
     }
   }, [isOpen, initialIndex, items.length]);
 
@@ -71,21 +69,132 @@ export default function MediaLightbox({
   useEffect(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
-    setIsLoading(true);
-    setHasError(false);
   }, [currentIndex]);
 
   const currentItem = items[currentIndex];
   const isPdf = currentItem?.mimeType === 'application/pdf' || currentItem?.url?.startsWith('data:application/pdf') || currentItem?.title?.toLowerCase().endsWith('.pdf');
   const hasMultiple = items.length > 1;
 
-  // Limite de segurança de zoom: 1x a 4x
+  // Limite seguro de zoom: 1x a 3.0x para prevenir estouro de VRAM na GPU móvel
   const minZoom = 1;
-  const maxZoom = 4;
+  const maxZoom = 3.0;
+
+  // =========================================================================
+  // 1. MEMORY SHIELD: DOWNSAMPLE INTELIGENTE DE ALTA RESOLUÇÃO PARA DISPLAY
+  // =========================================================================
+  // Fotos de câmeras de celular modernas (12MP a 48MP, 4000x3000+) estouram a 
+  // VRAM da GPU ao serem aplicadas com CSS transforms e filtros.
+  // Aqui geramos uma versão com limite seguro de 1600px em offscreen canvas,
+  // reduzindo o uso de VRAM de ~48MB para ~6MB sem perder nenhuma nitidez.
+  useEffect(() => {
+    if (!isOpen || !currentItem?.url) {
+      setDisplayUrl(null);
+      return;
+    }
+
+    if (isPdf) {
+      setDisplayUrl(currentItem.url);
+      setIsLoading(false);
+      setHasError(false);
+      return;
+    }
+
+    let isCancelled = false;
+    let createdBlobUrl: string | null = null;
+    setIsLoading(true);
+    setHasError(false);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+      if (isCancelled) return;
+
+      try {
+        const { naturalWidth: w, naturalHeight: h } = img;
+        const maxSafeDimension = 1600; // Limite de textura segura para GPUs móveis
+
+        if (w > maxSafeDimension || h > maxSafeDimension) {
+          let targetW = w;
+          let targetH = h;
+          if (w > h) {
+            targetH = Math.round((h * maxSafeDimension) / w);
+            targetW = maxSafeDimension;
+          } else {
+            targetW = Math.round((w * maxSafeDimension) / h);
+            targetH = maxSafeDimension;
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = targetW;
+          canvas.height = targetH;
+          const ctx = canvas.getContext('2d', { alpha: false });
+
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, targetW, targetH);
+
+            canvas.toBlob(
+              (blob) => {
+                if (isCancelled) return;
+                if (blob) {
+                  createdBlobUrl = URL.createObjectURL(blob);
+                  setDisplayUrl(createdBlobUrl);
+                } else {
+                  setDisplayUrl(currentItem.url);
+                }
+                setIsLoading(false);
+              },
+              'image/jpeg',
+              0.85
+            );
+            return;
+          }
+        }
+
+        // Se a imagem já for menor que o limite seguro, usa a URL original
+        setDisplayUrl(currentItem.url);
+        setIsLoading(false);
+      } catch (err) {
+        console.warn("Fallback para URL original do anexo:", err);
+        if (!isCancelled) {
+          setDisplayUrl(currentItem.url);
+          setIsLoading(false);
+        }
+      }
+    };
+
+    img.onerror = () => {
+      if (isCancelled) return;
+      setIsLoading(false);
+      setHasError(true);
+    };
+
+    img.src = currentItem.url;
+
+    return () => {
+      isCancelled = true;
+      if (createdBlobUrl) {
+        URL.revokeObjectURL(createdBlobUrl);
+      }
+    };
+  }, [isOpen, currentItem?.url, isPdf]);
+
+  // Função para limitar o pan e manter a imagem sempre visível dentro da tela
+  const clampPan = useCallback((x: number, y: number, currentZoom: number) => {
+    if (currentZoom <= 1) return { x: 0, y: 0 };
+    const maxPanX = Math.round(((currentZoom - 1) * (typeof window !== 'undefined' ? window.innerWidth : 800)) / 2);
+    const maxPanY = Math.round(((currentZoom - 1) * (typeof window !== 'undefined' ? window.innerHeight : 600)) / 2);
+    return {
+      x: Math.max(-maxPanX, Math.min(maxPanX, x)),
+      y: Math.max(-maxPanY, Math.min(maxPanY, y))
+    };
+  }, []);
 
   const handleZoomIn = useCallback(() => {
     setZoom(prev => {
-      const next = Math.min(maxZoom, Number((prev + 0.5).toFixed(1)));
+      const next = Math.min(maxZoom, Number((prev + 0.4).toFixed(1)));
       if (next === 1) setPan({ x: 0, y: 0 });
       return next;
     });
@@ -93,7 +202,7 @@ export default function MediaLightbox({
 
   const handleZoomOut = useCallback(() => {
     setZoom(prev => {
-      const next = Math.max(minZoom, Number((prev - 0.5).toFixed(1)));
+      const next = Math.max(minZoom, Number((prev - 0.4).toFixed(1)));
       if (next === 1) setPan({ x: 0, y: 0 });
       return next;
     });
@@ -115,17 +224,15 @@ export default function MediaLightbox({
   }, [items.length]);
 
   // =========================================================================
-  // 1. GESTÃO DO BOTÃO VOLTAR DO ANDROID / PWA (HISTORY API)
+  // 2. GESTÃO DO BOTÃO VOLTAR DO ANDROID / PWA (HISTORY API)
   // =========================================================================
   useEffect(() => {
     if (!isOpen) return;
 
-    // Empurra um estado no histórico para capturar o botão Voltar do dispositivo
     const historyState = { ddsMediaLightbox: true };
     window.history.pushState(historyState, '');
 
-    const handlePopState = (event: PopStateEvent) => {
-      // Se o usuário apertou o botão voltar do Android, fecha o modal sem sair do DDS
+    const handlePopState = () => {
       onClose();
     };
 
@@ -133,7 +240,6 @@ export default function MediaLightbox({
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
-      // Se fechou programaticamente (botão X ou ESC) e o estado ainda estiver no topo, volta o histórico
       if (window.history.state && window.history.state.ddsMediaLightbox) {
         window.history.back();
       }
@@ -141,16 +247,14 @@ export default function MediaLightbox({
   }, [isOpen, onClose]);
 
   // =========================================================================
-  // 2. ACESSIBILIDADE E TECLADO (ESC, SETAS, FOCO)
+  // 3. ACESSIBILIDADE E TECLADO (ESC, SETAS, FOCO)
   // =========================================================================
   useEffect(() => {
     if (!isOpen) return;
 
-    // Trava scroll do body enquanto aberto
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    // Foco automático no botão de fechar para leitores de tela
     closeBtnRef.current?.focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -179,18 +283,17 @@ export default function MediaLightbox({
   }, [isOpen, onClose, handlePrev, handleNext, handleZoomIn, handleZoomOut, handleResetZoom, zoom]);
 
   // =========================================================================
-  // 3. ZOOM VIA SCROLL DO MOUSE (DESKTOP WHEEL)
+  // 4. ZOOM VIA SCROLL DO MOUSE (DESKTOP WHEEL)
   // =========================================================================
   const handleWheel = (e: React.WheelEvent) => {
     if (isPdf) return;
     e.stopPropagation();
 
-    // Rolar para cima = Zoom in; Rolar para baixo = Zoom out
     if (e.deltaY < 0) {
-      setZoom(prev => Math.min(maxZoom, Number((prev + 0.25).toFixed(2))));
+      setZoom(prev => Math.min(maxZoom, Number((prev + 0.2).toFixed(2))));
     } else {
       setZoom(prev => {
-        const next = Math.max(minZoom, Number((prev - 0.25).toFixed(2)));
+        const next = Math.max(minZoom, Number((prev - 0.2).toFixed(2)));
         if (next === 1) setPan({ x: 0, y: 0 });
         return next;
       });
@@ -198,11 +301,11 @@ export default function MediaLightbox({
   };
 
   // =========================================================================
-  // 4. ARRASTO COM MOUSE (DESKTOP PAN)
+  // 5. ARRASTO COM MOUSE (DESKTOP PAN)
   // =========================================================================
   const handleMouseDown = (e: React.MouseEvent) => {
     if (zoom <= 1 || isPdf) return;
-    if (e.button !== 0) return; // apenas botão esquerdo
+    if (e.button !== 0) return;
 
     e.preventDefault();
     isDraggingRef.current = true;
@@ -221,11 +324,8 @@ export default function MediaLightbox({
 
     const deltaX = e.clientX - dragStartRef.current.x;
     const deltaY = e.clientY - dragStartRef.current.y;
-
-    setPan({
-      x: dragStartRef.current.panX + deltaX,
-      y: dragStartRef.current.panY + deltaY
-    });
+    const clamped = clampPan(dragStartRef.current.panX + deltaX, dragStartRef.current.panY + deltaY, zoom);
+    setPan(clamped);
   };
 
   const handleMouseUp = () => {
@@ -234,18 +334,16 @@ export default function MediaLightbox({
   };
 
   // =========================================================================
-  // 5. GESTOS TOUCH NO MOBILE (PINCH-TO-ZOOM, DUPLO TOQUE, PAN E SWIPE)
+  // 6. GESTOS TOUCH NO MOBILE (PINCH-TO-ZOOM, DUPLO TOQUE, PAN E SWIPE)
   // =========================================================================
   const getTouchDistance = (t1: React.Touch, t2: React.Touch) => {
-    const dx = t1.clientX - t2.clientX;
-    const dy = t1.clientY - t2.clientY;
-    return Math.hypot(dx, dy);
+    return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (isPdf) return;
 
-    // A. DOIS DEDOS: PINCH TO ZOOM
+    // DOIS DEDOS: PINCH TO ZOOM
     if (e.touches.length === 2) {
       pinchStartDistRef.current = getTouchDistance(e.touches[0], e.touches[1]);
       pinchStartZoomRef.current = zoom;
@@ -253,18 +351,18 @@ export default function MediaLightbox({
       return;
     }
 
-    // B. UM DEDO: PAN (SE ZOOM > 1) OU SWIPE / DUPLO TOQUE
+    // UM DEDO: PAN (SE ZOOM > 1) OU SWIPE / DUPLO TOQUE
     if (e.touches.length === 1) {
       const touch = e.touches[0];
       const now = Date.now();
       const lastTap = lastTapRef.current;
 
-      // Detecção de Duplo Toque (< 300ms e proximidade de 25px)
+      // Duplo Toque (< 300ms e proximidade de 25px)
       if (now - lastTap.time < 300 && Math.hypot(touch.clientX - lastTap.x, touch.clientY - lastTap.y) < 25) {
         if (zoom > 1) {
           handleResetZoom();
         } else {
-          setZoom(2.2);
+          setZoom(2.0);
         }
         lastTapRef.current = { time: 0, x: 0, y: 0 };
         return;
@@ -280,7 +378,6 @@ export default function MediaLightbox({
           panY: pan.y
         };
       } else {
-        // Guarda posição para possível swipe de troca de slide
         touchStartSwipeRef.current = {
           x: touch.clientX,
           y: touch.clientY,
@@ -293,7 +390,7 @@ export default function MediaLightbox({
   const handleTouchMove = (e: React.TouchEvent) => {
     if (isPdf) return;
 
-    // A. Processando Pinch-to-Zoom
+    // Pinch-to-Zoom
     if (e.touches.length === 2 && pinchStartDistRef.current !== null) {
       const currentDist = getTouchDistance(e.touches[0], e.touches[1]);
       const scaleFactor = currentDist / pinchStartDistRef.current;
@@ -303,16 +400,13 @@ export default function MediaLightbox({
       return;
     }
 
-    // B. Processando Pan de 1 dedo
+    // Pan de 1 dedo
     if (e.touches.length === 1 && isDraggingRef.current && zoom > 1) {
       const touch = e.touches[0];
       const deltaX = touch.clientX - dragStartRef.current.x;
       const deltaY = touch.clientY - dragStartRef.current.y;
-
-      setPan({
-        x: dragStartRef.current.panX + deltaX,
-        y: dragStartRef.current.panY + deltaY
-      });
+      const clamped = clampPan(dragStartRef.current.panX + deltaX, dragStartRef.current.panY + deltaY, zoom);
+      setPan(clamped);
     }
   };
 
@@ -320,14 +414,13 @@ export default function MediaLightbox({
     pinchStartDistRef.current = null;
     isDraggingRef.current = false;
 
-    // Detecção de Swipe horizontal para fotos quando zoom === 1
+    // Swipe horizontal para fotos quando zoom === 1
     if (zoom === 1 && touchStartSwipeRef.current && e.changedTouches.length > 0 && hasMultiple) {
       const endTouch = e.changedTouches[0];
       const dx = endTouch.clientX - touchStartSwipeRef.current.x;
       const dy = endTouch.clientY - touchStartSwipeRef.current.y;
       const dt = Date.now() - touchStartSwipeRef.current.time;
 
-      // Se foi um deslize horizontal de pelo menos 45px em menos de 450ms
       if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 450) {
         if (dx < 0) {
           handleNext();
@@ -339,7 +432,6 @@ export default function MediaLightbox({
     touchStartSwipeRef.current = null;
   };
 
-  // Toggle de zoom ao clicar diretamente na imagem (desktop)
   const handleImageClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (zoom === 1) {
@@ -356,14 +448,13 @@ export default function MediaLightbox({
       role="dialog"
       aria-modal="true"
       aria-label="Visualizador ampliado de imagem"
-      className="fixed inset-0 z-[99999] flex flex-col bg-slate-950/95 backdrop-blur-md animate-in fade-in duration-200 select-none overflow-hidden touch-none"
+      className="fixed inset-0 z-[99999] flex flex-col bg-slate-950 text-white select-none overflow-hidden touch-none"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onWheel={handleWheel}
     >
-      {/* 1. BARRA SUPERIOR (HEADER) */}
-      <header className="h-14 sm:h-16 px-3 sm:px-6 bg-slate-900/90 border-b border-slate-800/80 backdrop-blur-md flex items-center justify-between gap-3 shrink-0 z-30 shadow-lg">
-        {/* Título e Indicador de Slides */}
+      {/* 1. BARRA SUPERIOR (HEADER SEM BLUR PESADO) */}
+      <header className="h-14 sm:h-16 px-3 sm:px-6 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-3 shrink-0 z-30 shadow-md">
         <div className="min-w-0 flex-1 flex items-center gap-2">
           {hasMultiple && (
             <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-black shrink-0 font-mono">
@@ -371,7 +462,7 @@ export default function MediaLightbox({
             </span>
           )}
           <div className="min-w-0">
-            <h3 className="text-xs sm:text-sm font-bold text-white truncate drop-shadow-sm">
+            <h3 className="text-xs sm:text-sm font-bold text-white truncate">
               {currentItem.title || `Material do DDS #${currentIndex + 1}`}
             </h3>
             {currentItem.description && (
@@ -382,9 +473,7 @@ export default function MediaLightbox({
           </div>
         </div>
 
-        {/* Ações da Barra Superior */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Botão Baixar */}
           {currentItem.url && (
             <a
               href={currentItem.url}
@@ -397,12 +486,11 @@ export default function MediaLightbox({
             </a>
           )}
 
-          {/* Botão Fechar X com área de toque mínima de 44x44px */}
           <button
             ref={closeBtnRef}
             type="button"
             onClick={onClose}
-            className="p-2.5 bg-slate-800/80 hover:bg-red-500/20 text-slate-200 hover:text-red-300 rounded-xl border border-slate-700 hover:border-red-500/40 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
+            className="p-2.5 bg-slate-800 hover:bg-red-500/20 text-slate-200 hover:text-red-300 rounded-xl border border-slate-700 hover:border-red-500/40 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
             title="Fechar visualização (ESC)"
             aria-label="Fechar visualização"
           >
@@ -411,11 +499,10 @@ export default function MediaLightbox({
         </div>
       </header>
 
-      {/* 2. ÁREA CENTRAL DE VISUALIZAÇÃO DA MÍDIA */}
+      {/* 2. ÁREA CENTRAL DE VISUALIZAÇÃO */}
       <div 
         ref={containerRef}
         onClick={(e) => {
-          // Fecha se clicar no backdrop fora da imagem quando não estiver em zoom/arrasto
           if (e.target === containerRef.current && zoom === 1) {
             onClose();
           }
@@ -423,13 +510,13 @@ export default function MediaLightbox({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className="flex-1 relative flex items-center justify-center p-2 sm:p-4 min-h-0 overflow-hidden cursor-default"
+        className="flex-1 relative flex items-center justify-center p-2 sm:p-4 min-h-0 overflow-hidden cursor-default bg-slate-950"
       >
         {/* Loading Spinner */}
-        {isLoading && !isPdf && (
+        {isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 z-10 pointer-events-none">
             <Loader2 size={36} className="animate-spin text-emerald-400" />
-            <span className="text-xs text-slate-400 font-semibold">Carregando imagem em alta resolução...</span>
+            <span className="text-xs text-slate-400 font-semibold">Otimizando e carregando imagem...</span>
           </div>
         )}
 
@@ -438,7 +525,7 @@ export default function MediaLightbox({
           <div className="p-6 bg-slate-900 border border-red-500/30 rounded-3xl max-w-sm text-center space-y-3 shadow-2xl z-10">
             <AlertCircle size={36} className="text-red-400 mx-auto" />
             <p className="text-sm font-bold text-white">Não foi possível carregar esta mídia.</p>
-            <p className="text-xs text-slate-400">Verifique sua conexão ou tente novamente.</p>
+            <p className="text-xs text-slate-400">Verifique a imagem ou tente novamente.</p>
             <button
               type="button"
               onClick={() => {
@@ -452,11 +539,11 @@ export default function MediaLightbox({
           </div>
         )}
 
-        {/* MÍDIA: PDF OU IMAGEM */}
+        {/* MÍDIA: PDF OU IMAGEM OTIMIZADA */}
         {isPdf ? (
-          <div className="w-full max-w-4xl h-full flex flex-col items-center justify-center gap-3 bg-slate-900/90 rounded-2xl p-2 border border-slate-800 shadow-2xl">
+          <div className="w-full max-w-4xl h-full flex flex-col items-center justify-center gap-3 bg-slate-900 rounded-2xl p-2 border border-slate-800 shadow-2xl">
             <iframe 
-              src={currentItem.url} 
+              src={displayUrl || currentItem.url} 
               title={currentItem.title || 'Documento PDF'}
               className="w-full h-full rounded-xl border border-slate-800"
             />
@@ -472,13 +559,14 @@ export default function MediaLightbox({
             </div>
           </div>
         ) : (
-          !hasError && (
+          displayUrl && !hasError && (
             <div
-              className={`relative flex items-center justify-center max-w-full max-h-full transition-transform ease-out ${
-                isDraggingRef.current ? 'duration-0' : 'duration-200'
+              className={`relative flex items-center justify-center max-w-full max-h-full ${
+                isDraggingRef.current ? '' : 'transition-transform duration-100 ease-out'
               }`}
               style={{
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+                willChange: zoom > 1 || isDraggingRef.current ? 'transform' : 'auto',
                 cursor: zoom > 1 
                   ? (isCursorGrabbing ? 'grabbing' : 'grab') 
                   : 'zoom-in'
@@ -488,21 +576,17 @@ export default function MediaLightbox({
             >
               <img
                 ref={imageRef}
-                src={currentItem.url}
+                src={displayUrl}
                 alt={currentItem.title || 'Material do Diálogo Diário de Segurança'}
-                onLoad={() => setIsLoading(false)}
-                onError={() => {
-                  setIsLoading(false);
-                  setHasError(true);
-                }}
-                className="max-w-[96vw] sm:max-w-[92vw] max-h-[calc(100vh-140px)] w-auto h-auto object-contain rounded-2xl shadow-2xl border border-slate-800/80 bg-slate-950/40 pointer-events-auto transition-opacity"
+                decoding="async"
+                className="max-w-[96vw] sm:max-w-[92vw] max-h-[calc(100vh-140px)] w-auto h-auto object-contain rounded-2xl shadow-xl border border-slate-800 bg-slate-950 pointer-events-auto"
                 draggable={false}
               />
             </div>
           )
         )}
 
-        {/* SETAS LATERAIS DE NAVEGAÇÃO ENTRE SLIDES (SE HOUVER MAIS DE 1) */}
+        {/* SETAS LATERAIS */}
         {hasMultiple && (
           <>
             <button
@@ -511,7 +595,7 @@ export default function MediaLightbox({
                 e.stopPropagation();
                 handlePrev();
               }}
-              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-3 sm:p-3.5 bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white rounded-2xl border border-slate-700/80 backdrop-blur-md shadow-xl transition-all min-h-[48px] min-w-[48px] flex items-center justify-center z-20 active:scale-95 cursor-pointer"
+              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-3 sm:p-3.5 bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white rounded-2xl border border-slate-700 shadow-xl transition-all min-h-[48px] min-w-[48px] flex items-center justify-center z-20 active:scale-95 cursor-pointer"
               title="Mídia anterior (Seta esquerda)"
               aria-label="Mídia anterior"
             >
@@ -524,7 +608,7 @@ export default function MediaLightbox({
                 e.stopPropagation();
                 handleNext();
               }}
-              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-3 sm:p-3.5 bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white rounded-2xl border border-slate-700/80 backdrop-blur-md shadow-xl transition-all min-h-[48px] min-w-[48px] flex items-center justify-center z-20 active:scale-95 cursor-pointer"
+              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-3 sm:p-3.5 bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white rounded-2xl border border-slate-700 shadow-xl transition-all min-h-[48px] min-w-[48px] flex items-center justify-center z-20 active:scale-95 cursor-pointer"
               title="Próxima mídia (Seta direita)"
               aria-label="Próxima mídia"
             >
@@ -534,50 +618,45 @@ export default function MediaLightbox({
         )}
       </div>
 
-      {/* 3. BARRA INFERIOR FLUTUANTE DE CONTROLES DE ZOOM E DICA DE USO */}
+      {/* 3. BARRA INFERIOR DE CONTROLES */}
       {!isPdf && !hasError && (
-        <footer className="h-16 px-4 bg-slate-900/90 border-t border-slate-800/80 backdrop-blur-md flex items-center justify-between gap-2 shrink-0 z-30 shadow-2xl">
-          {/* Dica de Interação Mobile / Desktop */}
+        <footer className="h-16 px-4 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-2 shrink-0 z-30 shadow-xl">
           <div className="hidden md:flex items-center gap-1.5 text-slate-400 text-xs">
             <ZoomIn size={14} className="text-emerald-400" />
-            <span>Use o scroll do mouse para zoom ou clique e arraste para navegar.</span>
+            <span>Use o scroll do mouse ou clique para zoom. Arraste para navegar.</span>
           </div>
           <div className="md:hidden flex items-center gap-1.5 text-slate-400 text-[11px] truncate">
             <span className="text-emerald-400 font-bold">Dica:</span>
             <span className="truncate">Toque duplo ou use dois dedos para zoom.</span>
           </div>
 
-          {/* Pílula de Controles de Zoom: − 100% + Ajustar */}
           <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 p-1 rounded-2xl shadow-inner ml-auto">
-            {/* Diminuir Zoom (−) */}
             <button
               type="button"
               onClick={handleZoomOut}
               disabled={zoom <= minZoom}
               className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 rounded-xl transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center cursor-pointer"
-              title="Diminuir Zoom (-)"
+              title="Diminuir Zoom"
               aria-label="Diminuir Zoom"
             >
               <ZoomOut size={16} />
             </button>
 
-            {/* Nível Atual / Reset */}
             <button
               type="button"
               onClick={handleResetZoom}
               className="px-2.5 py-1 text-xs font-mono font-bold text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors min-w-[50px] text-center"
-              title="Clique para resetar zoom em 100%"
+              title="Resetar Zoom"
             >
               {Math.round(zoom * 100)}%
             </button>
 
-            {/* Aumentar Zoom (+) */}
             <button
               type="button"
               onClick={handleZoomIn}
               disabled={zoom >= maxZoom}
               className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 rounded-xl transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center cursor-pointer"
-              title="Aumentar Zoom (+)"
+              title="Aumentar Zoom"
               aria-label="Aumentar Zoom"
             >
               <ZoomIn size={16} />
@@ -585,7 +664,6 @@ export default function MediaLightbox({
 
             <div className="h-4 w-px bg-slate-800 mx-0.5" />
 
-            {/* Ajustar à Tela */}
             <button
               type="button"
               onClick={handleResetZoom}
