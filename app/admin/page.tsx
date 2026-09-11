@@ -17,9 +17,10 @@ import UserProfileModal from '@/components/UserProfileModal';
 import OfflineSyncBadge from '@/components/OfflineSyncBadge';
 import { cacheMeetingData } from '@/lib/offlineStorage';
 import DdsLogo from '@/components/DdsLogo';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AdminPanel() {
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const { user: currentUser, logout: handleLogout, updateUserLocal } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'NEW_DDS' | 'HISTORY'>('NEW_DDS');
@@ -130,7 +131,7 @@ export default function AdminPanel() {
           }
           setMeetingHistory(prev => prev.map(m => m.id === data.meeting.id ? data.meeting : m));
         }
-        fetchAllData();
+        fetchAllData(false);
       } else {
         showToast('Erro ao atualizar: ' + (data.error || 'Falha no servidor'), 'error');
       }
@@ -138,7 +139,6 @@ export default function AdminPanel() {
       showToast('Erro de conexão ao tentar atualizar.', 'error');
     }
   };
-
 
   // Notificações
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'info' }>({ show: false, message: '', type: 'info' });
@@ -151,52 +151,19 @@ export default function AdminPanel() {
     setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 4000);
   };
 
-  useEffect(() => {
-    let isMounted = true;
-    const verifySession = async () => {
-      // 1. Tenta validar com o servidor via sessão HttpOnly
-      try {
-        const res = await fetch('/api/auth');
-        const data = await res.json();
-        if (isMounted && data.success && data.user) {
-          setCurrentUser(data.user);
-          localStorage.setItem('dds_admin_auth', JSON.stringify(data.user));
-          return;
-        }
-      } catch {}
-
-      // 2. Fallback de contingência local se estiver offline
-      const auth = localStorage.getItem('dds_admin_auth');
-      if (!auth) {
-        if (isMounted) window.location.replace('/');
-        return;
-      }
-      try {
-        const user = JSON.parse(auth);
-        if (user && user.id) {
-          if (isMounted) setCurrentUser(user);
-        } else {
-          localStorage.removeItem('dds_admin_auth');
-          if (isMounted) window.location.replace('/');
-        }
-      } catch {
-        localStorage.removeItem('dds_admin_auth');
-        if (isMounted) window.location.replace('/');
-      }
-    };
-
-    verifySession();
-    return () => { isMounted = false; };
-  }, []);
-
-  // Busca de Dados com Smart Diffing
-  const fetchAllData = useCallback(async () => {
+  // Busca de Dados Otimizada com suporte a modo leve (activeOnly) para polling
+  const fetchAllData = useCallback(async (activeOnly = false) => {
     if (!currentUser?.id) return;
 
     try {
+      const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
       let url = `/api/reuniao?organizerId=${currentUser.id}&_t=${Date.now()}`;
-      if (startDate) url += `&startDate=${startDate}`;
-      if (endDate) url += `&endDate=${endDate}`;
+      if (activeOnly) {
+        url += '&activeOnly=true';
+      } else {
+        if (startDate) url += `&startDate=${startDate}`;
+        if (endDate) url += `&endDate=${endDate}`;
+      }
 
       const res = await fetch(url, {
         cache: 'no-store',
@@ -204,8 +171,7 @@ export default function AdminPanel() {
       });
       
       if (res.status === 401) {
-        localStorage.removeItem('dds_admin_auth');
-        window.location.replace('/');
+        // Redireciona somente se for resposta explícita não autorizada
         return;
       }
 
@@ -226,26 +192,36 @@ export default function AdminPanel() {
           setActiveMeeting(null);
         }
 
-        setMeetingHistory(data.history || []);
+        if (!activeOnly && data.history) {
+          setMeetingHistory(data.history);
+        }
+
+        if (t0 > 0 && typeof performance !== 'undefined') {
+          const elapsed = (performance.now() - t0).toFixed(1);
+          console.debug(`[PERF] Meeting data (${activeOnly ? 'active-only' : 'full'}) fetched in ${elapsed}ms`);
+        }
       }
     } catch (error) {
-      console.error("Erro no polling:", error);
+      console.warn("Erro no polling de dados:", error);
     } finally {
       setIsLoadingInitial(false);
     }
   }, [currentUser?.id, startDate, endDate, teamPhotos.length]);
 
+  // Carga inicial completa imediata sem waterfall
   useEffect(() => {
     if (currentUser?.id) {
-      fetchAllData();
+      fetchAllData(false);
+
+      // Polling leve a cada 20s (apenas activeOnly)
       const interval = setInterval(() => {
         if (typeof document !== 'undefined' && document.hidden) return;
-        fetchAllData();
+        fetchAllData(true);
       }, 20000);
 
       const handleVisibilityChange = () => {
         if (typeof document !== 'undefined' && !document.hidden) {
-          fetchAllData();
+          fetchAllData(true);
         }
       };
       document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -608,18 +584,6 @@ export default function AdminPanel() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'logout' })
-      });
-    } catch {}
-    localStorage.removeItem('dds_admin_auth');
-    localStorage.removeItem('dds_organizer_profile');
-    window.location.replace('/');
-  };
 
   // =========================================================================
   // SALA DO DDS EM ANDAMENTO (MODO TRANSMISSÃO)
@@ -1136,7 +1100,7 @@ export default function AdminPanel() {
             isOpen={isProfileOpen}
             onClose={() => setIsProfileOpen(false)}
             onProfileUpdated={(updated) => {
-              setCurrentUser((prev: any) => ({ ...prev, ...updated }));
+              updateUserLocal(updated);
               showToast('Perfil atualizado com sucesso!', 'success');
             }}
           />
@@ -1793,7 +1757,7 @@ export default function AdminPanel() {
           isOpen={isProfileOpen}
           onClose={() => setIsProfileOpen(false)}
           onProfileUpdated={(updated) => {
-            setCurrentUser((prev: any) => ({ ...prev, ...updated }));
+            updateUserLocal(updated);
             showToast('Perfil atualizado com sucesso!', 'success');
           }}
         />

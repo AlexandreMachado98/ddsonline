@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
+import { AuthProvider } from "@/context/AuthContext";
 import OfflineBanner from "@/components/OfflineBanner";
 import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 
@@ -85,11 +86,13 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.className} bg-slate-950 text-slate-100 antialiased min-h-screen selection:bg-emerald-600 selection:text-white`}>
-        <ToastProvider>
-          <OfflineBanner />
-          <PwaInstallPrompt />
-          {children}
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <OfflineBanner />
+            <PwaInstallPrompt />
+            {children}
+          </ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -73,6 +73,9 @@ model Meeting {
   documentHash        String?
   attendees           Attendance[]
   attachments         MeetingAttachment[]
+
+  @@index([organizerId, status, createdAt(sort: Desc)])
+  @@index([companyId])
 }
 
 model Attendance {
@@ -87,6 +90,8 @@ model Attendance {
   createdAt     DateTime  @default(now())
   meetingId     String
   meeting       Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId, createdAt])
 }
 
 model MeetingAttachment {
@@ -102,4 +107,6 @@ model MeetingAttachment {
   createdAt   DateTime @default(now())
   meetingId   String
   meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId, order])
 }

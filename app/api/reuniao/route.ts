@@ -46,11 +46,11 @@ async function ensureDbColumns() {
 // 1. GET: Busca reunião por ID específico ou busca reunião e histórico do organizador autenticado
 export async function GET(req: Request) {
   try {
-    await ensureDbColumns();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const attachmentId = searchParams.get('attachmentId');
     const isFull = searchParams.get('full') === 'true' || searchParams.get('includeFiles') === 'true';
+    const activeOnly = searchParams.get('activeOnly') === 'true';
 
     // Cenário 0: Download sob demanda de um anexo específico
     if (attachmentId) {
@@ -185,8 +185,8 @@ export async function GET(req: Request) {
     // Executa purga automática de dados operacionais expirados deste organizador
     purgeExpiredOperationalData(sessionUser.id).catch(() => {});
 
-    // Polling padrão da reunião ativa do organizador autenticado
-    const activeMeeting = await prisma.meeting.findFirst({
+    // Definição da query do DDS Ativo
+    const activeMeetingPromise = prisma.meeting.findFirst({
       where: {
         status: 'LIVE',
         organizerId: sessionUser.id
@@ -239,8 +239,14 @@ export async function GET(req: Request) {
       }
     });
 
+    // Se o cliente pediu apenas o DDS ativo (polling leve a cada 20s)
+    if (activeOnly) {
+      const activeMeeting = await activeMeetingPromise;
+      return NextResponse.json({ success: true, meeting: activeMeeting });
+    }
+
     // Histórico de DDS concluídos: Omite estritamente groupPhoto, assinaturas e fileData pesados
-    const history = await prisma.meeting.findMany({
+    const historyPromise = prisma.meeting.findMany({
       where: {
         status: 'ENDED',
         organizerId: sessionUser.id
@@ -293,6 +299,12 @@ export async function GET(req: Request) {
       }
     });
 
+    // Execução paralela ultrarrápida no banco
+    const [activeMeeting, history] = await Promise.all([
+      activeMeetingPromise,
+      historyPromise
+    ]);
+
     return NextResponse.json({ success: true, meeting: activeMeeting, history });
 
   } catch (error) {
@@ -304,8 +316,6 @@ export async function GET(req: Request) {
 // 2. POST: Abre uma nova sala de DDS vinculada estritamente ao organizador autenticado
 export async function POST(req: Request) {
   try {
-    await ensureDbColumns();
-
     const sessionUser = await getAuthenticatedUser(req);
     if (!sessionUser) {
       logSecurityEvent('UNAUTHORIZED_ACCESS', { path: 'POST /api/reuniao', reason: 'NO_SESSION' });
@@ -378,8 +388,6 @@ export async function POST(req: Request) {
 // 3. PUT: Atualiza a reunião (anexa foto em grupo, sincroniza anexos ou encerra a reunião com congelamento SHA-256)
 export async function PUT(req: Request) {
   try {
-    await ensureDbColumns();
-
     const sessionUser = await getAuthenticatedUser(req);
     if (!sessionUser) {
       logSecurityEvent('UNAUTHORIZED_ACCESS', { path: 'PUT /api/reuniao', reason: 'NO_SESSION' });

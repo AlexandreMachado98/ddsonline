@@ -20,8 +20,6 @@ async function ensureUserColumns() {
 // 1. GET: Retorna dados do perfil do usuário autenticado no servidor
 export async function GET(req: Request) {
   try {
-    await ensureUserColumns();
-
     const sessionUser = await getAuthenticatedUser(req);
     if (!sessionUser) {
       return NextResponse.json({ success: false, error: 'Sessão expirada. Faça login novamente.' }, { status: 401 });
@@ -70,8 +68,6 @@ export async function GET(req: Request) {
 // 2. PUT: Atualização SEGURA do perfil (somente name e photoURL do usuário autenticado)
 export async function PUT(req: Request) {
   try {
-    await ensureUserColumns();
-
     const sessionUser = await getAuthenticatedUser(req);
     if (!sessionUser) {
       logSecurityEvent('UNAUTHORIZED_ACCESS', { path: 'PUT /api/usuario/perfil', reason: 'NO_SESSION' });
