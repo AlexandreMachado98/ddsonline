@@ -8,7 +8,7 @@ import {
   Check, FileSpreadsheet, LayoutList, FileImage, 
   AlertCircle, ExternalLink, Image as ImageIcon
 } from 'lucide-react';
-import { generateDdsPdf, MeetingData } from '@/lib/pdfGenerator';
+import { generateDdsPdf, MeetingData, parseGroupPhotos } from '@/lib/pdfGenerator';
 
 interface DdsReportPreviewModalProps {
   meeting: MeetingData;
@@ -409,24 +409,36 @@ export default function DdsReportPreviewModal({
               )}
             </div>
 
-            {/* Foto da Equipe (Evidência em Grupo) */}
-            {meeting.groupPhoto && meeting.groupPhoto.length > 50 && (
-              <div className="pt-2 text-center space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">
-                  Foto da Equipe (Registro Fotográfico de Campo)
-                </span>
-                <div 
-                  onClick={() => setZoomImage(meeting.groupPhoto || null)}
-                  className="max-w-md mx-auto rounded-2xl overflow-hidden border border-slate-200 shadow-sm cursor-pointer group relative"
-                  title="Clique para ampliar foto"
-                >
-                  <img src={meeting.groupPhoto} alt="Foto da Equipe" className="w-full h-auto max-h-56 object-cover group-hover:scale-102 transition-transform" />
-                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold gap-1">
-                    <Eye size={14} /> Ampliar Foto
+            {/* Fotos da Equipe (Evidências de Campo em Grade) */}
+            {(() => {
+              const photos = parseGroupPhotos(meeting.groupPhoto);
+              if (photos.length === 0) return null;
+              return (
+                <div className="pt-2 text-center space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">
+                    Fotos da Equipe (Registro Fotográfico de Campo • {photos.length} {photos.length === 1 ? 'Foto' : 'Fotos'})
+                  </span>
+                  <div className={`grid gap-2.5 max-w-2xl mx-auto ${photos.length === 1 ? 'grid-cols-1 max-w-md' : 'grid-cols-1 sm:grid-cols-2'}`}>
+                    {photos.map((photoUrl: string, pIdx: number) => (
+                      <div 
+                        key={pIdx}
+                        onClick={() => setZoomImage(photoUrl)}
+                        className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm cursor-pointer group relative bg-slate-950 aspect-video flex items-center justify-center"
+                        title="Clique para ampliar foto"
+                      >
+                        <img src={photoUrl} alt={`Foto da Equipe #${pIdx + 1}`} className="w-full h-full object-contain group-hover:scale-102 transition-transform" />
+                        <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-white text-[9px] font-bold px-2 py-0.5 rounded-md">
+                          Foto #{pIdx + 1}
+                        </div>
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold gap-1">
+                          <Eye size={14} /> Ampliar
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Rodapé da Página 1 */}
             <div className="pt-4 mt-auto border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-500 gap-1 font-sans">

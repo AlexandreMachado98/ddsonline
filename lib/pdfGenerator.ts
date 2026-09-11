@@ -37,7 +37,7 @@ export interface MeetingData {
   classification?: string | null;
   organizer?: { name: string; position?: string | null; company?: string | null };
   attendees?: AttendanceData[];
-  groupPhoto?: string | null;
+  groupPhoto?: string | string[] | null;
   attachments?: AttachmentPdfData[];
   documentHash?: string | null;
 }
@@ -58,6 +58,23 @@ async function getDocumentSha256(text: string): Promise<string> {
     h |= 0;
   }
   return Math.abs(h).toString(16).padStart(16, '0') + 'f0a9b8c7e6d5e4b3';
+}
+
+export function parseGroupPhotos(groupPhoto?: string | string[] | null): string[] {
+  if (!groupPhoto) return [];
+  if (Array.isArray(groupPhoto)) return groupPhoto.filter((p): p is string => typeof p === 'string' && p.length > 50);
+  if (typeof groupPhoto !== 'string') return [];
+  const trimmed = groupPhoto.trim();
+  if (!trimmed || trimmed.length < 50) return [];
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((p: any): p is string => typeof p === 'string' && p.length > 50);
+      }
+    } catch (e) {}
+  }
+  return [trimmed];
 }
 
 export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
@@ -400,37 +417,128 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
 
   let finalY = (doc as any).lastAutoTable.finalY + 12;
 
-  // --- GROUP PHOTO (EVIDÊNCIA) ---
-  if (meeting.groupPhoto && meeting.groupPhoto.length > 50) {
-    if (finalY + 55 > pageHeight - 30) {
-      doc.addPage();
-      finalY = 20;
-    }
-    try {
+  // --- FOTOS DA EQUIPE (EVIDÊNCIAS DE CAMPO EM GRADE BALANCEADA) ---
+  const teamPhotosList = parseGroupPhotos(meeting.groupPhoto);
+
+  if (teamPhotosList.length > 0) {
+    if (teamPhotosList.length === 1) {
+      const singlePhoto = teamPhotosList[0];
+      const maxW = 95;
+      const maxH = 55;
+      let imgWidth = maxW;
+      let imgHeight = maxH;
+      try {
+        const imgProps = doc.getImageProperties(singlePhoto);
+        if (imgProps) {
+          const ratio = imgProps.width / imgProps.height;
+          imgHeight = imgWidth / ratio;
+          if (imgHeight > maxH) {
+            imgHeight = maxH;
+            imgWidth = imgHeight * ratio;
+          }
+        }
+      } catch (e) {}
+
+      if (finalY + imgHeight + 16 > pageHeight - 25) {
+        doc.addPage();
+        finalY = 25;
+      }
+
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(textDark[0], textDark[1], textDark[2]);
       doc.text('FOTO DA EQUIPE (EVIDÊNCIA)', pageWidth / 2, finalY, { align: 'center' });
-      
-      const imgProps = doc.getImageProperties(meeting.groupPhoto);
-      const maxW = 80;
-      const maxH = 45;
-      let imgWidth = maxW;
-      let imgHeight = maxH;
-      if (imgProps) {
-        const ratio = imgProps.width / imgProps.height;
-        imgHeight = imgWidth / ratio;
-        if (imgHeight > maxH) {
-          imgHeight = maxH;
-          imgWidth = imgHeight * ratio;
-        }
-      }
-      
+
       const imgX = (pageWidth - imgWidth) / 2;
-      const format = meeting.groupPhoto.includes('image/png') ? 'PNG' : 'JPEG';
-      doc.addImage(meeting.groupPhoto, format, imgX, finalY + 4, imgWidth, imgHeight);
-      finalY += imgHeight + 8;
-    } catch(e){}
+      const format = singlePhoto.includes('image/png') ? 'PNG' : 'JPEG';
+      
+      // Moldura suave
+      doc.setFillColor(248, 250, 249);
+      doc.roundedRect(imgX - 2, finalY + 3, imgWidth + 4, imgHeight + 4, 2, 2, 'F');
+      doc.setDrawColor(220, 230, 225);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(imgX - 2, finalY + 3, imgWidth + 4, imgHeight + 4, 2, 2, 'S');
+
+      try {
+        doc.addImage(singlePhoto, format, imgX, finalY + 5, imgWidth, imgHeight);
+      } catch (e) {}
+      finalY += imgHeight + 12;
+    } else {
+      // Grade elegante de 2 colunas para 2 ou mais fotos
+      const slotW = 88;
+      const slotH = 50;
+      const colGap = 6;
+      const leftColX = 14;
+      const rightColX = 14 + slotW + colGap;
+
+      if (finalY + 65 > pageHeight - 25) {
+        doc.addPage();
+        finalY = 25;
+      }
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+      doc.text(`FOTOS DA EQUIPE (${teamPhotosList.length} EVIDÊNCIAS DE CAMPO)`, pageWidth / 2, finalY, { align: 'center' });
+      finalY += 6;
+
+      for (let i = 0; i < teamPhotosList.length; i++) {
+        const isRightCol = i % 2 === 1;
+        const colX = isRightCol ? rightColX : leftColX;
+
+        // Se for o início de uma nova linha (exceto a primeira)
+        if (i > 0 && i % 2 === 0) {
+          finalY += 56;
+          if (finalY + 54 > pageHeight - 25) {
+            doc.addPage();
+            finalY = 25;
+            doc.setFontSize(7.5);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+            doc.text('FOTOS DA EQUIPE (CONTINUAÇÃO)', pageWidth / 2, finalY, { align: 'center' });
+            finalY += 6;
+          }
+        }
+
+        const photoItem = teamPhotosList[i];
+        let imgWidth = slotW - 4;
+        let imgHeight = slotH - 4;
+        try {
+          const imgProps = doc.getImageProperties(photoItem);
+          if (imgProps) {
+            const ratio = imgProps.width / imgProps.height;
+            imgHeight = imgWidth / ratio;
+            if (imgHeight > (slotH - 4)) {
+              imgHeight = slotH - 4;
+              imgWidth = imgHeight * ratio;
+            }
+          }
+        } catch (e) {}
+
+        const imgX = colX + (slotW - imgWidth) / 2;
+        const imgY = finalY + (slotH - imgHeight) / 2;
+
+        // Moldura do slot
+        doc.setFillColor(248, 250, 249);
+        doc.roundedRect(colX, finalY, slotW, slotH, 2, 2, 'F');
+        doc.setDrawColor(220, 230, 225);
+        doc.setLineWidth(0.2);
+        doc.roundedRect(colX, finalY, slotW, slotH, 2, 2, 'S');
+
+        try {
+          const format = photoItem.includes('image/png') ? 'PNG' : 'JPEG';
+          doc.addImage(photoItem, format, imgX, imgY, imgWidth, imgHeight);
+        } catch (e) {}
+
+        // Legenda discreta
+        doc.setFontSize(6);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+        doc.text(`Foto #${i + 1}`, colX + 3, finalY + slotH - 2);
+      }
+
+      finalY += 58;
+    }
   }
 
   // =========================================================================

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
-import GroupPhotoCapture from '@/components/GroupPhotoCapture';
+import GroupPhotoCapture, { parseGroupPhotos, serializeGroupPhotos } from '@/components/GroupPhotoCapture';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
 import AttachmentManager, { DdsAttachment } from '@/components/AttachmentManager';
 import DdsReportPreviewModal from '@/components/DdsReportPreviewModal';
@@ -218,8 +218,9 @@ export default function AdminPanel() {
           setActiveMeeting(data.meeting);
           cacheMeetingData(data.meeting);
 
-          if (data.meeting.groupPhoto && typeof data.meeting.groupPhoto === 'string') {
-            if (teamPhotos.length === 0) setTeamPhotos([data.meeting.groupPhoto]);
+          if (data.meeting.groupPhoto) {
+            const parsedPhotos = parseGroupPhotos(data.meeting.groupPhoto);
+            if (parsedPhotos.length > 0) setTeamPhotos(parsedPhotos);
           }
         } else {
           setActiveMeeting(null);
@@ -279,7 +280,7 @@ export default function AdminPanel() {
           programmaticContent: programmaticContent.trim(),
           organizerId: currentUser?.id,
           email: currentUser?.email,
-          groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : null,
+          groupPhoto: serializeGroupPhotos(teamPhotos),
           attachments: newAttachments
         })
       });
@@ -358,7 +359,7 @@ export default function AdminPanel() {
             const res = await fetch('/api/reuniao', {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ meetingId: activeMeeting.id, groupPhoto: updatedPhotos.length > 0 ? updatedPhotos[0] : null })
+              body: JSON.stringify({ meetingId: activeMeeting.id, groupPhoto: serializeGroupPhotos(updatedPhotos) })
             });
             const data = await res.json();
             if (!res.ok || !data.success) {
@@ -385,7 +386,7 @@ export default function AdminPanel() {
       await fetch('/api/reuniao', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meetingId: activeMeeting.id, groupPhoto: updatedPhotos.length > 0 ? updatedPhotos[0] : null })
+        body: JSON.stringify({ meetingId: activeMeeting.id, groupPhoto: serializeGroupPhotos(updatedPhotos) })
       });
     }
     showToast('Foto removida.', 'info');
@@ -426,7 +427,7 @@ export default function AdminPanel() {
         instructorName: fullMeeting.instructorName,
         endedAt: fullMeeting.endedAt,
         organizer: fullMeeting.organizer,
-        groupPhoto: teamPhotos.length > 0 ? teamPhotos[0] : fullMeeting.groupPhoto,
+        groupPhoto: teamPhotos.length > 0 ? serializeGroupPhotos(teamPhotos) : fullMeeting.groupPhoto,
         createdAt: fullMeeting.createdAt,
         attendees: fullMeeting.attendees,
         attachments: fullMeeting.attachments || newAttachments || []
@@ -487,7 +488,7 @@ export default function AdminPanel() {
         const full = data.meeting;
         setPreviewMeeting({
           ...full,
-          groupPhoto: (teamPhotos.length > 0 && activeMeeting && activeMeeting.id === full.id) ? teamPhotos[0] : full.groupPhoto,
+          groupPhoto: (teamPhotos.length > 0 && activeMeeting && activeMeeting.id === full.id) ? serializeGroupPhotos(teamPhotos) : full.groupPhoto,
           attachments: full.attachments || (activeMeeting && activeMeeting.id === full.id ? (activeMeeting.attachments || newAttachments) : []) || []
         });
       } else {
@@ -988,26 +989,15 @@ export default function AdminPanel() {
 
                   <div className="space-y-3 pt-2">
                     <GroupPhotoCapture 
-                      initialPhoto={teamPhotos.length > 0 ? teamPhotos[0] : null}
-                      onPhotoChange={(photoDataUrl) => {
-                        if (photoDataUrl) {
-                          setTeamPhotos([photoDataUrl]);
-                          if (activeMeeting) {
-                            fetch('/api/reuniao', {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ meetingId: activeMeeting.id, groupPhoto: photoDataUrl })
-                            }).catch(console.error);
-                          }
-                        } else {
-                          setTeamPhotos([]);
-                          if (activeMeeting) {
-                            fetch('/api/reuniao', {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ meetingId: activeMeeting.id, groupPhoto: null })
-                            }).catch(console.error);
-                          }
+                      initialPhotos={teamPhotos}
+                      onPhotosChange={(updatedPhotos) => {
+                        setTeamPhotos(updatedPhotos);
+                        if (activeMeeting) {
+                          fetch('/api/reuniao', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ meetingId: activeMeeting.id, groupPhoto: serializeGroupPhotos(updatedPhotos) })
+                          }).catch(console.error);
                         }
                       }}
                     />
@@ -1594,6 +1584,14 @@ export default function AdminPanel() {
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-base sm:text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed font-sans"
                   />
                 </div>
+
+              {/* Fotos Coletivas da Equipe no Novo DDS */}
+              <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                <GroupPhotoCapture 
+                  initialPhotos={teamPhotos}
+                  onPhotosChange={setTeamPhotos}
+                />
+              </div>
 
               {/* Seção de Anexos / Evidências do Novo DDS */}
               <div className="pt-2 border-t border-slate-800/80">
