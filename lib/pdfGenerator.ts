@@ -852,53 +852,55 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
 
     versoY += 18;
 
-    // 1. Bloco de Objetivo Geral
-    const vObjText = rawObjective || 'Orientação, instrução normativa e conscientização operacional conforme as diretrizes de Segurança e Saúde no Trabalho.';
-    const vObjLines = doc.splitTextToSize(vObjText, totalWidth - 12);
-    const vObjLineCount = Array.isArray(vObjLines) ? vObjLines.length : 1;
-    const vObjBlockH = Math.max(18, 9 + vObjLineCount * 4.5);
+    // 1. Bloco de Objetivo Geral (somente se informado pelo usuário)
+    if (rawObjective) {
+      const vObjLines = doc.splitTextToSize(rawObjective, totalWidth - 12);
+      const vObjLineCount = Array.isArray(vObjLines) ? vObjLines.length : 1;
+      const vObjBlockH = Math.max(16, 9 + vObjLineCount * 4.5);
 
-    doc.setFillColor(brandMintBg[0], brandMintBg[1], brandMintBg[2]);
-    doc.roundedRect(14, versoY, totalWidth, vObjBlockH, 2.5, 2.5, 'F');
-    doc.setDrawColor(brandCardBorder[0], brandCardBorder[1], brandCardBorder[2]);
-    doc.setLineWidth(0.2);
-    doc.roundedRect(14, versoY, totalWidth, vObjBlockH, 2.5, 2.5, 'S');
-    
-    doc.setFontSize(8.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(brandDarkGreen[0], brandDarkGreen[1], brandDarkGreen[2]);
-    doc.text(meeting.classification === 'Campanha' ? '1. OBJETIVO DA CAMPANHA' : '1. OBJETIVO DO TREINAMENTO', 19, versoY + 6.5);
-    
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(textBody[0], textBody[1], textBody[2]);
-    doc.text(vObjLines, 19, versoY + 12);
+      doc.setFillColor(brandMintBg[0], brandMintBg[1], brandMintBg[2]);
+      doc.roundedRect(14, versoY, totalWidth, vObjBlockH, 2.5, 2.5, 'F');
+      doc.setDrawColor(brandCardBorder[0], brandCardBorder[1], brandCardBorder[2]);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(14, versoY, totalWidth, vObjBlockH, 2.5, 2.5, 'S');
+      
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(brandDarkGreen[0], brandDarkGreen[1], brandDarkGreen[2]);
+      doc.text(meeting.classification === 'Campanha' ? '1. OBJETIVO DA CAMPANHA' : '1. OBJETIVO DO TREINAMENTO', 19, versoY + 6.5);
+      
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(textBody[0], textBody[1], textBody[2]);
+      doc.text(vObjLines, 19, versoY + 12);
 
-    versoY += vObjBlockH + 5;
+      versoY += vObjBlockH + 5;
+    }
 
-    // 2. Bloco de Conteúdo Programático Ministrado
-    const vContentText = rawContent || '1. Módulo Geral: Conceitos e Diretrizes de Segurança do Trabalho e NRs aplicáveis.\n2. Módulo Específico: Procedimentos Operacionais Padrão (POP), Análise Preliminar de Risco (APR) e uso correto de EPIs.\n3. Módulo Prático: Condutas Preventivas, Primeiros Socorros e Prática Operacional.';
-    const vContentLines = doc.splitTextToSize(vContentText, totalWidth - 12);
-    const vContentLineCount = Array.isArray(vContentLines) ? vContentLines.length : 1;
-    const vContentBlockH = Math.max(40, 10 + vContentLineCount * 4.5);
+    // 2. Bloco de Conteúdo Programático Ministrado (somente se informado pelo usuário)
+    if (rawContent) {
+      const vContentLines = doc.splitTextToSize(rawContent, totalWidth - 12);
+      const vContentLineCount = Array.isArray(vContentLines) ? vContentLines.length : 1;
+      const vContentBlockH = Math.max(25, 10 + vContentLineCount * 4.5);
 
-    doc.setFillColor(brandMintBg[0], brandMintBg[1], brandMintBg[2]);
-    doc.roundedRect(14, versoY, totalWidth, vContentBlockH, 2.5, 2.5, 'F');
-    doc.setDrawColor(brandCardBorder[0], brandCardBorder[1], brandCardBorder[2]);
-    doc.setLineWidth(0.2);
-    doc.roundedRect(14, versoY, totalWidth, vContentBlockH, 2.5, 2.5, 'S');
+      doc.setFillColor(brandMintBg[0], brandMintBg[1], brandMintBg[2]);
+      doc.roundedRect(14, versoY, totalWidth, vContentBlockH, 2.5, 2.5, 'F');
+      doc.setDrawColor(brandCardBorder[0], brandCardBorder[1], brandCardBorder[2]);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(14, versoY, totalWidth, vContentBlockH, 2.5, 2.5, 'S');
 
-    doc.setFontSize(8.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(brandDarkGreen[0], brandDarkGreen[1], brandDarkGreen[2]);
-    doc.text(meeting.classification === 'Campanha' ? '2. PROGRAMAÇÃO E AÇÕES DA CAMPANHA' : '2. CONTEÚDO PROGRAMÁTICO & MÓDULOS MINISTRADOS', 19, versoY + 6.5);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(brandDarkGreen[0], brandDarkGreen[1], brandDarkGreen[2]);
+      doc.text(meeting.classification === 'Campanha' ? '2. PROGRAMAÇÃO E AÇÕES DA CAMPANHA' : '2. CONTEÚDO PROGRAMÁTICO & MÓDULOS MINISTRADOS', 19, versoY + 6.5);
 
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(textBody[0], textBody[1], textBody[2]);
-    doc.text(vContentLines, 19, versoY + 12);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(textBody[0], textBody[1], textBody[2]);
+      doc.text(vContentLines, 19, versoY + 12);
 
-    versoY += vContentBlockH + 6;
+      versoY += vContentBlockH + 6;
+    }
 
     // 3. Bloco de Declaração do Responsável pelo DDS
     const declText = 'Declaro para os devidos fins de registro de Segurança e Saúde no Trabalho que os conteúdos e orientações de segurança foram ministrados aos colaboradores listados nesta lista de presença, com base nas diretrizes internas de prevenção de acidentes da empresa.';

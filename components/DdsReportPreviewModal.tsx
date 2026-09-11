@@ -566,24 +566,28 @@ export default function DdsReportPreviewModal({
               </div>
 
               {/* 1. Objetivo */}
-              <div style={{ backgroundColor: brandMintBg }} className="p-4 rounded-2xl border border-emerald-200/60 space-y-1">
-                <h3 style={{ color: brandDarkGreen }} className="text-xs font-bold uppercase tracking-wider">
-                  {meeting.classification === 'Campanha' ? '1. OBJETIVO DA CAMPANHA' : '1. OBJETIVO DO TREINAMENTO'}
-                </h3>
-                <p className="text-xs text-slate-800 leading-relaxed font-medium">
-                  {meeting.objective || 'Orientação, instrução normativa e conscientização operacional conforme as diretrizes de Segurança e Saúde no Trabalho.'}
-                </p>
-              </div>
+              {meeting.objective && (
+                <div style={{ backgroundColor: brandMintBg }} className="p-4 rounded-2xl border border-emerald-200/60 space-y-1">
+                  <h3 style={{ color: brandDarkGreen }} className="text-xs font-bold uppercase tracking-wider">
+                    {meeting.classification === 'Campanha' ? '1. OBJETIVO DA CAMPANHA' : '1. OBJETIVO DO TREINAMENTO'}
+                  </h3>
+                  <p className="text-xs text-slate-800 leading-relaxed font-medium">
+                    {meeting.objective}
+                  </p>
+                </div>
+              )}
 
               {/* 2. Conteúdo Programático */}
-              <div style={{ backgroundColor: brandMintBg }} className="p-4 rounded-2xl border border-emerald-200/60 space-y-1">
-                <h3 style={{ color: brandDarkGreen }} className="text-xs font-bold uppercase tracking-wider">
-                  {meeting.classification === 'Campanha' ? '2. PROGRAMAÇÃO E AÇÕES DA CAMPANHA' : '2. CONTEÚDO PROGRAMÁTICO & MÓDULOS MINISTRADOS'}
-                </h3>
-                <p className="text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line">
-                  {rawContent || '1. Módulo Geral: Conceitos e Diretrizes de Segurança do Trabalho e NRs aplicáveis.\n2. Módulo Específico: Procedimentos Operacionais Padrão (POP), Análise Preliminar de Risco (APR) e uso correto de EPIs.\n3. Módulo Prático: Condutas Preventivas, Primeiros Socorros e Prática Operacional.'}
-                </p>
-              </div>
+              {rawContent && (
+                <div style={{ backgroundColor: brandMintBg }} className="p-4 rounded-2xl border border-emerald-200/60 space-y-1">
+                  <h3 style={{ color: brandDarkGreen }} className="text-xs font-bold uppercase tracking-wider">
+                    {meeting.classification === 'Campanha' ? '2. PROGRAMAÇÃO E AÇÕES DA CAMPANHA' : '2. CONTEÚDO PROGRAMÁTICO & MÓDULOS MINISTRADOS'}
+                  </h3>
+                  <p className="text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line">
+                    {rawContent}
+                  </p>
+                </div>
+              )}
 
               {/* 3. Declaração do Responsável & Linha de Assinatura */}
               <div className="p-4 rounded-2xl border border-emerald-500/30 bg-white space-y-4">
