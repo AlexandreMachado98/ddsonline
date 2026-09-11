@@ -140,6 +140,8 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
   doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
   const categoriaLabel = meeting.classification === 'Treinamento' 
     ? 'REGISTRO DE TREINAMENTO OBRIGATÓRIO (SST)' 
+    : meeting.classification === 'Campanha'
+    ? 'CAMPANHA DE SAÚDE, SEGURANÇA E CONSCIENTIZAÇÃO (SST)'
     : 'DIÁLOGO DIÁRIO DE SEGURANÇA E SAÚDE DO TRABALHO';
   doc.text(categoriaLabel.toUpperCase(), 14, currentY);
 
@@ -453,7 +455,8 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(230, 240, 235);
-    doc.text('PROGRAMAÇÃO E CONTEÚDO PROGRAMÁTICO DO TREINAMENTO', 14, 23);
+    const versoSubHeader = meeting.classification === 'Campanha' ? 'PROGRAMAÇÃO E DETALHAMENTO DA CAMPANHA' : 'PROGRAMAÇÃO E CONTEÚDO PROGRAMÁTICO DO TREINAMENTO';
+    doc.text(versoSubHeader, 14, 23);
 
     renderCompanyLogo(30);
 
@@ -463,12 +466,14 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
     doc.setTextColor(textDark[0], textDark[1], textDark[2]);
     doc.setFontSize(15);
     doc.setFont('helvetica', 'bold');
-    doc.text('CONTEÚDO PROGRAMÁTICO & METODOLOGIA', 14, versoY);
+    const versoMainTitle = meeting.classification === 'Campanha' ? 'PROGRAMAÇÃO & AÇÕES DA CAMPANHA' : 'CONTEÚDO PROGRAMÁTICO & METODOLOGIA';
+    doc.text(versoMainTitle, 14, versoY);
     
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-    doc.text('Detalhamento pedagógico e normativo em conformidade com as Normas Regulamentadoras (NRs).', 14, versoY + 5);
+    const versoDesc = meeting.classification === 'Campanha' ? 'Detalhamento das ações de conscientização, dinâmicas e diretrizes de Segurança e Saúde (SST).' : 'Detalhamento pedagógico e normativo em conformidade com as Normas Regulamentadoras (NRs).';
+    doc.text(versoDesc, 14, versoY + 5);
 
     versoY += 12;
 
@@ -487,7 +492,7 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
     doc.setFontSize(6.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-    doc.text('TEMA / TREINAMENTO', 17, vMetaY);
+    doc.text(meeting.classification === 'Campanha' ? 'TEMA / CAMPANHA' : 'TEMA / TREINAMENTO', 17, vMetaY);
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(textDark[0], textDark[1], textDark[2]);
@@ -540,7 +545,7 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-    doc.text('1. OBJETIVO DO TREINAMENTO', 19, versoY + 6.5);
+    doc.text(meeting.classification === 'Campanha' ? '1. OBJETIVO DA CAMPANHA' : '1. OBJETIVO DO TREINAMENTO', 19, versoY + 6.5);
     
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
@@ -561,7 +566,7 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-    doc.text('2. CONTEÚDO PROGRAMÁTICO & MÓDULOS MINISTRADOS', 19, versoY + 6.5);
+    doc.text(meeting.classification === 'Campanha' ? '2. PROGRAMAÇÃO E AÇÕES DA CAMPANHA' : '2. CONTEÚDO PROGRAMÁTICO & MÓDULOS MINISTRADOS', 19, versoY + 6.5);
 
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
@@ -1019,7 +1024,7 @@ export function generateConsolidatedDdsPdf(report: ConsolidatedReportData) {
   const tableData = report.meetings.map(m => [
     new Date(m.createdAt || Date.now()).toLocaleDateString('pt-BR'),
     new Date(m.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    m.topic + (m.classification === 'Treinamento' ? ' (Treinamento)' : ''),
+    m.topic + (m.classification && m.classification !== 'DDS' ? ` (${m.classification})` : ''),
     m.farm,
     m.type === 'PRESENTIAL' ? '👥 Presencial' : '🎙️ Remoto',
     `${m.attendees?.length || 0} pessoas`,

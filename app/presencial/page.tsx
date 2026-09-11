@@ -422,9 +422,22 @@ function PresencialContent() {
       {/* Topo com Identificação do DDS ON Presencial */}
       <div className="w-full max-w-md flex items-center justify-between py-2 mb-3 relative z-10">
         <DdsLogo size="sm" showSubtitle={true} />
-        <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full inline-flex items-center gap-1 shrink-0">
-          <QrCode size={12} /> Presencial
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full inline-flex items-center gap-1">
+            <QrCode size={12} /> Presencial
+          </span>
+          {classification && (
+            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full border ${
+              classification === 'Treinamento'
+                ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                : classification === 'Campanha'
+                ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+            }`}>
+              {classification}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Badge de Conexão e Fila de Presenças Offline */}

@@ -263,6 +263,8 @@ export default function DdsReportPreviewModal({
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 block mb-1">
                   {meeting.classification === 'Treinamento'
                     ? 'Registro de Treinamento Obrigatório (SST)'
+                    : meeting.classification === 'Campanha'
+                    ? 'Campanha de Saúde, Segurança e Conscientização (SST)'
                     : 'Diálogo Diário de Segurança e Saúde do Trabalho'}
                 </span>
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
@@ -463,7 +465,7 @@ export default function DdsReportPreviewModal({
                     </span>
                   </div>
                   <p className="text-[10px] text-emerald-100 font-medium mt-0.5">
-                    PROGRAMAÇÃO E CONTEÚDO PROGRAMÁTICO DO TREINAMENTO
+                    {meeting.classification === 'Campanha' ? 'PROGRAMAÇÃO E DETALHAMENTO DA CAMPANHA' : 'PROGRAMAÇÃO E CONTEÚDO PROGRAMÁTICO DO TREINAMENTO'}
                   </p>
                 </div>
               </div>
@@ -477,17 +479,17 @@ export default function DdsReportPreviewModal({
             <div className="p-4 sm:p-6 space-y-4 flex-1 flex flex-col">
               <div className="border-b border-slate-200 pb-2">
                 <h2 className="text-base sm:text-lg font-black text-slate-900 uppercase">
-                  CONTEÚDO PROGRAMÁTICO & METODOLOGIA
+                  {meeting.classification === 'Campanha' ? 'PROGRAMAÇÃO & AÇÕES DA CAMPANHA' : 'CONTEÚDO PROGRAMÁTICO & METODOLOGIA'}
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Detalhamento pedagógico e normativo em conformidade com as Normas Regulamentadoras (NRs).
+                  {meeting.classification === 'Campanha' ? 'Detalhamento das ações de conscientização, dinâmicas e diretrizes de Segurança e Saúde (SST).' : 'Detalhamento pedagógico e normativo em conformidade com as Normas Regulamentadoras (NRs).'}
                 </p>
               </div>
 
               {/* Cards Resumo */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div style={{ backgroundColor: lightGreenBg }} className="p-3 rounded-xl border border-emerald-900/10">
-                  <span className="text-[9px] font-bold uppercase text-slate-600 block">Tema / Treinamento</span>
+                  <span className="text-[9px] font-bold uppercase text-slate-600 block">{meeting.classification === 'Campanha' ? 'Tema / Campanha' : 'Tema / Treinamento'}</span>
                   <p className="text-xs font-bold text-slate-900 mt-0.5">{meeting.topic}</p>
                 </div>
                 <div style={{ backgroundColor: lightGreenBg }} className="p-3 rounded-xl border border-emerald-900/10">
@@ -507,7 +509,7 @@ export default function DdsReportPreviewModal({
               {/* 1. Objetivo */}
               <div style={{ backgroundColor: lightGreenBg }} className="p-4 rounded-2xl border border-emerald-900/10 space-y-1">
                 <h3 style={{ color: darkGreen }} className="text-xs font-bold uppercase tracking-wider">
-                  1. OBJETIVO DO TREINAMENTO
+                  {meeting.classification === 'Campanha' ? '1. OBJETIVO DA CAMPANHA' : '1. OBJETIVO DO TREINAMENTO'}
                 </h3>
                 <p className="text-xs text-slate-800 leading-relaxed font-medium">
                   {meeting.objective || 'Orientação, instrução normativa e conscientização operacional conforme as diretrizes de Segurança e Saúde no Trabalho.'}
@@ -517,7 +519,7 @@ export default function DdsReportPreviewModal({
               {/* 2. Conteúdo Programático */}
               <div style={{ backgroundColor: lightGreenBg }} className="p-4 rounded-2xl border border-emerald-900/10 space-y-1">
                 <h3 style={{ color: darkGreen }} className="text-xs font-bold uppercase tracking-wider">
-                  2. CONTEÚDO PROGRAMÁTICO & MÓDULOS MINISTRADOS
+                  {meeting.classification === 'Campanha' ? '2. PROGRAMAÇÃO E AÇÕES DA CAMPANHA' : '2. CONTEÚDO PROGRAMÁTICO & MÓDULOS MINISTRADOS'}
                 </h3>
                 <p className="text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line">
                   {rawContent || '1. Módulo Geral: Conceitos e Diretrizes de Segurança do Trabalho e NRs aplicáveis.\n2. Módulo Específico: Procedimentos Operacionais Padrão (POP), Análise Preliminar de Risco (APR) e uso correto de EPIs.\n3. Módulo Prático: Condutas Preventivas, Primeiros Socorros e Prática Operacional.'}

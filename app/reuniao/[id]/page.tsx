@@ -556,9 +556,16 @@ export default function MeetingRoom() {
 
       {/* Topo com Título do DDS ON */}
       <header className="w-full max-w-md bg-gradient-to-r from-emerald-600 to-teal-600 text-slate-950 p-4 sm:p-5 rounded-3xl shadow-2xl mb-5 text-center relative z-10 border border-emerald-400/30 overflow-hidden">
-        <span className="text-[10px] font-black uppercase tracking-widest bg-white/40 px-3 py-1 rounded-full inline-block mb-1">
-          {meetingType === 'PRESENTIAL' ? 'DDS Presencial' : 'DDS Remoto / Ao Vivo'}
-        </span>
+        <div className="flex items-center justify-center gap-1.5 mb-1">
+          <span className="text-[10px] font-black uppercase tracking-widest bg-white/40 px-3 py-1 rounded-full inline-block">
+            {meetingType === 'PRESENTIAL' ? 'Presencial' : 'Remoto / Ao Vivo'}
+          </span>
+          {classification && (
+            <span className="text-[10px] font-black uppercase tracking-widest bg-black/30 text-white px-2.5 py-1 rounded-full inline-block border border-white/20">
+              {classification}
+            </span>
+          )}
+        </div>
         <h1 className="text-base sm:text-xl font-black mt-1 tracking-tight text-white break-words">{topic}</h1>
         {farm && (
           <p className="text-xs text-slate-900 font-bold mt-1 flex items-center justify-center gap-1 break-words">

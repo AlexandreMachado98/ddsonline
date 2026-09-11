@@ -343,7 +343,7 @@ export async function POST(req: Request) {
         topic: String(topic || 'DDS de Segurança').slice(0, 200).trim(),
         farm: String(farm || 'Unidade Operacional').slice(0, 150).trim(),
         type: type === 'REMOTE' ? 'REMOTE' : 'PRESENTIAL',
-        classification: classification === 'Treinamento' ? 'Treinamento' : 'DDS',
+        classification: (classification === 'Treinamento' || classification === 'Campanha') ? classification : 'DDS',
         objective: objective ? String(objective).slice(0, 1000).trim() : null,
         programmaticContent: programmaticContent ? String(programmaticContent).slice(0, 3000).trim() : null,
         status: 'LIVE',
@@ -439,7 +439,7 @@ export async function PUT(req: Request) {
     if (createdAt) updateData.createdAt = new Date(createdAt);
     if (endedAt !== undefined) updateData.endedAt = endedAt ? new Date(endedAt) : null;
     if (instructorName !== undefined) updateData.instructorName = instructorName;
-    if (classification !== undefined) updateData.classification = classification;
+    if (classification !== undefined) updateData.classification = (classification === 'Treinamento' || classification === 'Campanha') ? classification : 'DDS';
     if (objective !== undefined) updateData.objective = objective ? String(objective).slice(0, 1000).trim() : null;
     if (programmaticContent !== undefined) {
       updateData.programmaticContent = programmaticContent ? String(programmaticContent).slice(0, 3000).trim() : null;
