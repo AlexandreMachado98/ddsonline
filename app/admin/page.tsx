@@ -656,6 +656,7 @@ export default function AdminPanel() {
                   >
                     <option value="DDS">DDS</option>
                     <option value="Treinamento">Treinamento</option>
+                    <option value="Campanha">Campanha</option>
                   </select>
                 </div>
 
@@ -1175,6 +1176,7 @@ export default function AdminPanel() {
                   >
                     <option value="DDS">DDS</option>
                     <option value="Treinamento">Treinamento</option>
+                    <option value="Campanha">Campanha</option>
                   </select>
                 </div>
 
@@ -1521,6 +1523,7 @@ export default function AdminPanel() {
                   >
                     <option value="DDS">DDS</option>
                     <option value="Treinamento">Treinamento</option>
+                    <option value="Campanha">Campanha</option>
                   </select>
                 </div>
                 <div></div>
