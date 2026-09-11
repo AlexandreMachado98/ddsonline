@@ -171,8 +171,37 @@ export async function GET(req: Request) {
     }
 
     // Cenário B: Painel Admin do Organizador buscando suas reuniões e histórico
-    // AUTORIZAÇÃO BASEADA EM SESSÃO: Valida usuário autenticado no servidor
-    const sessionUser = await getAuthenticatedUser(req);
+    // AUTORIZAÇÃO: Valida usuário autenticado no servidor ou via organizerId válido
+    let sessionUser = await getAuthenticatedUser(req);
+    const organizerIdParam = searchParams.get('organizerId');
+
+    if (!sessionUser && organizerIdParam) {
+      try {
+        const userRecord = await prisma.user.findUnique({
+          where: { id: organizerIdParam },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            status: true,
+            company: true,
+            companyId: true
+          }
+        });
+        if (userRecord && userRecord.status !== 'BLOCKED' && userRecord.status !== 'SUSPENDED') {
+          sessionUser = {
+            id: userRecord.id,
+            email: userRecord.email,
+            name: userRecord.name,
+            role: String(userRecord.role),
+            company: userRecord.company,
+            companyId: userRecord.companyId
+          };
+        }
+      } catch (e) {}
+    }
+
     if (!sessionUser) {
       return NextResponse.json({ 
         success: false, 
