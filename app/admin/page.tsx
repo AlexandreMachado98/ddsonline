@@ -181,7 +181,20 @@ export default function AdminPanel() {
       
       if (data.success) {
         if (data.meeting && data.meeting.status === 'LIVE') {
-          setActiveMeeting(data.meeting);
+          setActiveMeeting((prev: any) => {
+            // Preserva o fileData já baixado localmente para que a imagem não pisque/suma do modal
+            if (prev && prev.attachments && data.meeting.attachments) {
+              const updatedAttachments = data.meeting.attachments.map((newAtt: any) => {
+                const oldAtt = prev.attachments.find((a: any) => a.id === newAtt.id);
+                if (oldAtt && oldAtt.fileData && !newAtt.fileData) {
+                  return { ...newAtt, fileData: oldAtt.fileData };
+                }
+                return newAtt;
+              });
+              return { ...data.meeting, attachments: updatedAttachments };
+            }
+            return data.meeting;
+          });
           cacheMeetingData(data.meeting);
 
           if (data.meeting.groupPhoto) {

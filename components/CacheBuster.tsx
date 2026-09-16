@@ -21,14 +21,11 @@ export async function forceClearAppCache() {
       }
     }
 
-    // 3. Remove chaves temporárias corrompidas do localStorage (preservando login)
     const preservedAuth = localStorage.getItem('dds_admin_auth');
-    const preservedProfile = localStorage.getItem('dds_organizer_profile');
     
     sessionStorage.clear();
 
     if (preservedAuth) localStorage.setItem('dds_admin_auth', preservedAuth);
-    if (preservedProfile) localStorage.setItem('dds_organizer_profile', preservedProfile);
 
     // 4. Força o recarregamento com timestamp único para ignorar qualquer cache HTTP
     const cleanUrl = window.location.href.split('?')[0];

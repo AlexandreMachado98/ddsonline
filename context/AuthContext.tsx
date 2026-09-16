@@ -59,7 +59,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const startTime = typeof performance !== 'undefined' ? performance.now() : 0;
       const res = await fetch('/api/auth', {
-        headers: { 'Cache-Control': 'no-cache' }
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+        cache: 'no-store'
       });
 
       if (res.ok) {
@@ -88,8 +89,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-    return user;
-  }, [user]);
+    
+    return null;
+  }, []);
 
   // Executa revalidação silenciosa em background na montagem
   useEffect(() => {

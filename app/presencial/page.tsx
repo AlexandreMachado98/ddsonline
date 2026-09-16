@@ -89,7 +89,19 @@ function PresencialContent() {
         if (!isMounted) return;
 
         if (data.success && data.meeting) {
-          setMeeting(data.meeting);
+          setMeeting((prev: any) => {
+            if (prev && prev.attachments && data.meeting.attachments) {
+              const updatedAttachments = data.meeting.attachments.map((newAtt: any) => {
+                const oldAtt = prev.attachments.find((a: any) => a.id === newAtt.id);
+                if (oldAtt && oldAtt.fileData && !newAtt.fileData) {
+                  return { ...newAtt, fileData: oldAtt.fileData };
+                }
+                return newAtt;
+              });
+              return { ...data.meeting, attachments: updatedAttachments };
+            }
+            return data.meeting;
+          });
           setMeetingId(data.meeting.id);
           setTopic(data.meeting.topic || 'DDS Presencial');
           setFarm(data.meeting.farm || '');

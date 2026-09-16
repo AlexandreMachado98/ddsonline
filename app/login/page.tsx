@@ -48,12 +48,7 @@ export default function LoginPage() {
 
       if (data.success && data.user) {
         localStorage.setItem('dds_admin_auth', JSON.stringify(data.user));
-        localStorage.setItem('dds_organizer_profile', JSON.stringify({
-          name: data.user.name,
-          role: data.user.position || 'Técnico em Segurança do Trabalho',
-          company: data.user.company || ''
-        }));
-        toast.success('Login Autorizado!', `Bem-vindo, ${data.user.name}.`);
+        toast.success('Login Autorizado', `Bem-vindo de volta, ${data.user.name}.`);
         router.push('/admin');
       } else {
         const errorMsg = data.error || 'Credenciais inválidas.';

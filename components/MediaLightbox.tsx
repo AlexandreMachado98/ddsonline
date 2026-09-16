@@ -84,15 +84,21 @@ export default function MediaLightbox({
   // Sincroniza initialIndex e reseta estado ao abrir
   useEffect(() => {
     if (isOpen) {
+      console.log(`[IMAGE VIEWER OPEN] timestamp: ${Date.now()}, viewport: ${window.innerWidth}x${window.innerHeight}, imageIndex: ${initialIndex}`);
       const validIndex = Math.min(Math.max(initialIndex, 0), Math.max(items.length - 1, 0));
       setCurrentIndex(validIndex);
       resetViewerState();
       setIsLoading(true);
-      console.log(`[DDS_MEDIA] MEDIA_VIEWER_OPEN (index: ${validIndex}, total: ${items.length})`);
     } else {
       resetViewerState();
     }
   }, [isOpen, initialIndex, items.length, resetViewerState]);
+
+  useEffect(() => {
+    return () => {
+      console.log('[COMPONENT UNMOUNT] MediaLightbox unmounted');
+    };
+  }, []);
 
   // Reseta zoom e pan ao mudar de slide
   useEffect(() => {
@@ -151,8 +157,32 @@ export default function MediaLightbox({
   }, [items.length]);
 
   // =========================================================================
-  // 2. CONTROLE DO BOTÃO VOLTAR DO ANDROID / PWA (HISTORY API)
+  // 2. CONTROLE DO BOTÃO VOLTAR DO ANDROID / PWA (HISTORY API) E EVENTOS DE TECLADO
   // =========================================================================
+  // Refs para manter callbacks sempre atualizados sem disparar re-render/cleanup dos effects
+  const callbacksRef = useRef({
+    onClose,
+    handlePrev,
+    handleNext,
+    handleZoomIn,
+    handleZoomOut,
+    resetViewerState,
+    zoom
+  });
+
+  // Atualiza as refs em cada render
+  useEffect(() => {
+    callbacksRef.current = {
+      onClose,
+      handlePrev,
+      handleNext,
+      handleZoomIn,
+      handleZoomOut,
+      resetViewerState,
+      zoom
+    };
+  }, [onClose, handlePrev, handleNext, handleZoomIn, handleZoomOut, resetViewerState, zoom]);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -160,8 +190,9 @@ export default function MediaLightbox({
     window.history.pushState({ ddsMediaViewer: true }, '');
 
     const handlePopState = () => {
+      console.log('[MODAL CLOSE REQUEST] source: handlePopState (Android back/swipe)');
       pushedHistoryRef.current = false;
-      onClose();
+      callbacksRef.current.onClose();
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -169,6 +200,7 @@ export default function MediaLightbox({
     return () => {
       window.removeEventListener('popstate', handlePopState);
       if (pushedHistoryRef.current) {
+        console.log('[MODAL UNMOUNT/CLEANUP] Popping history state');
         pushedHistoryRef.current = false;
         try {
           if (window.history.state && window.history.state.ddsMediaViewer) {
@@ -179,7 +211,7 @@ export default function MediaLightbox({
         }
       }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   // =========================================================================
   // 3. ACESSIBILIDADE, TECLADO E TRAVAMENTO DE BODY SCROLL COM RESTAURAÇÃO
@@ -193,7 +225,10 @@ export default function MediaLightbox({
     closeBtnRef.current?.focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      const { onClose, handlePrev, handleNext, handleZoomIn, handleZoomOut, resetViewerState, zoom } = callbacksRef.current;
+      
       if (e.key === 'Escape') {
+        console.log('[MODAL CLOSE REQUEST] source: ESC key');
         e.preventDefault();
         onClose();
       } else if (e.key === 'ArrowLeft' && zoom === MIN_ZOOM) {
@@ -214,10 +249,10 @@ export default function MediaLightbox({
     return () => {
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
-      resetViewerState();
+      callbacksRef.current.resetViewerState();
       console.log('[DDS_MEDIA] MEDIA_VIEWER_CLOSE');
     };
-  }, [isOpen, onClose, handlePrev, handleNext, handleZoomIn, handleZoomOut, resetViewerState, zoom]);
+  }, [isOpen]);
 
   // =========================================================================
   // 4. MOUSE WHEEL ZOOM (DESKTOP)
@@ -454,7 +489,10 @@ export default function MediaLightbox({
           <button
             ref={closeBtnRef}
             type="button"
-            onClick={onClose}
+            onClick={(e) => {
+              console.log('[MODAL CLOSE REQUEST] source: X button');
+              onClose();
+            }}
             className="p-2.5 bg-slate-800 hover:bg-red-500/20 text-slate-200 hover:text-red-300 rounded-xl border border-slate-700 hover:border-red-500/40 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
             title="Fechar visualização (ESC)"
             aria-label="Fechar visualização"
@@ -469,7 +507,11 @@ export default function MediaLightbox({
         ref={containerRef}
         onClick={(e) => {
           if (e.target === containerRef.current && zoom === MIN_ZOOM) {
-            onClose();
+            // [CORREÇÃO DDS ON] 
+            // Fechamento ao tocar fora da imagem desativado intencionalmente
+            // para dispositivos móveis para evitar ghost clicks e fechamentos acidentais.
+            // O usuário deve fechar explicitamente no botão X ou botão Voltar.
+            console.log('[MODAL CLICK OUTSIDE] Fechamento por toque externo bloqueado.');
           }
         }}
         onTouchStart={handleTouchStart}
@@ -511,11 +553,14 @@ export default function MediaLightbox({
               src={currentItem.url} 
               title={currentItem.title || 'Documento PDF'}
               className="w-full h-full rounded-xl border border-slate-800"
-              onLoad={() => setIsLoading(false)}
+              onLoad={() => {
+                console.log('[IMAGE LOAD SUCCESS] PDF loaded');
+                setIsLoading(false);
+              }}
               onError={() => {
                 setIsLoading(false);
                 setHasError(true);
-                console.error('[DDS_MEDIA] MEDIA_RENDER_ERROR (PDF load failed)');
+                console.error('[IMAGE LOAD ERROR] PDF load failed');
               }}
             />
             <div className="flex items-center gap-3 py-1">
@@ -551,13 +596,14 @@ export default function MediaLightbox({
                 alt={currentItem.title || 'Material do Diálogo Diário de Segurança'}
                 decoding="async"
                 onLoad={() => {
+                  console.log(`[IMAGE LOAD SUCCESS] Image loaded in browser`);
                   setIsLoading(false);
                   setHasError(false);
                 }}
                 onError={() => {
+                  console.error('[IMAGE LOAD ERROR] Image load failed');
                   setIsLoading(false);
                   setHasError(true);
-                  console.error('[DDS_MEDIA] MEDIA_RENDER_ERROR (Image load failed)');
                 }}
                 className="max-w-[94vw] sm:max-w-[90vw] max-h-[calc(100vh-140px)] w-auto h-auto object-contain rounded-2xl shadow-xl border border-slate-800 bg-slate-950 pointer-events-auto"
                 draggable={false}
