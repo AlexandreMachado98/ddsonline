@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   FileText, Camera, Trash2, Eye, AlertCircle, CheckCircle2, 
   X, Download, Plus, Loader2, FileCheck2, 
@@ -48,6 +48,7 @@ export default function AttachmentManager({
 }: AttachmentManagerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const fileDataMapRef = useRef<Record<string, string>>({});
 
   const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
   const [lightboxIndex, setLightboxIndex] = useState<number>(0);
@@ -57,21 +58,37 @@ export default function AttachmentManager({
   const [isLoadingFile, setIsLoadingFile] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Mantém cache local de fileData sempre sincronizado com os anexos que já o possuem
+  useEffect(() => {
+    attachments.forEach(att => {
+      if (att.fileData) {
+        if (att.id) fileDataMapRef.current[att.id] = att.fileData;
+        if (att.fileName) fileDataMapRef.current[att.fileName] = att.fileData;
+      }
+    });
+  }, [attachments]);
+
   const openPreview = async (index: number) => {
     const att = attachments[index];
     if (!att) return;
 
+    let targetData = att.fileData || (att.id ? fileDataMapRef.current[att.id] : undefined);
+
     // Se o anexo veio sem fileData (otimização de tráfego de rede), busca sob demanda
-    if (!att.fileData && att.id) {
+    if (!targetData && att.id) {
       try {
         setIsLoadingFile(true);
         const res = await fetch(`/api/reuniao?attachmentId=${encodeURIComponent(att.id)}`);
         const data = await res.json();
         if (data.success && data.attachment?.fileData) {
-          att.fileData = data.attachment.fileData;
+          const fetchedData: string = data.attachment.fileData;
+          targetData = fetchedData;
+          if (att.id) fileDataMapRef.current[att.id] = fetchedData;
+          if (att.fileName) fileDataMapRef.current[att.fileName] = fetchedData;
+          att.fileData = fetchedData;
           const updated = [...attachments];
-          updated[index] = { ...att };
-          onChange(updated);
+          updated[index] = { ...att, fileData: fetchedData };
+          if (onChange) onChange(updated);
         }
       } catch (e) {
         console.error("Erro ao carregar dados do anexo:", e);
@@ -79,6 +96,7 @@ export default function AttachmentManager({
         setIsLoadingFile(false);
       }
     }
+
     setLightboxIndex(index);
     setIsLightboxOpen(true);
   };
@@ -624,7 +642,7 @@ export default function AttachmentManager({
         initialIndex={lightboxIndex}
         items={attachments.map(att => ({
           id: att.id,
-          url: att.fileData,
+          url: att.fileData || (att.id ? fileDataMapRef.current[att.id] : undefined) || (att.fileName ? fileDataMapRef.current[att.fileName] : undefined) || '',
           title: att.displayName || att.fileName,
           description: att.description,
           mimeType: att.mimeType,

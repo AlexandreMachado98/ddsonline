@@ -5,7 +5,8 @@ import {
   Play, Users, FileText, CheckCircle2, 
   Smartphone, Download, Copy, Check, LogOut, 
   History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet,
-  Camera, Image as ImageIcon, Trash2, Target, ExternalLink, Info, CheckSquare, Square, MapPin, Sparkles, ChevronRight, Eye
+  Camera, Image as ImageIcon, Trash2, Target, ExternalLink, Info, CheckSquare, Square, MapPin, Sparkles, ChevronRight, Eye,
+  ArrowLeft, Plus, PenTool
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
@@ -812,25 +813,29 @@ export default function AdminPanel() {
           <OfflineSyncBadge meetingId={activeMeeting?.id} onSyncComplete={() => fetchAllData()} />
 
           {/* Header Superior */}
-          <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-3xl shadow-xl">
-            <div className="flex items-center gap-2.5">
+          <header className="flex items-center justify-between gap-2 bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-2xl sm:rounded-3xl shadow-xl">
+            <div className="flex items-center gap-2 min-w-0">
               <DdsLogo size="sm" showSubtitle={false} clickable href="/admin" />
-              <span className="text-[10px] bg-slate-800 text-slate-300 font-bold px-2 py-0.5 rounded-lg border border-slate-700 ml-1">
+              <span className="text-[10px] sm:text-xs bg-slate-800 text-emerald-400 font-bold px-2 py-0.5 rounded-lg border border-slate-700 shrink-0">
                 {isPresential ? '📍 Presencial' : '💻 EAD'}
               </span>
             </div>
-
             
-            <div className="flex items-center gap-2 self-end sm:self-auto">
-              <label className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-colors border border-slate-700 flex items-center gap-1.5 cursor-pointer" title="Adicionar Logo da Empresa ao PDF">
-                <span>➕ Logo Empresa</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <label 
+                className="px-2.5 sm:px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-[11px] sm:text-xs font-bold transition-colors border border-slate-700 flex items-center gap-1.5 cursor-pointer shadow-sm" 
+                title="Adicionar Logo da Empresa ao PDF"
+              >
+                <Plus size={13} className="text-emerald-400 shrink-0" />
+                <span className="hidden sm:inline">Logo Empresa</span>
+                <span className="sm:hidden">Logo</span>
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
                     const reader = new FileReader();
                     reader.onloadend = () => {
                       localStorage.setItem('dds_company_logo', reader.result as string);
-                      alert('Logo salva! Ela aparecerá no canto superior direito das próximas Atas em PDF.');
+                      showToast('Logo salva! Ela aparecerá no topo das próximas Atas em PDF.', 'success');
                     };
                     reader.readAsDataURL(file);
                   }
@@ -840,10 +845,10 @@ export default function AdminPanel() {
               <button
                 type="button"
                 onClick={() => setIsProfileOpen(true)}
-                className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-800 transition-colors text-left cursor-pointer"
+                className="p-1 rounded-xl hover:bg-slate-800 transition-colors flex items-center gap-1.5 cursor-pointer"
                 title="Abrir Meu Perfil"
               >
-                <div className="w-7 h-7 rounded-full bg-slate-800 ring-2 ring-emerald-500/40 p-0.5 shrink-0 flex items-center justify-center overflow-hidden shadow-sm">
+                <div className="w-8 h-8 rounded-full bg-slate-800 ring-2 ring-emerald-500/40 p-0.5 shrink-0 flex items-center justify-center overflow-hidden shadow-sm">
                   {currentUser?.photoURL ? (
                     <img
                       src={currentUser.photoURL}
@@ -851,7 +856,7 @@ export default function AdminPanel() {
                       className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full rounded-full bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white text-[10px] font-black select-none">
+                    <div className="w-full h-full rounded-full bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white text-[11px] font-black select-none">
                       {currentUser?.name ? (
                         currentUser.name.split(' ').length > 1
                           ? (currentUser.name.split(' ')[0][0] + currentUser.name.split(' ')[currentUser.name.split(' ').length - 1][0]).toUpperCase()
@@ -860,88 +865,102 @@ export default function AdminPanel() {
                     </div>
                   )}
                 </div>
-                <span className="text-xs text-slate-400 hidden sm:inline">
-                  Técnico: <strong className="text-white hover:text-emerald-300 transition-colors">{currentUser?.name}</strong>
-                </span>
               </button>
+
               <button 
                 onClick={() => setIsLiveMode(false)} 
-                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-colors border border-slate-700 flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 sm:px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[11px] sm:text-xs font-bold transition-colors border border-slate-700 flex items-center gap-1 cursor-pointer shrink-0 shadow-sm"
               >
-                Voltar ao Painel
+                <ArrowLeft size={13} className="shrink-0" />
+                <span className="hidden sm:inline">Voltar ao Painel</span>
+                <span className="sm:hidden">Painel</span>
               </button>
             </div>
           </header>
 
           {/* Banner de Status do DDS */}
-          <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 rounded-3xl p-4 sm:p-6 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-emerald-500/40 overflow-hidden max-w-full">
-            <div className="min-w-0 max-w-full overflow-hidden space-y-1">
+          <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 rounded-3xl p-4 sm:p-6 text-white shadow-xl space-y-4 border border-emerald-500/40 overflow-hidden max-w-full">
+            <div className="min-w-0 max-w-full overflow-hidden space-y-1.5">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="relative flex h-2.5 w-2.5 shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
                 </span>
-                <span className="font-bold text-emerald-200 uppercase tracking-widest text-[10px]">
+                <span className="font-black text-emerald-300 uppercase tracking-wider text-[11px]">
                   {isPresential ? 'DDS Presencial em Andamento' : 'DDS EAD Ao Vivo'}
                 </span>
               </div>
-              <h2 className="text-lg sm:text-2xl font-black break-words leading-snug">{activeMeeting.topic}</h2>
-              <p className="text-emerald-100 text-xs sm:text-sm mt-0.5 flex items-center gap-1 break-words">
-                <MapPin size={12} className="shrink-0 text-emerald-300" />
-                <span className="break-words">{activeMeeting.farm}</span>
+              <h2 className="text-base sm:text-xl md:text-2xl font-black break-words leading-tight">{activeMeeting.topic}</h2>
+              <p className="text-emerald-100 text-xs sm:text-sm flex items-center gap-1.5 break-words">
+                <MapPin size={13} className="shrink-0 text-emerald-300" />
+                <span className="break-words font-medium">{activeMeeting.farm}</span>
               </p>
               {activeMeeting.objective && (
-                <p className="text-emerald-200/90 text-xs mt-1 italic break-words">🎯 Objetivo: {activeMeeting.objective}</p>
+                <p className="text-emerald-200/90 text-xs mt-1 bg-black/20 p-2.5 rounded-xl border border-white/5 break-words">
+                  🎯 <strong>Objetivo:</strong> {activeMeeting.objective}
+                </p>
               )}
               {activeMeeting.programmaticContent && (
-                <p className="text-teal-200/90 text-xs mt-1 whitespace-pre-line break-words">📚 Conteúdo: {activeMeeting.programmaticContent}</p>
+                <p className="text-teal-200/90 text-xs mt-1 bg-black/20 p-2.5 rounded-xl border border-white/5 whitespace-pre-line break-words">
+                  📚 <strong>Conteúdo:</strong> {activeMeeting.programmaticContent}
+                </p>
               )}
             </div>
             
-            <div className="flex flex-wrap gap-2 shrink-0">
-              <button 
-                onClick={() => {
-                  setEditingMeeting(activeMeeting);
-                  setEditForm({
-                    createdAt: formatDatetimeLocal(activeMeeting.createdAt),
-                    endedAt: activeMeeting.endedAt ? formatDatetimeLocal(activeMeeting.endedAt) : '',
-                    instructorName: activeMeeting.instructorName || activeMeeting.organizer?.name || '',
-                    classification: activeMeeting.classification || 'DDS',
-                    objective: activeMeeting.objective || '',
-                    programmaticContent: activeMeeting.programmaticContent || ''
-                  });
-                }}
-                className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-sm text-xs cursor-pointer border border-slate-700 min-h-[40px]"
-              >
-                <span>✏️ Editar</span>
-              </button>
-              <button 
-                onClick={handleCopyInviteLink} 
-                className="px-3.5 py-2.5 bg-white text-slate-950 hover:bg-slate-100 rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-md text-xs cursor-pointer min-h-[40px]"
-              >
-                {copiedLink ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
-                <span>{copiedLink ? 'Copiado!' : 'Copiar Link'}</span>
-              </button>
-              <button 
-                onClick={() => handleOpenPreview(activeMeeting)} 
-                className="px-3.5 py-2.5 bg-emerald-950/80 hover:bg-emerald-900/90 border border-emerald-500/50 text-emerald-300 rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-sm text-xs cursor-pointer min-h-[40px]"
-                title="Pré-visualizar Lista de Presença e Dossiê Completo"
-              >
-                <Eye size={16} />
-                <span>Prévia</span>
-              </button>
-              <button 
-                onClick={handleDownloadActivePdf} 
-                className="px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-600 border border-emerald-400/40 text-white rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-sm text-xs cursor-pointer min-h-[40px]"
-              >
-                <Download size={16} />
-                <span>Ata PDF</span>
-              </button>
+            {/* Toolbar de Ações Perfeitamente Alinhada e Responsiva */}
+            <div className="pt-3 border-t border-emerald-500/20 space-y-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <button 
+                  onClick={() => {
+                    setEditingMeeting(activeMeeting);
+                    setEditForm({
+                      createdAt: formatDatetimeLocal(activeMeeting.createdAt),
+                      endedAt: activeMeeting.endedAt ? formatDatetimeLocal(activeMeeting.endedAt) : '',
+                      instructorName: activeMeeting.instructorName || activeMeeting.organizer?.name || '',
+                      classification: activeMeeting.classification || 'DDS',
+                      objective: activeMeeting.objective || '',
+                      programmaticContent: activeMeeting.programmaticContent || ''
+                    });
+                  }}
+                  className="w-full px-3 py-2.5 bg-slate-950/70 hover:bg-slate-900 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm text-xs cursor-pointer border border-slate-700/80 min-h-[42px] active:scale-[0.98]"
+                >
+                  <PenTool size={14} className="text-emerald-400 shrink-0" />
+                  <span>Editar</span>
+                </button>
+
+                <button 
+                  onClick={handleCopyInviteLink} 
+                  className="w-full px-3 py-2.5 bg-white text-slate-950 hover:bg-slate-100 rounded-xl font-black transition-all flex items-center justify-center gap-1.5 shadow-md text-xs cursor-pointer min-h-[42px] active:scale-[0.98]"
+                >
+                  {copiedLink ? <Check size={15} className="text-emerald-600 shrink-0" /> : <Copy size={15} className="shrink-0" />}
+                  <span>{copiedLink ? 'Copiado!' : 'Copiar Link'}</span>
+                </button>
+
+                <button 
+                  onClick={() => handleOpenPreview(activeMeeting)} 
+                  className="w-full px-3 py-2.5 bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-300 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm text-xs cursor-pointer min-h-[42px] active:scale-[0.98]"
+                  title="Pré-visualizar Lista de Presença e Dossiê Completo"
+                >
+                  <Eye size={15} className="shrink-0 text-emerald-400" />
+                  <span>Prévia</span>
+                </button>
+
+                <button 
+                  onClick={handleDownloadActivePdf} 
+                  className="w-full px-3 py-2.5 bg-emerald-600 hover:bg-emerald-500 border border-emerald-400/40 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm text-xs cursor-pointer min-h-[42px] active:scale-[0.98]"
+                >
+                  <Download size={15} className="shrink-0" />
+                  <span>Ata PDF</span>
+                </button>
+              </div>
+
+              {/* Botão de Encerrar DDS com Destaque e Alinhamento Preciso */}
               <button 
                 onClick={handleEndMeeting} 
-                className="px-3.5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold transition-all text-xs shadow-md cursor-pointer ml-auto sm:ml-0 min-h-[40px]"
+                className="w-full py-2.5 px-4 bg-red-600/90 hover:bg-red-600 active:bg-red-700 text-white rounded-xl font-black transition-all text-xs sm:text-sm shadow-lg flex items-center justify-center gap-2 cursor-pointer min-h-[44px] border border-red-500/40 active:scale-[0.99]"
               >
-                Encerrar DDS
+                <LogOut size={16} className="shrink-0" />
+                <span>Encerrar DDS e Concluir Ata</span>
               </button>
             </div>
           </div>

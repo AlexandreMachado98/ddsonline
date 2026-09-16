@@ -157,7 +157,7 @@ export default function MediaLightbox({
   }, [items.length]);
 
   // =========================================================================
-  // 2. CONTROLE DO BOTÃO VOLTAR DO ANDROID / PWA (HISTORY API) E EVENTOS DE TECLADO
+  // 2. CONTROLE DE EVENTOS DE TECLADO E ACESSIBILIDADE
   // =========================================================================
   // Refs para manter callbacks sempre atualizados sem disparar re-render/cleanup dos effects
   const callbacksRef = useRef({
@@ -182,36 +182,6 @@ export default function MediaLightbox({
       zoom
     };
   }, [onClose, handlePrev, handleNext, handleZoomIn, handleZoomOut, resetViewerState, zoom]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    pushedHistoryRef.current = true;
-    window.history.pushState({ ddsMediaViewer: true }, '');
-
-    const handlePopState = () => {
-      console.log('[MODAL CLOSE REQUEST] source: handlePopState (Android back/swipe)');
-      pushedHistoryRef.current = false;
-      callbacksRef.current.onClose();
-    };
-
-    window.addEventListener('popstate', handlePopState);
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-      if (pushedHistoryRef.current) {
-        console.log('[MODAL UNMOUNT/CLEANUP] Popping history state');
-        pushedHistoryRef.current = false;
-        try {
-          if (window.history.state && window.history.state.ddsMediaViewer) {
-            window.history.back();
-          }
-        } catch {
-          // Ignora se o histórico já estiver no estado correto
-        }
-      }
-    };
-  }, [isOpen]);
 
   // =========================================================================
   // 3. ACESSIBILIDADE, TECLADO E TRAVAMENTO DE BODY SCROLL COM RESTAURAÇÃO
