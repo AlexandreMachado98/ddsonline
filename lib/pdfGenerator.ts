@@ -32,19 +32,65 @@ export interface AttendanceData {
 }
 
 /**
+ * Converte e normaliza strings de imagem em Data URLs válidas (JPEG/PNG/WebP/Base64/HTTP)
+ */
+export function normalizeImageDataUrl(src: any): string {
+  if (!src) return '';
+  if (typeof src !== 'string') return '';
+  const trimmed = src.trim();
+  if (!trimmed) return '';
+
+  // Data URLs ou URLs HTTP/HTTPS/Blob completas
+  if (
+    trimmed.startsWith('data:image/') ||
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('blob:')
+  ) {
+    return trimmed;
+  }
+
+  // Base64 cru de JPEG (/9j/...)
+  if (trimmed.startsWith('/9j/')) {
+    return `data:image/jpeg;base64,${trimmed}`;
+  }
+
+  // Base64 cru de PNG (iVBORw...)
+  if (trimmed.startsWith('iVBORw')) {
+    return `data:image/png;base64,${trimmed}`;
+  }
+
+  // Base64 cru de WebP (UklGR...)
+  if (trimmed.startsWith('UklGR')) {
+    return `data:image/webp;base64,${trimmed}`;
+  }
+
+  // Se parecer Base64 genérico
+  if (trimmed.length > 30 && /^[A-Za-z0-9+/=_\-\r\n\s]+$/.test(trimmed)) {
+    return `data:image/jpeg;base64,${trimmed.replace(/[\r\n\s]+/g, '')}`;
+  }
+
+  return trimmed;
+}
+
+/**
  * Normaliza objetos de participantes de qualquer versão (offline, legada ou atual)
  */
 export function normalizeAttendee(raw: any): AttendanceData {
   if (!raw) {
     return { name: 'Participante', cpf: '-', createdAt: new Date().toISOString() };
   }
-  const selfie = raw.selfie || raw.savedSelfie || raw.biometricPhoto || raw.photo || raw.photoEvidence || '';
-  const signature = raw.signature || raw.savedSignature || raw.signatureData || '';
-  const exitSignature = raw.exitSignature || raw.savedExitSignature || '';
+  const rawSelfie = raw.selfie || raw.savedSelfie || raw.biometricPhoto || raw.photo || raw.photoEvidence || raw.biometria || '';
+  const rawSignature = raw.signature || raw.savedSignature || raw.signatureData || raw.assinatura || '';
+  const rawExitSignature = raw.exitSignature || raw.savedExitSignature || '';
   const exitReason = raw.exitReason || raw.justification || '';
   const name = raw.name || raw.fullName || raw.collaboratorName || 'Participante';
   const cpf = raw.cpf || raw.role || raw.funcao || raw.position || '-';
   const createdAt = raw.createdAt || raw.timestamp || raw.admittedAt || new Date().toISOString();
+
+  const selfie = normalizeImageDataUrl(rawSelfie);
+  const signature = normalizeImageDataUrl(rawSignature);
+  const exitSignature = normalizeImageDataUrl(rawExitSignature);
 
   return {
     ...raw,
@@ -95,21 +141,53 @@ async function getDocumentSha256(text: string): Promise<string> {
   return Math.abs(h).toString(16).padStart(16, '0') + 'f0a9b8c7e6d5e4b3';
 }
 
-export function parseGroupPhotos(groupPhoto?: string | string[] | null): string[] {
+export function parseGroupPhotos(groupPhoto?: any): string[] {
   if (!groupPhoto) return [];
-  if (Array.isArray(groupPhoto)) return groupPhoto.filter((p): p is string => typeof p === 'string' && p.length > 50);
-  if (typeof groupPhoto !== 'string') return [];
-  const trimmed = groupPhoto.trim();
-  if (!trimmed || trimmed.length < 50) return [];
-  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) {
-        return parsed.filter((p: any): p is string => typeof p === 'string' && p.length > 50);
+
+  const extractItems = (item: any): string[] => {
+    if (!item) return [];
+    if (typeof item === 'string') {
+      const trimmed = item.trim();
+      if (!trimmed) return [];
+
+      // Trata strings JSON ou JSON duplamente encodado
+      if (
+        (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+        (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+        (trimmed.startsWith('"') && trimmed.endsWith('"'))
+      ) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return extractItems(parsed);
+        } catch (e) {}
       }
-    } catch (e) {}
-  }
-  return [trimmed];
+
+      // Trata delimitadores múltiplos legados
+      if (trimmed.includes('||')) {
+        return trimmed.split('||').flatMap(extractItems);
+      }
+
+      const normalized = normalizeImageDataUrl(trimmed);
+      if (normalized && (normalized.length > 20 || normalized.startsWith('http'))) {
+        return [normalized];
+      }
+      return [];
+    }
+
+    if (Array.isArray(item)) {
+      return item.flatMap(extractItems);
+    }
+
+    if (typeof item === 'object') {
+      const candidate = item.url || item.data || item.photo || item.src || item.fileData;
+      if (candidate) return extractItems(candidate);
+    }
+
+    return [];
+  };
+
+  const results = extractItems(groupPhoto);
+  return Array.from(new Set(results)).filter(p => typeof p === 'string' && (p.length > 20 || p.startsWith('http')));
 }
 
 /**
@@ -665,8 +743,10 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
 
         // Biometria Facial (Foto Selfie do Colaborador)
         if (data.column.index === 5) {
-          const selfieData = attendee.selfie || (attendee as any).savedSelfie || (attendee as any).biometricPhoto || (attendee as any).photo || (attendee as any).photoEvidence;
-          if (selfieData && typeof selfieData === 'string' && selfieData.length > 50) {
+          const selfieData = normalizeImageDataUrl(
+            attendee.selfie || (attendee as any).savedSelfie || (attendee as any).biometricPhoto || (attendee as any).photo || (attendee as any).photoEvidence
+          );
+          if (selfieData && typeof selfieData === 'string' && (selfieData.length > 20 || selfieData.startsWith('http'))) {
             try {
               const format = selfieData.includes('image/png') ? 'PNG' : 'JPEG';
               const imgW = 14;
@@ -699,8 +779,10 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
 
         // Assinatura Digital
         if (data.column.index === 6) {
-          const signatureData = attendee.signature || (attendee as any).savedSignature || (attendee as any).signatureData;
-          if (signatureData && typeof signatureData === 'string' && signatureData.length > 50) {
+          const signatureData = normalizeImageDataUrl(
+            attendee.signature || (attendee as any).savedSignature || (attendee as any).signatureData
+          );
+          if (signatureData && typeof signatureData === 'string' && (signatureData.length > 20 || signatureData.startsWith('http'))) {
             try {
               const format = signatureData.includes('image/jpeg') ? 'JPEG' : 'PNG';
               const signW = 31;

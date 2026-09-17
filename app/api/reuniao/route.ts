@@ -370,7 +370,7 @@ export async function POST(req: Request) {
         status: 'LIVE',
         organizerId: sessionUser.id,
         companyId: sessionUser.companyId || null,
-        groupPhoto: typeof groupPhoto === 'string' && groupPhoto.length > 50 ? groupPhoto : null,
+        groupPhoto: typeof groupPhoto === 'string' && (groupPhoto.length > 20 || groupPhoto.startsWith('http')) ? groupPhoto : null,
         attachments: sanitizedAttachments.length > 0 ? {
           create: sanitizedAttachments
         } : undefined

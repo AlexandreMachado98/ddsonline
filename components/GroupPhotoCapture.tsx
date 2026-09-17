@@ -11,25 +11,57 @@ interface GroupPhotoCaptureProps {
   onPhotoChange?: (photoDataUrl: string | null) => void;
 }
 
-export function parseGroupPhotos(groupPhoto?: string | string[] | null): string[] {
+import { normalizeImageDataUrl } from '@/lib/pdfGenerator';
+
+export function parseGroupPhotos(groupPhoto?: any): string[] {
   if (!groupPhoto) return [];
-  if (Array.isArray(groupPhoto)) return groupPhoto.filter((p): p is string => typeof p === 'string' && p.length > 50);
-  if (typeof groupPhoto !== 'string') return [];
-  const trimmed = groupPhoto.trim();
-  if (!trimmed || trimmed.length < 50) return [];
-  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) {
-        return parsed.filter((p: any): p is string => typeof p === 'string' && p.length > 50);
+
+  const extractItems = (item: any): string[] => {
+    if (!item) return [];
+    if (typeof item === 'string') {
+      const trimmed = item.trim();
+      if (!trimmed) return [];
+
+      if (
+        (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+        (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+        (trimmed.startsWith('"') && trimmed.endsWith('"'))
+      ) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return extractItems(parsed);
+        } catch (e) {}
       }
-    } catch (e) {}
-  }
-  return [trimmed];
+
+      if (trimmed.includes('||')) {
+        return trimmed.split('||').flatMap(extractItems);
+      }
+
+      const normalized = normalizeImageDataUrl(trimmed);
+      if (normalized && (normalized.length > 20 || normalized.startsWith('http'))) {
+        return [normalized];
+      }
+      return [];
+    }
+
+    if (Array.isArray(item)) {
+      return item.flatMap(extractItems);
+    }
+
+    if (typeof item === 'object') {
+      const candidate = item.url || item.data || item.photo || item.src || item.fileData;
+      if (candidate) return extractItems(candidate);
+    }
+
+    return [];
+  };
+
+  const results = extractItems(groupPhoto);
+  return Array.from(new Set(results)).filter(p => typeof p === 'string' && (p.length > 20 || p.startsWith('http')));
 }
 
 export function serializeGroupPhotos(photos: string[]): string | null {
-  const valid = photos.filter(p => typeof p === 'string' && p.length > 50);
+  const valid = photos.filter(p => typeof p === 'string' && (p.length > 20 || p.startsWith('http')));
   if (valid.length === 0) return null;
   if (valid.length === 1) return valid[0];
   return JSON.stringify(valid);
