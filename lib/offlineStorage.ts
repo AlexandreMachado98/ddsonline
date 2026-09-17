@@ -149,8 +149,10 @@ export function cacheMeetingData(meeting: any): void {
   try {
     const raw = localStorage.getItem(LOCALSTORAGE_MEETINGS_CACHE_KEY);
     const map = raw ? JSON.parse(raw) : {};
+    // Garante que foto de equipe nunca seja gravada no cache local público de reuniões
+    const { groupPhoto, ...publicMeetingData } = meeting;
     map[meeting.id] = {
-      ...meeting,
+      ...publicMeetingData,
       _cachedAt: new Date().toISOString()
     };
     map['_last_meeting_id'] = meeting.id;

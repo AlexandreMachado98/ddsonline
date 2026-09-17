@@ -1584,19 +1584,19 @@ export default function AdminPanel() {
                   />
                 </div>
 
-              {/* Fotos Coletivas da Equipe no Novo DDS */}
-              <div className="pt-2 border-t border-slate-800/80 space-y-2">
-                <GroupPhotoCapture 
-                  initialPhotos={teamPhotos}
-                  onPhotosChange={setTeamPhotos}
-                />
-              </div>
-
-              {/* Seção de Anexos / Evidências do Novo DDS */}
+              {/* Seção 1: Material de Apresentação do DDS (Slides, Cartazes e PDFs) */}
               <div className="pt-2 border-t border-slate-800/80">
                 <AttachmentManager
                   attachments={newAttachments}
                   onChange={setNewAttachments}
+                />
+              </div>
+
+              {/* Seção 2: Fotos Coletivas da Equipe (Evidência Administrativa) */}
+              <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                <GroupPhotoCapture 
+                  initialPhotos={teamPhotos}
+                  onPhotosChange={setTeamPhotos}
                 />
               </div>
 

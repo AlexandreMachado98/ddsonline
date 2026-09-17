@@ -598,7 +598,7 @@ export default function MeetingRoom() {
           </p>
         </div>
 
-        {/* Material Apresentado no DDS */}
+        {/* Material de Apresentação do DDS (Slides, Cartazes e PDFs) */}
         {attachments.length > 0 && (
           <div className="bg-slate-900/90 backdrop-blur-md p-4 sm:p-5 rounded-3xl border border-slate-800 shadow-xl">
             <AttachmentManager

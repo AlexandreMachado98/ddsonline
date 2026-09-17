@@ -238,13 +238,18 @@ export default function GroupPhotoCapture({ initialPhotos, initialPhoto, onPhoto
         <div className="space-y-3 bg-slate-950/60 border border-slate-800/90 rounded-3xl p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
             <div className="flex items-center gap-2">
-              <span className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
+              <span className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg">
                 <Users size={16} />
               </span>
               <div>
-                <h4 className="text-xs font-bold text-white">Fotos da Equipe Registradas</h4>
-                <p className="text-[10px] text-emerald-400 font-medium">
-                  {photos.length} {photos.length === 1 ? 'foto anexada' : 'fotos anexadas'} • Serão organizadas no PDF
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-bold text-white">Fotos da Equipe (Evidência Administrativa)</h4>
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                    🔒 Exclusivo Organizador
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                  {photos.length} {photos.length === 1 ? 'foto registrada' : 'fotos registradas'} • Comprovação na Ata PDF (não visível para colaboradores)
                 </p>
               </div>
             </div>
@@ -324,9 +329,14 @@ export default function GroupPhotoCapture({ initialPhotos, initialPhoto, onPhoto
             <Users size={24} />
           </div>
           <div>
-            <h4 className="text-xs font-bold text-slate-200">Fotos da Equipe (Opcional)</h4>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Adicione quantas fotos desejar do grupo reunido para comprovação na ata em PDF
+            <div className="flex items-center justify-center gap-2">
+              <h4 className="text-xs font-bold text-slate-200">Foto Coletiva da Equipe (Evidência)</h4>
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                🔒 Apenas Organizador
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+              Fotografia dos colaboradores reunidos para auditoria na Ata PDF (não é exibida na tela pública de assinatura).
             </p>
           </div>
 
@@ -334,9 +344,9 @@ export default function GroupPhotoCapture({ initialPhotos, initialPhoto, onPhoto
             <button
               type="button"
               onClick={() => setIsCameraOpen(true)}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-1.5 min-h-[40px]"
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-1.5 min-h-[40px] cursor-pointer"
             >
-              <Camera size={14} /> Abrir Câmera
+              <Camera size={14} /> Abrir Câmera da Equipe
             </button>
 
             <button

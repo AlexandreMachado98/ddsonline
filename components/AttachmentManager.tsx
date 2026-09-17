@@ -5,7 +5,7 @@ import {
   FileText, Camera, Trash2, Eye, AlertCircle, CheckCircle2, 
   X, Download, Plus, Loader2, FileCheck2, 
   MoveUp, MoveDown, ZoomIn, ZoomOut, Maximize2, Minimize2,
-  Sparkles, ScrollText, ArrowDown
+  Sparkles, ScrollText, ArrowDown, Image as ImageIcon
 } from 'lucide-react';
 import MediaLightbox from '@/components/MediaLightbox';
 
@@ -310,27 +310,29 @@ export default function AttachmentManager({
 
   return (
     <div className="w-full space-y-3">
-      {/* Cabeçalho da Seção de Evidências */}
+      {/* Cabeçalho da Seção de Material de Apresentação */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <div className="flex items-center gap-2">
             <FileCheck2 size={16} className="text-emerald-400" />
             <h4 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
-              Evidências & Material Apresentado
+              {readOnly ? 'Material de Apresentação do DDS' : 'Material de Apresentação do Tema (Slides e PDFs)'}
             </h4>
             <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              {attachments.length} {attachments.length === 1 ? 'anexo' : 'anexos'}
+              {attachments.length} {attachments.length === 1 ? 'material' : 'materiais'}
             </span>
           </div>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            Procedimentos, cartilhas em PDF, fotos de cartazes ou slides apresentados aos colaboradores. <span className="text-emerald-400 font-medium">Consolidados na Ata PDF.</span>
+            {readOnly 
+              ? 'Cartazes, slides, procedimentos ou cartilhas em PDF apresentados para leitura e acompanhamento neste DDS.'
+              : 'Cartazes, slides de apresentação ou cartilhas em PDF para visualização e leitura dos colaboradores na assinatura.'}
           </p>
         </div>
 
         {/* Botões de Ação de Adição (se não estiver em modo somente leitura) */}
         {!readOnly && (
           <div className="flex items-center gap-1.5 flex-wrap pt-1 sm:pt-0">
-            {/* Input Oculto para Câmera Direta */}
+            {/* Input Oculto para Câmera Direta de Cartaz/Slide */}
             <input 
               ref={cameraInputRef}
               type="file" 
@@ -352,16 +354,16 @@ export default function AttachmentManager({
               disabled={isProcessing}
             />
 
-            {/* Botão Tirar Foto */}
+            {/* Botão Fotografar Slide/Cartaz */}
             <button
               type="button"
               onClick={() => cameraInputRef.current?.click()}
               disabled={isProcessing}
               className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 hover:border-emerald-500/50 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 min-h-[38px]"
-              title="Tirar foto com a câmera"
+              title="Fotografar cartaz físico ou slide de apresentação"
             >
               <Camera size={14} className="text-emerald-400" />
-              <span>Câmera</span>
+              <span>Fotografar Cartaz</span>
             </button>
 
             {/* Botão Anexar PDF / Imagem */}
@@ -370,14 +372,14 @@ export default function AttachmentManager({
               onClick={() => fileInputRef.current?.click()}
               disabled={isProcessing}
               className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50 min-h-[38px]"
-              title="Selecionar PDF ou foto da galeria"
+              title="Selecionar PDF ou slide de apresentação da galeria"
             >
               {isProcessing ? (
                 <Loader2 size={14} className="animate-spin text-white" />
               ) : (
                 <Plus size={14} className="text-white" />
               )}
-              <span>+ Anexar Material</span>
+              <span>+ Anexar Slide / PDF</span>
             </button>
           </div>
         )}
@@ -406,11 +408,11 @@ export default function AttachmentManager({
           <div className="w-10 h-10 mx-auto rounded-full bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-400">
             <FileCheck2 size={20} className="text-slate-400" />
           </div>
-          <p className="text-xs font-bold text-slate-300">Nenhum material anexado a este DDS</p>
+          <p className="text-xs font-bold text-slate-300">Nenhum material de apresentação anexado a este DDS</p>
           <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
             {readOnly 
-              ? 'Nenhuma evidência ou material complementar foi registrado neste DDS.' 
-              : 'Clique em "+ Anexar Material" ou "Câmera" para anexar o PDF de instrução, procedimento ou foto do cartaz utilizado no DDS.'}
+              ? 'Nenhum slide, cartaz ou documento complementar foi registrado para leitura neste DDS.' 
+              : 'Clique em "+ Anexar Slide / PDF" ou "Fotografar Cartaz" para adicionar o conteúdo visual e instrucional do DDS.'}
           </p>
         </div>
       ) : (
@@ -446,8 +448,8 @@ export default function AttachmentManager({
                         />
                       ) : (
                         <div className="flex flex-col items-center justify-center text-emerald-400">
-                          <Camera size={20} />
-                          <span className="text-[8px] font-black uppercase text-emerald-300">FOTO</span>
+                          <ImageIcon size={20} />
+                          <span className="text-[8px] font-black uppercase text-emerald-300">SLIDE</span>
                         </div>
                       )}
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
@@ -470,7 +472,7 @@ export default function AttachmentManager({
                         <span className="font-mono text-emerald-400">{formatFileSize(att.fileSize)}</span>
                         <span>•</span>
                         <span className="uppercase font-semibold text-slate-400">
-                          {isPdf ? `PDF (${att.pageCount || 1} ${(att.pageCount || 1) === 1 ? 'pág' : 'págs'})` : 'IMAGEM'}
+                          {isPdf ? `PDF (${att.pageCount || 1} ${(att.pageCount || 1) === 1 ? 'pág' : 'págs'})` : 'SLIDE / IMAGEM'}
                         </span>
                         {att.uploadStatus === 'success' && (
                           <span className="text-emerald-400 flex items-center gap-0.5">
