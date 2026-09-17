@@ -16,6 +16,60 @@ interface DdsReportPreviewModalProps {
   onDownloadPdf?: () => Promise<void> | void;
 }
 
+function renderInlineMarkdown(str: string) {
+  const parts = str.split(/(\*\*.*?\*\*|__.*?__|`.*?`)/g);
+  return parts.map((part, i) => {
+    if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
+      return <strong key={i} className="font-bold text-slate-950">{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return <code key={i} className="bg-slate-200 text-slate-800 px-1 py-0.5 rounded text-[10px] font-mono">{part.slice(1, -1)}</code>;
+    }
+    return part;
+  });
+}
+
+function FormattedMarkdownView({ text, className = '' }: { text: string; className?: string }) {
+  if (!text) return null;
+  const lines = text.split(/\r?\n/);
+  
+  return (
+    <div className={`space-y-1.5 ${className}`}>
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={idx} className="h-1" />;
+        
+        if (trimmed.startsWith('#')) {
+          const content = trimmed.replace(/^#{1,6}\s*/, '');
+          return <h4 key={idx} className="font-bold text-slate-900 text-xs mt-1.5 mb-0.5">{renderInlineMarkdown(content)}</h4>;
+        }
+        
+        const isBullet = trimmed.match(/^([\*\-\+\•])\s+(.*)$/);
+        if (isBullet) {
+          return (
+            <div key={idx} className="flex items-start gap-1.5 text-xs text-slate-800 ml-1">
+              <span className="text-emerald-700 font-bold shrink-0 leading-tight">•</span>
+              <span className="leading-relaxed">{renderInlineMarkdown(isBullet[2])}</span>
+            </div>
+          );
+        }
+
+        const isNumbered = trimmed.match(/^(\d+[\.\)])\s+(.*)$/);
+        if (isNumbered) {
+          return (
+            <div key={idx} className="flex items-start gap-1.5 text-xs text-slate-800 ml-1">
+              <span className="text-emerald-700 font-bold shrink-0 leading-tight">{isNumbered[1]}</span>
+              <span className="leading-relaxed">{renderInlineMarkdown(isNumbered[2])}</span>
+            </div>
+          );
+        }
+
+        return <p key={idx} className="text-xs text-slate-800 leading-relaxed">{renderInlineMarkdown(trimmed)}</p>;
+      })}
+    </div>
+  );
+}
+
 export default function DdsReportPreviewModal({
   meeting,
   onClose,
@@ -314,9 +368,7 @@ export default function DdsReportPreviewModal({
                 <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-800 block mb-0.5">
                   Objetivo Específico:
                 </span>
-                <p className="text-xs text-slate-800 leading-relaxed font-normal">
-                  {meeting.objective}
-                </p>
+                <FormattedMarkdownView text={meeting.objective} />
               </div>
             )}
 
@@ -341,8 +393,8 @@ export default function DdsReportPreviewModal({
                         <th className="p-2">Função</th>
                         <th className="p-2 text-center">Entrada</th>
                         <th className="p-2 text-center">Status / Saída</th>
-                        <th className="p-2 text-center w-16">Foto Facial</th>
-                        <th className="p-2 text-center w-28">Assinatura</th>
+                        <th className="p-2 text-center w-16">Biometria (Foto)</th>
+                        <th className="p-2 text-center w-28">Assinatura Digital</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-[11px]">
@@ -384,7 +436,7 @@ export default function DdsReportPreviewModal({
                                   title="Clique para ampliar"
                                 />
                               ) : (
-                                <span className="text-slate-300 text-[10px]">-</span>
+                                <span className="text-slate-400 text-[10px] italic">Não coletada</span>
                               )}
                             </td>
                             <td className="p-2 text-center">
@@ -397,7 +449,7 @@ export default function DdsReportPreviewModal({
                                   <img src={attendee.signature} alt="Assinatura" className="max-h-full max-w-full object-contain" />
                                 </div>
                               ) : (
-                                <span className="text-slate-300 text-[10px]">-</span>
+                                <span className="text-slate-400 text-[10px] italic">Não assinada</span>
                               )}
                             </td>
                           </tr>
@@ -523,9 +575,9 @@ export default function DdsReportPreviewModal({
                 <h3 style={{ color: darkGreen }} className="text-xs font-bold uppercase tracking-wider">
                   {meeting.classification === 'Campanha' ? '1. OBJETIVO DA CAMPANHA' : '1. OBJETIVO DO TREINAMENTO'}
                 </h3>
-                <p className="text-xs text-slate-800 leading-relaxed font-medium">
-                  {meeting.objective || 'Orientação, instrução normativa e conscientização operacional conforme as diretrizes de Segurança e Saúde no Trabalho.'}
-                </p>
+                <FormattedMarkdownView 
+                  text={meeting.objective || 'Orientação, instrução normativa e conscientização operacional conforme as diretrizes de Segurança e Saúde no Trabalho.'} 
+                />
               </div>
 
               {/* 2. Conteúdo Programático */}
@@ -533,9 +585,9 @@ export default function DdsReportPreviewModal({
                 <h3 style={{ color: darkGreen }} className="text-xs font-bold uppercase tracking-wider">
                   {meeting.classification === 'Campanha' ? '2. PROGRAMAÇÃO E AÇÕES DA CAMPANHA' : '2. CONTEÚDO PROGRAMÁTICO & MÓDULOS MINISTRADOS'}
                 </h3>
-                <p className="text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line">
-                  {rawContent || '1. Módulo Geral: Conceitos e Diretrizes de Segurança do Trabalho e NRs aplicáveis.\n2. Módulo Específico: Procedimentos Operacionais Padrão (POP), Análise Preliminar de Risco (APR) e uso correto de EPIs.\n3. Módulo Prático: Condutas Preventivas, Primeiros Socorros e Prática Operacional.'}
-                </p>
+                <FormattedMarkdownView 
+                  text={rawContent || '1. Módulo Geral: Conceitos e Diretrizes de Segurança do Trabalho e NRs aplicáveis.\n2. Módulo Específico: Procedimentos Operacionais Padrão (POP), Análise Preliminar de Risco (APR) e uso correto de EPIs.\n3. Módulo Prático: Condutas Preventivas, Primeiros Socorros e Prática Operacional.'} 
+                />
               </div>
 
               {/* 3. Declaração do Responsável & Linha de Assinatura */}

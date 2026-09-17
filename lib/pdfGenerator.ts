@@ -77,6 +77,214 @@ export function parseGroupPhotos(groupPhoto?: string | string[] | null): string[
   return [trimmed];
 }
 
+/**
+ * Normaliza e limpa Markdown para campos que necessitam de texto limpo de linha única
+ */
+export function sanitizeMarkdownText(text: string | null | undefined): string {
+  if (!text) return '';
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^[\*\-\+]\s+/gm, '• ')
+    .trim();
+}
+
+/**
+ * Renderiza bloco de texto formatado com suporte a Markdown (títulos, negrito, listas e tópicos) no jsPDF
+ */
+export function renderFormattedMarkdownInPdf(
+  doc: jsPDF,
+  rawText: string,
+  startX: number,
+  startY: number,
+  maxWidth: number,
+  options: {
+    baseFontSize?: number;
+    lineHeight?: number;
+    textColor?: [number, number, number];
+    boldColor?: [number, number, number];
+    headerColor?: [number, number, number];
+    bulletIndent?: number;
+    dryRun?: boolean;
+  } = {}
+): { totalHeight: number; endY: number } {
+  const baseFontSize = options.baseFontSize || 7.5;
+  const lineHeight = options.lineHeight || 4.2;
+  const textColor = options.textColor || [30, 41, 59];
+  const boldColor = options.boldColor || [15, 23, 42];
+  const headerColor = options.headerColor || [0, 99, 65];
+  const bulletIndent = options.bulletIndent || 3.5;
+  const dryRun = options.dryRun || false;
+
+  if (!rawText || !rawText.trim()) {
+    return { totalHeight: 0, endY: startY };
+  }
+
+  let currentY = startY;
+  const rawLines = rawText.split(/\r?\n/);
+
+  for (let lIdx = 0; lIdx < rawLines.length; lIdx++) {
+    const rawLine = rawLines[lIdx];
+    const trimmedLine = rawLine.trim();
+
+    // Linha em branco -> espaçamento de parágrafo
+    if (!trimmedLine) {
+      currentY += lineHeight * 0.5;
+      continue;
+    }
+
+    // 1. Títulos Markdown (# Título, ## Título, ### Título)
+    const headerMatch = trimmedLine.match(/^(#{1,6})\s+(.*)$/);
+    if (headerMatch) {
+      const headerLevel = headerMatch[1].length;
+      const headerTitle = sanitizeMarkdownText(headerMatch[2]);
+      const headerFontSize = headerLevel === 1 ? baseFontSize + 1.8 : headerLevel === 2 ? baseFontSize + 1 : baseFontSize + 0.4;
+
+      doc.setFontSize(headerFontSize);
+      doc.setFont('helvetica', 'bold');
+      if (!dryRun) {
+        doc.setTextColor(headerColor[0], headerColor[1], headerColor[2]);
+      }
+
+      const splitHeader = doc.splitTextToSize(headerTitle, maxWidth);
+      const linesArr = Array.isArray(splitHeader) ? splitHeader : [splitHeader];
+      for (const hLine of linesArr) {
+        if (!dryRun) {
+          doc.text(hLine, startX, currentY);
+        }
+        currentY += lineHeight + 0.6;
+      }
+      currentY += 0.8;
+      continue;
+    }
+
+    // 2. Lista com marcadores (* item, - item, • item, + item) ou numérica (1. item)
+    let lineToProcess = trimmedLine;
+    let currentXOffset = startX;
+    let availableWidth = maxWidth;
+
+    const bulletMatch = trimmedLine.match(/^([\*\-\+\•])\s+(.*)$/);
+    const numMatch = trimmedLine.match(/^(\d+[\.\)])\s+(.*)$/);
+
+    if (bulletMatch) {
+      lineToProcess = bulletMatch[2];
+      availableWidth = maxWidth - bulletIndent;
+      currentXOffset = startX + bulletIndent;
+
+      if (!dryRun) {
+        doc.setFontSize(baseFontSize);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(headerColor[0], headerColor[1], headerColor[2]);
+        doc.text('•', startX + 0.5, currentY);
+      }
+    } else if (numMatch) {
+      const numPrefix = numMatch[1];
+      lineToProcess = numMatch[2];
+      doc.setFontSize(baseFontSize);
+      doc.setFont('helvetica', 'bold');
+      const numWidth = (doc.getStringUnitWidth(numPrefix + ' ') * baseFontSize) / doc.internal.scaleFactor;
+      const effectiveIndent = Math.max(bulletIndent + 1.5, numWidth + 1);
+      availableWidth = maxWidth - effectiveIndent;
+      currentXOffset = startX + effectiveIndent;
+
+      if (!dryRun) {
+        doc.setTextColor(headerColor[0], headerColor[1], headerColor[2]);
+        doc.text(numPrefix, startX, currentY);
+      }
+    }
+
+    // 3. Tokenização da linha para suportar **negrito** inline com quebra de linhas precisa
+    const tokens: { text: string; isBold: boolean }[] = [];
+    const boldRegex = /\*\*(.*?)\*\*|__(.*?)__/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = boldRegex.exec(lineToProcess)) !== null) {
+      if (match.index > lastIndex) {
+        tokens.push({ text: lineToProcess.substring(lastIndex, match.index), isBold: false });
+      }
+      const boldText = match[1] || match[2] || '';
+      if (boldText) {
+        tokens.push({ text: boldText, isBold: true });
+      }
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < lineToProcess.length) {
+      tokens.push({ text: lineToProcess.substring(lastIndex), isBold: false });
+    }
+
+    // Separação em palavras preservando negrito
+    interface WordToken {
+      word: string;
+      isBold: boolean;
+    }
+    const words: WordToken[] = [];
+    for (const t of tokens) {
+      const parts = t.text.split(/(\s+)/);
+      for (const p of parts) {
+        if (p.length > 0) {
+          words.push({ word: p, isBold: t.isBold });
+        }
+      }
+    }
+
+    let lineTokens: WordToken[] = [];
+    let lineOccupiedWidth = 0;
+
+    const flushCurrentLine = (tokensToDraw: WordToken[]) => {
+      if (tokensToDraw.length === 0) return;
+      let drawX = currentXOffset;
+
+      for (const wt of tokensToDraw) {
+        doc.setFont('helvetica', wt.isBold ? 'bold' : 'normal');
+        doc.setFontSize(baseFontSize);
+        const wWidth = (doc.getStringUnitWidth(wt.word) * baseFontSize) / doc.internal.scaleFactor;
+
+        if (!dryRun) {
+          if (wt.isBold) {
+            doc.setTextColor(boldColor[0], boldColor[1], boldColor[2]);
+          } else {
+            doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+          }
+          doc.text(wt.word, drawX, currentY);
+        }
+        drawX += wWidth;
+      }
+      currentY += lineHeight;
+    };
+
+    for (let wIdx = 0; wIdx < words.length; wIdx++) {
+      const wt = words[wIdx];
+      doc.setFont('helvetica', wt.isBold ? 'bold' : 'normal');
+      doc.setFontSize(baseFontSize);
+      const wWidth = (doc.getStringUnitWidth(wt.word) * baseFontSize) / doc.internal.scaleFactor;
+
+      if (lineOccupiedWidth + wWidth > availableWidth && lineTokens.length > 0) {
+        if (wt.word.trim().length === 0) {
+          continue;
+        }
+        flushCurrentLine(lineTokens);
+        lineTokens = [wt];
+        lineOccupiedWidth = wWidth;
+      } else {
+        lineTokens.push(wt);
+        lineOccupiedWidth += wWidth;
+      }
+    }
+
+    if (lineTokens.length > 0) {
+      flushCurrentLine(lineTokens);
+    }
+  }
+
+  const totalHeight = currentY - startY;
+  return { totalHeight, endY: currentY };
+}
+
 export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
@@ -265,25 +473,53 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
   // --- OBJETIVO DO DDS (SE PREENCHIDO) ---
   const rawObjective = (meeting.objective || '').trim();
   if (rawObjective) {
-    const objLines = doc.splitTextToSize(rawObjective, fullWidth - 14);
-    const textLineCount = Array.isArray(objLines) ? objLines.length : 1;
-    const objCardH = Math.max(12, 6 + textLineCount * 4);
+    const textStartX = 19;
+    const textMaxWidth = fullWidth - 10;
+    
+    // Calcula a altura real com formatação Markdown
+    const dryRunRes = renderFormattedMarkdownInPdf(
+      doc, 
+      rawObjective, 
+      textStartX, 
+      currentY + 9, 
+      textMaxWidth, 
+      { baseFontSize: 7.5, lineHeight: 4.2, dryRun: true }
+    );
+    
+    const objContentH = dryRunRes.totalHeight;
+    const objCardH = Math.max(14, 10 + objContentH + 3);
 
     // Barra sutil de destaque lateral
     doc.setFillColor(248, 250, 249);
-    doc.rect(14, currentY, fullWidth, objCardH, 'F');
-    doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-    doc.rect(14, currentY, 2, objCardH, 'F');
+    doc.roundedRect(14, currentY, fullWidth, objCardH, 2, 2, 'F');
+    doc.setDrawColor(230, 235, 232);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(14, currentY, fullWidth, objCardH, 2, 2, 'S');
 
-    doc.setFontSize(6.5);
+    doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+    doc.roundedRect(14, currentY, 2.5, objCardH, 1, 1, 'F');
+
+    doc.setFontSize(6.8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-    doc.text('OBJETIVO ESPECÍFICO:', 19, currentY + 4.5);
+    doc.text('OBJETIVO ESPECÍFICO:', 19, currentY + 4.8);
 
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-    doc.text(objLines, 19, currentY + 9);
+    // Renderiza o texto com suporte a Markdown limpo e negrito
+    renderFormattedMarkdownInPdf(
+      doc, 
+      rawObjective, 
+      textStartX, 
+      currentY + 9, 
+      textMaxWidth, 
+      { 
+        baseFontSize: 7.5, 
+        lineHeight: 4.2, 
+        textColor: textDark, 
+        boldColor: [15, 23, 42],
+        headerColor: darkGreen,
+        dryRun: false 
+      }
+    );
 
     currentY += objCardH + 4;
   }
@@ -310,19 +546,19 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
   const tableRows = attendeesList.map((a, idx) => {
     return [
       String(idx + 1),
-      a.name.replace(/\(Saída:.*\)/, '').trim(),
-      a.cpf || '-',
+      sanitizeMarkdownText(a.name.replace(/\(Saída:.*\)/, '')),
+      sanitizeMarkdownText(a.cpf || '-'),
       new Date(a.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       '', // Status pill drawn manually
-      '', // Selfie
-      ''  // Signature
+      '', // Biometria Facial (Foto Selfie)
+      ''  // Assinatura Digital
     ];
   });
 
   autoTable(doc, {
     startY: currentY,
     margin: { top: 20, bottom: 25, left: 14, right: 14 },
-    head: [['#', 'NOME COMPLETO', 'FUNÇÃO', 'ENTRADA', 'STATUS / SAÍDA', 'BIOMETRIA', 'ASSINATURA DIGITAL']],
+    head: [['#', 'NOME COMPLETO', 'FUNÇÃO', 'ENTRADA', 'STATUS / SAÍDA', 'BIOMETRIA (FOTO)', 'ASSINATURA DIGITAL']],
     body: tableRows.length > 0 ? tableRows : [['-', 'Nenhum participante', '-', '-', '-', '-', '-']],
     theme: 'plain',
     headStyles: {
@@ -350,12 +586,12 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
     },
     columnStyles: {
       0: { cellWidth: 8, halign: 'center' },
-      1: { cellWidth: 40, halign: 'left', fontStyle: 'bold' },
+      1: { cellWidth: 39, halign: 'left', fontStyle: 'bold' },
       2: { cellWidth: 26, halign: 'left' },
       3: { cellWidth: 15, halign: 'center' },
-      4: { cellWidth: 32, halign: 'center' },
-      5: { cellWidth: 26, halign: 'center' },
-      6: { cellWidth: 35, halign: 'center' }
+      4: { cellWidth: 30, halign: 'center' },
+      5: { cellWidth: 28, halign: 'center' },
+      6: { cellWidth: 36, halign: 'center' }
     },
     didDrawCell: (data) => {
       if (data.section === 'body' && attendeesList.length > 0) {
@@ -369,7 +605,7 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
           const fg = isEarlyExit ? [132, 32, 41] : [15, 81, 50];
           
           doc.setFillColor(bg[0], bg[1], bg[2]);
-          const pillW = 28;
+          const pillW = 27;
           const pillH = 9.5;
           const px = data.cell.x + (data.cell.width - pillW) / 2;
           const py = data.cell.y + (data.cell.height - pillH) / 2;
@@ -377,38 +613,85 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
           doc.roundedRect(px, py, pillW, pillH, 2, 2, 'F');
           
           doc.setFillColor(tableHeaderGreen[0], tableHeaderGreen[1], tableHeaderGreen[2]);
-          doc.circle(px + 5.5, py + 4.7, 2.2, 'F');
+          doc.circle(px + 5, py + 4.7, 2, 'F');
           
           doc.setTextColor(fg[0], fg[1], fg[2]);
           doc.setFontSize(6);
           doc.setFont('helvetica', 'bold');
           
           if (isEarlyExit) {
-            doc.text('SAÍDA', px + 16, py + 4.2, { align: 'center' });
-            doc.text('ANTECIPADA', px + 16, py + 7.2, { align: 'center' });
+            doc.text('SAÍDA', px + 15.5, py + 4.2, { align: 'center' });
+            doc.text('ANTECIPADA', px + 15.5, py + 7.2, { align: 'center' });
           } else {
-            doc.text('PRESENTE', px + 16.5, py + 4.2, { align: 'center' });
-            doc.text('ATÉ O FIM', px + 16.5, py + 7.2, { align: 'center' });
+            doc.text('PRESENTE', px + 16, py + 4.2, { align: 'center' });
+            doc.text('ATÉ O FIM', px + 16, py + 7.2, { align: 'center' });
           }
         }
 
-        // Selfie com detecção dinâmica de formato
-        if (data.column.index === 5 && attendee.selfie) {
-          try {
-            const format = attendee.selfie.includes('image/png') ? 'PNG' : 'JPEG';
-            doc.addImage(attendee.selfie, format, data.cell.x + 6, data.cell.y + 1.5, 14, 14);
-          } catch (e) {
-            console.warn('Aviso: selfie não pôde ser renderizada no PDF:', e);
+        // Biometria Facial (Foto Selfie do Colaborador)
+        if (data.column.index === 5) {
+          if (attendee.selfie && typeof attendee.selfie === 'string' && attendee.selfie.length > 50) {
+            try {
+              const format = attendee.selfie.includes('image/png') ? 'PNG' : 'JPEG';
+              const imgW = 14;
+              const imgH = 14;
+              const imgX = data.cell.x + (data.cell.width - imgW) / 2;
+              const imgY = data.cell.y + (data.cell.height - imgH) / 2;
+
+              // Moldura sutil ao redor da foto
+              doc.setFillColor(245, 248, 246);
+              doc.roundedRect(imgX - 1, imgY - 1, imgW + 2, imgH + 2, 1.5, 1.5, 'F');
+              doc.setDrawColor(210, 225, 218);
+              doc.setLineWidth(0.2);
+              doc.roundedRect(imgX - 1, imgY - 1, imgW + 2, imgH + 2, 1.5, 1.5, 'S');
+
+              doc.addImage(attendee.selfie, format, imgX, imgY, imgW, imgH);
+            } catch (e) {
+              console.warn('Aviso: selfie não pôde ser renderizada no PDF:', e);
+              doc.setFontSize(6);
+              doc.setFont('helvetica', 'bold');
+              doc.setTextColor(tableHeaderGreen[0], tableHeaderGreen[1], tableHeaderGreen[2]);
+              doc.text('✓ Foto Validada', data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1, { align: 'center' });
+            }
+          } else {
+            // Em caso de não captura ou purge
+            doc.setFontSize(6);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+            doc.text('Não coletada', data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1, { align: 'center' });
           }
         }
 
-        // Signature com detecção dinâmica de formato
-        if (data.column.index === 6 && attendee.signature) {
-          try {
-            const format = attendee.signature.includes('image/jpeg') ? 'JPEG' : 'PNG';
-            doc.addImage(attendee.signature, format, data.cell.x + 2, data.cell.y + 2.5, 29, 12);
-          } catch (e) {
-            console.warn('Aviso: assinatura não pôde ser renderizada no PDF:', e);
+        // Assinatura Digital
+        if (data.column.index === 6) {
+          if (attendee.signature && typeof attendee.signature === 'string' && attendee.signature.length > 50) {
+            try {
+              const format = attendee.signature.includes('image/jpeg') ? 'JPEG' : 'PNG';
+              const signW = 31;
+              const signH = 13.5;
+              const signX = data.cell.x + (data.cell.width - signW) / 2;
+              const signY = data.cell.y + (data.cell.height - signH) / 2;
+
+              // Fundo branco limpo para assinatura
+              doc.setFillColor(255, 255, 255);
+              doc.roundedRect(signX, signY, signW, signH, 1, 1, 'F');
+              doc.setDrawColor(220, 230, 225);
+              doc.setLineWidth(0.2);
+              doc.roundedRect(signX, signY, signW, signH, 1, 1, 'S');
+
+              doc.addImage(attendee.signature, format, signX + 0.5, signY + 0.5, signW - 1, signH - 1);
+            } catch (e) {
+              console.warn('Aviso: assinatura não pôde ser renderizada no PDF:', e);
+              doc.setFontSize(6);
+              doc.setFont('helvetica', 'bold');
+              doc.setTextColor(tableHeaderGreen[0], tableHeaderGreen[1], tableHeaderGreen[2]);
+              doc.text('✓ Assinatura Registrada', data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1, { align: 'center' });
+            }
+          } else {
+            doc.setFontSize(6);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+            doc.text('Não assinada', data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1, { align: 'center' });
           }
         }
       }
@@ -643,43 +926,83 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
 
     // 1. Bloco de Objetivo Geral
     const vObjText = rawObjective || 'Orientação, instrução normativa e conscientização operacional conforme as diretrizes de Segurança e Saúde no Trabalho.';
-    const vObjLines = doc.splitTextToSize(vObjText, fullWidth - 12);
-    const vObjLineCount = Array.isArray(vObjLines) ? vObjLines.length : 1;
-    const vObjBlockH = Math.max(18, 9 + vObjLineCount * 4.5);
+    const vObjDry = renderFormattedMarkdownInPdf(
+      doc, 
+      vObjText, 
+      19, 
+      versoY + 11.5, 
+      fullWidth - 10, 
+      { baseFontSize: 7.8, lineHeight: 4.2, dryRun: true }
+    );
+    const vObjBlockH = Math.max(18, 12 + vObjDry.totalHeight + 3);
 
     doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
     doc.roundedRect(14, versoY, fullWidth, vObjBlockH, 2, 2, 'F');
+    doc.setDrawColor(220, 235, 228);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(14, versoY, fullWidth, vObjBlockH, 2, 2, 'S');
     
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
     doc.text(meeting.classification === 'Campanha' ? '1. OBJETIVO DA CAMPANHA' : '1. OBJETIVO DO TREINAMENTO', 19, versoY + 6.5);
     
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-    doc.text(vObjLines, 19, versoY + 12);
+    renderFormattedMarkdownInPdf(
+      doc, 
+      vObjText, 
+      19, 
+      versoY + 11.5, 
+      fullWidth - 10, 
+      { 
+        baseFontSize: 7.8, 
+        lineHeight: 4.2, 
+        textColor: textDark, 
+        boldColor: [15, 23, 42],
+        headerColor: darkGreen,
+        dryRun: false 
+      }
+    );
 
     versoY += vObjBlockH + 5;
 
     // 2. Bloco de Conteúdo Programático Ministrado
     const vContentText = rawContent || '1. Módulo Geral: Conceitos e Diretrizes de Segurança do Trabalho e NRs aplicáveis.\n2. Módulo Específico: Procedimentos Operacionais Padrão (POP), Análise Preliminar de Risco (APR) e uso correto de EPIs.\n3. Módulo Prático: Condutas Preventivas, Primeiros Socorros e Prática Operacional.';
-    const vContentLines = doc.splitTextToSize(vContentText, fullWidth - 12);
-    const vContentLineCount = Array.isArray(vContentLines) ? vContentLines.length : 1;
-    const vContentBlockH = Math.max(40, 10 + vContentLineCount * 4.5);
+    const vContentDry = renderFormattedMarkdownInPdf(
+      doc, 
+      vContentText, 
+      19, 
+      versoY + 11.5, 
+      fullWidth - 10, 
+      { baseFontSize: 7.8, lineHeight: 4.2, dryRun: true }
+    );
+    const vContentBlockH = Math.max(36, 12 + vContentDry.totalHeight + 3);
 
     doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
     doc.roundedRect(14, versoY, fullWidth, vContentBlockH, 2, 2, 'F');
+    doc.setDrawColor(220, 235, 228);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(14, versoY, fullWidth, vContentBlockH, 2, 2, 'S');
 
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
     doc.text(meeting.classification === 'Campanha' ? '2. PROGRAMAÇÃO E AÇÕES DA CAMPANHA' : '2. CONTEÚDO PROGRAMÁTICO & MÓDULOS MINISTRADOS', 19, versoY + 6.5);
 
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-    doc.text(vContentLines, 19, versoY + 12);
+    renderFormattedMarkdownInPdf(
+      doc, 
+      vContentText, 
+      19, 
+      versoY + 11.5, 
+      fullWidth - 10, 
+      { 
+        baseFontSize: 7.8, 
+        lineHeight: 4.2, 
+        textColor: textDark, 
+        boldColor: [15, 23, 42],
+        headerColor: darkGreen,
+        dryRun: false 
+      }
+    );
 
     versoY += vContentBlockH + 6;
 

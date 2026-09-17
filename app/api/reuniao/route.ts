@@ -84,7 +84,7 @@ export async function GET(req: Request) {
           where: { id },
           include: {
             attendees: {
-              orderBy: { createdAt: 'desc' }
+              orderBy: { createdAt: 'asc' }
             },
             attachments: {
               orderBy: { order: 'asc' }
@@ -99,8 +99,13 @@ export async function GET(req: Request) {
           return NextResponse.json({ success: false, error: 'Reunião não encontrada' }, { status: 404 });
         }
 
-        // Proteção IDOR: Apenas o organizador dono da reunião ou Super Admin pode ver dados completos
-        const isOwner = sessionUser && (sessionUser.id === meeting.organizerId || sessionUser.role === 'SUPER_ADMIN');
+        // Proteção IDOR: Apenas o organizador dono da reunião, Admin da empresa ou Super Admin pode ver dados completos
+        const isOwner = sessionUser && (
+          sessionUser.id === meeting.organizerId || 
+          sessionUser.role === 'SUPER_ADMIN' ||
+          (sessionUser.companyId && sessionUser.companyId === meeting.companyId && (sessionUser.role === 'ADMIN' || sessionUser.role === 'ORGANIZER'))
+        );
+
         if (!isOwner) {
           logSecurityEvent('FORBIDDEN_ACCESS', {
             userId: sessionUser?.id,
@@ -109,7 +114,7 @@ export async function GET(req: Request) {
           });
           return NextResponse.json({ 
             success: false, 
-            error: 'Acesso restrito: somente o organizador responsável pode carregar a ata completa com dados operacionais.' 
+            error: 'Acesso restrito: somente o organizador responsável ou administrador pode carregar a ata completa com dados operacionais.' 
           }, { status: 403 });
         }
 
@@ -216,9 +221,11 @@ export async function GET(req: Request) {
             name: true,
             cpf: true,
             selfie: true,
+            signature: true,
             createdAt: true,
             leftAt: true,
-            exitReason: true
+            exitReason: true,
+            exitSignature: true
           },
           orderBy: { createdAt: 'desc' }
         },
