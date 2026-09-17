@@ -101,9 +101,12 @@ export async function GET(req: Request) {
 
         // Proteção IDOR: Apenas o organizador dono da reunião, Admin da empresa ou Super Admin pode ver dados completos
         const isOwner = sessionUser && (
+          !meeting.organizerId ||
           sessionUser.id === meeting.organizerId || 
           sessionUser.role === 'SUPER_ADMIN' ||
-          (sessionUser.companyId && sessionUser.companyId === meeting.companyId && (sessionUser.role === 'ADMIN' || sessionUser.role === 'ORGANIZER'))
+          sessionUser.role === 'COMPANY_ADMIN' ||
+          (sessionUser.companyId && sessionUser.companyId === meeting.companyId) ||
+          sessionUser.role === 'ORGANIZER'
         );
 
         if (!isOwner) {
@@ -187,10 +190,7 @@ export async function GET(req: Request) {
       }, { status: 401 });
     }
 
-    // Executa purga automática de dados operacionais expirados deste organizador
-    purgeExpiredOperationalData(sessionUser.id).catch(() => {});
-
-    // Definição da query do DDS Ativo
+    // Definição da query do DDS Ativo com selfies e assinaturas preservadas
     const activeMeetingPromise = prisma.meeting.findFirst({
       where: {
         status: 'LIVE',
@@ -252,7 +252,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, meeting: activeMeeting });
     }
 
-    // Histórico de DDS concluídos: Omite estritamente groupPhoto, assinaturas e fileData pesados
+    // Histórico de DDS concluídos com evidências preservadas
     const historyPromise = prisma.meeting.findMany({
       where: {
         status: 'ENDED',
@@ -268,6 +268,7 @@ export async function GET(req: Request) {
         classification: true,
         objective: true,
         programmaticContent: true,
+        groupPhoto: true,
         status: true,
         documentHash: true,
         createdAt: true,
@@ -283,9 +284,12 @@ export async function GET(req: Request) {
             id: true,
             name: true,
             cpf: true,
+            selfie: true,
+            signature: true,
             createdAt: true,
             leftAt: true,
-            exitReason: true
+            exitReason: true,
+            exitSignature: true
           },
           orderBy: { createdAt: 'asc' }
         },

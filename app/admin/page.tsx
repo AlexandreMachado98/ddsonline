@@ -437,12 +437,15 @@ export default function AdminPanel() {
     showToast('Carregando dados completos da reunião...', 'info');
     try {
       let fullMeeting = meeting;
-      const hasFullSignatures = meeting.attendees.some((a: any) => a.signature);
-      if (!hasFullSignatures && meeting.id) {
-        const res = await fetch(`/api/reuniao?id=${meeting.id}&full=true`);
-        const data = await res.json();
-        if (data.success && data.meeting) {
-          fullMeeting = data.meeting;
+      if (meeting.id) {
+        try {
+          const res = await fetch(`/api/reuniao?id=${meeting.id}&full=true`);
+          const data = await res.json();
+          if (data.success && data.meeting) {
+            fullMeeting = data.meeting;
+          }
+        } catch (fetchErr) {
+          console.warn('Falha ao buscar ata completa do servidor, usando dados locais:', fetchErr);
         }
       }
       showToast('Gerando Ata Oficial em PDF com evidências...', 'info');

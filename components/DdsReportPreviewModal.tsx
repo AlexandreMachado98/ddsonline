@@ -8,7 +8,7 @@ import {
   Check, FileSpreadsheet, LayoutList, FileImage, 
   AlertCircle, ExternalLink, Image as ImageIcon
 } from 'lucide-react';
-import { generateDdsPdf, MeetingData, parseGroupPhotos } from '@/lib/pdfGenerator';
+import { generateDdsPdf, MeetingData, parseGroupPhotos, normalizeAttendee } from '@/lib/pdfGenerator';
 
 interface DdsReportPreviewModalProps {
   meeting: MeetingData;
@@ -99,7 +99,7 @@ export default function DdsReportPreviewModal({
   const companyLogo = typeof window !== 'undefined' ? localStorage.getItem('dds_company_logo') : null;
 
   // Lista de participantes e anexos
-  const attendeesList = meeting.attendees || [];
+  const attendeesList = (meeting.attendees || []).map(normalizeAttendee);
   const attachmentsList = (meeting.attachments || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
 
   // Verso condicional (Conteúdo Programático ou Treinamento)

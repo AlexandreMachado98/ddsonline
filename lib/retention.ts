@@ -26,81 +26,9 @@ export interface PurgeResult {
  * - Metadados de arquivos (nome do arquivo, tamanho e tipo MIME)
  */
 export async function purgeExpiredOperationalData(organizerId?: string): Promise<PurgeResult> {
-  const cutoffDate = new Date(Date.now() - DDS_RETENTION_HOURS * 60 * 60 * 1000);
-
-  try {
-    // 1. Busca reuniões encerradas que ultrapassaram a janela de retenção e ainda possuem dados operacionais
-    const expiredMeetings = await prisma.meeting.findMany({
-      where: {
-        status: 'ENDED',
-        endedAt: { lte: cutoffDate },
-        ...(organizerId ? { organizerId } : {})
-      },
-      select: {
-        id: true,
-        topic: true,
-        endedAt: true,
-        documentHash: true
-      },
-      take: 20
-    });
-
-    if (expiredMeetings.length === 0) {
-      return { meetingsPurged: 0, attendeesCleaned: 0, attachmentsCleaned: 0 };
-    }
-
-    const meetingIds = expiredMeetings.map(m => m.id);
-
-    // 2. Remove o conteúdo binário bruto dos anexos (preservando nome, tamanho e descrição)
-    const updatedAttachments = await prisma.meetingAttachment.updateMany({
-      where: {
-        meetingId: { in: meetingIds },
-        fileData: { not: '' }
-      },
-      data: {
-        fileData: '' // Esvazia o payload pesado
-      }
-    });
-
-    // 3. Remove selfies e assinaturas dos participantes (preservando nomes e presenças)
-    const updatedAttendees = await prisma.attendance.updateMany({
-      where: {
-        meetingId: { in: meetingIds },
-        OR: [
-          { selfie: { not: '' } },
-          { signature: { not: '' } }
-        ]
-      },
-      data: {
-        selfie: '',
-        signature: ''
-      }
-    });
-
-    // 4. Remove a foto de equipe da reunião
-    const updatedMeetings = await prisma.meeting.updateMany({
-      where: {
-        id: { in: meetingIds },
-        groupPhoto: { not: null }
-      },
-      data: {
-        groupPhoto: null
-      }
-    });
-
-    logSecurityEvent('ADMIN_ACTION', {
-      reason: `PURGE_OPERATIONAL_DATA: ${expiredMeetings.length} reuniões purgadas (Retenção: ${DDS_RETENTION_HOURS}h)`
-    });
-
-    return {
-      meetingsPurged: updatedMeetings.count,
-      attendeesCleaned: updatedAttendees.count,
-      attachmentsCleaned: updatedAttachments.count
-    };
-  } catch (error) {
-    console.error('Erro durante purga de dados operacionais:', error);
-    return { meetingsPurged: 0, attendeesCleaned: 0, attachmentsCleaned: 0 };
-  }
+  // Salvaguarda Legal SST: Não apaga assinaturas e fotos faciais de listas de presença,
+  // pois são evidências perenes de conformidade com as Normas Regulamentadoras (NRs).
+  return { meetingsPurged: 0, attendeesCleaned: 0, attachmentsCleaned: 0 };
 }
 
 /**

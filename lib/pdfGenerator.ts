@@ -14,14 +14,49 @@ export interface AttachmentPdfData {
   order?: number;
 }
 
-interface AttendanceData {
+export interface AttendanceData {
+  id?: string;
   name: string;
   cpf: string;
   selfie?: string;
   signature?: string;
+  savedSelfie?: string;
+  savedSignature?: string;
+  biometricPhoto?: string;
+  photo?: string;
+  photoEvidence?: string;
+  signatureData?: string;
   createdAt: string;
   exitReason?: string;
   exitSignature?: string;
+}
+
+/**
+ * Normaliza objetos de participantes de qualquer versão (offline, legada ou atual)
+ */
+export function normalizeAttendee(raw: any): AttendanceData {
+  if (!raw) {
+    return { name: 'Participante', cpf: '-', createdAt: new Date().toISOString() };
+  }
+  const selfie = raw.selfie || raw.savedSelfie || raw.biometricPhoto || raw.photo || raw.photoEvidence || '';
+  const signature = raw.signature || raw.savedSignature || raw.signatureData || '';
+  const exitSignature = raw.exitSignature || raw.savedExitSignature || '';
+  const exitReason = raw.exitReason || raw.justification || '';
+  const name = raw.name || raw.fullName || raw.collaboratorName || 'Participante';
+  const cpf = raw.cpf || raw.role || raw.funcao || raw.position || '-';
+  const createdAt = raw.createdAt || raw.timestamp || raw.admittedAt || new Date().toISOString();
+
+  return {
+    ...raw,
+    id: raw.id || raw.attendanceId || raw.localId,
+    name,
+    cpf,
+    selfie,
+    signature,
+    exitSignature,
+    exitReason,
+    createdAt
+  };
 }
 
 export interface MeetingData {
@@ -542,7 +577,7 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
   
   currentY += 9;
   
-  const attendeesList = meeting.attendees || [];
+  const attendeesList = (meeting.attendees || []).map(normalizeAttendee);
   const tableRows = attendeesList.map((a, idx) => {
     return [
       String(idx + 1),
@@ -630,9 +665,10 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
 
         // Biometria Facial (Foto Selfie do Colaborador)
         if (data.column.index === 5) {
-          if (attendee.selfie && typeof attendee.selfie === 'string' && attendee.selfie.length > 50) {
+          const selfieData = attendee.selfie || (attendee as any).savedSelfie || (attendee as any).biometricPhoto || (attendee as any).photo || (attendee as any).photoEvidence;
+          if (selfieData && typeof selfieData === 'string' && selfieData.length > 50) {
             try {
-              const format = attendee.selfie.includes('image/png') ? 'PNG' : 'JPEG';
+              const format = selfieData.includes('image/png') ? 'PNG' : 'JPEG';
               const imgW = 14;
               const imgH = 14;
               const imgX = data.cell.x + (data.cell.width - imgW) / 2;
@@ -645,7 +681,7 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
               doc.setLineWidth(0.2);
               doc.roundedRect(imgX - 1, imgY - 1, imgW + 2, imgH + 2, 1.5, 1.5, 'S');
 
-              doc.addImage(attendee.selfie, format, imgX, imgY, imgW, imgH);
+              doc.addImage(selfieData, format, imgX, imgY, imgW, imgH);
             } catch (e) {
               console.warn('Aviso: selfie não pôde ser renderizada no PDF:', e);
               doc.setFontSize(6);
@@ -654,7 +690,6 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
               doc.text('✓ Foto Validada', data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1, { align: 'center' });
             }
           } else {
-            // Em caso de não captura ou purge
             doc.setFontSize(6);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
@@ -664,9 +699,10 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
 
         // Assinatura Digital
         if (data.column.index === 6) {
-          if (attendee.signature && typeof attendee.signature === 'string' && attendee.signature.length > 50) {
+          const signatureData = attendee.signature || (attendee as any).savedSignature || (attendee as any).signatureData;
+          if (signatureData && typeof signatureData === 'string' && signatureData.length > 50) {
             try {
-              const format = attendee.signature.includes('image/jpeg') ? 'JPEG' : 'PNG';
+              const format = signatureData.includes('image/jpeg') ? 'JPEG' : 'PNG';
               const signW = 31;
               const signH = 13.5;
               const signX = data.cell.x + (data.cell.width - signW) / 2;
@@ -679,7 +715,7 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
               doc.setLineWidth(0.2);
               doc.roundedRect(signX, signY, signW, signH, 1, 1, 'S');
 
-              doc.addImage(attendee.signature, format, signX + 0.5, signY + 0.5, signW - 1, signH - 1);
+              doc.addImage(signatureData, format, signX + 0.5, signY + 0.5, signW - 1, signH - 1);
             } catch (e) {
               console.warn('Aviso: assinatura não pôde ser renderizada no PDF:', e);
               doc.setFontSize(6);
