@@ -45,8 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Atualização em memória e no cache local
   const updateUserLocal = useCallback((updatedData: Partial<AuthUser>) => {
     setUser(prev => {
-      if (!prev) return null;
-      const merged = { ...prev, ...updatedData };
+      const merged = prev ? { ...prev, ...updatedData } : (updatedData as AuthUser);
       try {
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(merged));
       } catch {}

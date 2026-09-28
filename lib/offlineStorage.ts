@@ -142,19 +142,27 @@ export async function removeOfflineAttendance(localId: string): Promise<void> {
 }
 
 /**
- * Cache dos dados do DDS para permitir abrir a tela no campo mesmo sem sinal
+ * Cache dos dados essenciais do DDS para permitir abrir a tela no campo mesmo sem sinal.
+ * Garante por design que fotos faciais, assinaturas e listas de terceiros NUNCA fiquem em cache.
  */
 export function cacheMeetingData(meeting: any): void {
   if (typeof window === 'undefined' || !meeting || !meeting.id) return;
   try {
     const raw = localStorage.getItem(LOCALSTORAGE_MEETINGS_CACHE_KEY);
     const map = raw ? JSON.parse(raw) : {};
-    // Garante que foto de equipe nunca seja gravada no cache local público de reuniões
-    const { groupPhoto, ...publicMeetingData } = meeting;
-    map[meeting.id] = {
-      ...publicMeetingData,
+    const safeMeeting = {
+      id: meeting.id,
+      topic: meeting.topic,
+      farm: meeting.farm,
+      type: meeting.type,
+      classification: meeting.classification,
+      objective: meeting.objective,
+      programmaticContent: meeting.programmaticContent,
+      createdAt: meeting.createdAt,
+      status: meeting.status,
       _cachedAt: new Date().toISOString()
     };
+    map[meeting.id] = safeMeeting;
     map['_last_meeting_id'] = meeting.id;
     localStorage.setItem(LOCALSTORAGE_MEETINGS_CACHE_KEY, JSON.stringify(map));
   } catch (err) {

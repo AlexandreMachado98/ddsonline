@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser, logSecurityEvent } from '@/lib/auth';
 import { purgeExpiredOperationalData, purgeMeetingOperationalDataImmediate } from '@/lib/retention';
+import { validateBase64Image, validateAttachment } from '@/lib/fileValidation';
 
 export const dynamic = 'force-dynamic';
 
@@ -99,14 +100,13 @@ export async function GET(req: Request) {
           return NextResponse.json({ success: false, error: 'Reunião não encontrada' }, { status: 404 });
         }
 
-        // Proteção IDOR: Apenas o organizador dono da reunião, Admin da empresa ou Super Admin pode ver dados completos
-        const isOwner = sessionUser && (
-          !meeting.organizerId ||
-          sessionUser.id === meeting.organizerId || 
-          sessionUser.role === 'SUPER_ADMIN' ||
-          sessionUser.role === 'COMPANY_ADMIN' ||
-          (sessionUser.companyId && sessionUser.companyId === meeting.companyId) ||
-          sessionUser.role === 'ORGANIZER'
+        // Proteção IDOR e Multi-Tenant: Apenas o organizador dono da reunião, Admin da mesma empresa ou Super Admin pode ver a ata com dados operacionais completos (selfies e assinaturas)
+        const isOwner = Boolean(
+          sessionUser && (
+            sessionUser.role === 'SUPER_ADMIN' ||
+            (meeting.organizerId && sessionUser.id === meeting.organizerId) ||
+            (sessionUser.companyId && meeting.companyId && sessionUser.companyId === meeting.companyId && sessionUser.role === 'COMPANY_ADMIN')
+          )
         );
 
         if (!isOwner) {
@@ -117,7 +117,7 @@ export async function GET(req: Request) {
           });
           return NextResponse.json({ 
             success: false, 
-            error: 'Acesso restrito: somente o organizador responsável ou administrador pode carregar a ata completa com dados operacionais.' 
+            error: 'Acesso restrito: somente o organizador responsável ou administrador da empresa pode carregar a ata completa com dados operacionais.' 
           }, { status: 403 });
         }
 
@@ -345,19 +345,42 @@ export async function POST(req: Request) {
       data: { status: 'ENDED' }
     });
 
-    // Sanitização e Whitelist dos Anexos
-    const sanitizedAttachments = Array.isArray(attachments)
-      ? attachments.slice(0, 10).map((att: any, idx: number) => ({
-          fileName: String(att.fileName || `anexo_${idx+1}`).slice(0, 100),
-          displayName: String(att.displayName || att.fileName || `Anexo ${idx+1}`).slice(0, 100),
-          description: att.description ? String(att.description).slice(0, 500) : null,
-          mimeType: String(att.mimeType || 'application/pdf').slice(0, 50),
-          fileSize: Number(att.fileSize) || 0,
-          fileData: typeof att.fileData === 'string' ? att.fileData : '',
-          pageCount: Number(att.pageCount) || 1,
-          order: typeof att.order === 'number' ? att.order : idx
-        }))
-      : [];
+    // 1. Validação estrita da foto em grupo (se enviada)
+    let validatedGroupPhoto: string | null = null;
+    if (typeof groupPhoto === 'string' && groupPhoto.trim().length > 0) {
+      const imgValidation = validateBase64Image(groupPhoto, 5 * 1024 * 1024);
+      if (!imgValidation.valid) {
+        return NextResponse.json({ success: false, error: imgValidation.error || 'Foto em grupo inválida.' }, { status: 400 });
+      }
+      validatedGroupPhoto = groupPhoto;
+    }
+
+    // 2. Sanitização e Validação por Magic Bytes dos Anexos
+    const sanitizedAttachments: any[] = [];
+    if (Array.isArray(attachments)) {
+      for (let idx = 0; idx < Math.min(attachments.length, 10); idx++) {
+        const att = attachments[idx];
+        if (att && (att.fileData || att.fileName)) {
+          const attValidation = validateAttachment(att);
+          if (!attValidation.valid) {
+            return NextResponse.json({ 
+              success: false, 
+              error: `Erro no anexo ${idx + 1}: ${attValidation.error}` 
+            }, { status: 400 });
+          }
+          sanitizedAttachments.push({
+            fileName: String(att.fileName || `anexo_${idx+1}`).slice(0, 100),
+            displayName: String(att.displayName || att.fileName || `Anexo ${idx+1}`).slice(0, 100),
+            description: att.description ? String(att.description).slice(0, 500).trim() : null,
+            mimeType: attValidation.detectedMime || String(att.mimeType || 'application/pdf').slice(0, 50),
+            fileSize: Number(att.fileSize) || 0,
+            fileData: typeof att.fileData === 'string' ? att.fileData : '',
+            pageCount: Number(att.pageCount) || 1,
+            order: typeof att.order === 'number' ? att.order : idx
+          });
+        }
+      }
+    }
 
     const newMeeting = await prisma.meeting.create({
       data: {
@@ -370,7 +393,7 @@ export async function POST(req: Request) {
         status: 'LIVE',
         organizerId: sessionUser.id,
         companyId: sessionUser.companyId || null,
-        groupPhoto: typeof groupPhoto === 'string' && (groupPhoto.length > 20 || groupPhoto.startsWith('http')) ? groupPhoto : null,
+        groupPhoto: validatedGroupPhoto,
         attachments: sanitizedAttachments.length > 0 ? {
           create: sanitizedAttachments
         } : undefined
@@ -454,7 +477,17 @@ export async function PUT(req: Request) {
 
     const updateData: any = {};
     if (status) updateData.status = status;
-    if (groupPhoto !== undefined) updateData.groupPhoto = groupPhoto;
+    if (groupPhoto !== undefined) {
+      if (groupPhoto === null || groupPhoto === '') {
+        updateData.groupPhoto = null;
+      } else if (typeof groupPhoto === 'string') {
+        const imgValidation = validateBase64Image(groupPhoto, 5 * 1024 * 1024);
+        if (!imgValidation.valid) {
+          return NextResponse.json({ success: false, error: imgValidation.error || 'Foto em grupo inválida.' }, { status: 400 });
+        }
+        updateData.groupPhoto = groupPhoto;
+      }
+    }
     if (createdAt) updateData.createdAt = new Date(createdAt);
     if (endedAt !== undefined) updateData.endedAt = endedAt ? new Date(endedAt) : null;
     if (instructorName !== undefined) updateData.instructorName = instructorName;
@@ -480,8 +513,8 @@ export async function PUT(req: Request) {
         existingMeeting.topic || '',
         existingMeeting.createdAt?.toISOString() || '',
         endTimestamp,
-        existingMeeting.attendees?.map(a => `${a.id}:${a.name}:${a.cpf}`).join(';') || '',
-        existingMeeting.attachments?.map(att => `${att.id}:${att.fileName}`).join(';') || ''
+        existingMeeting.attendees?.map((a: any) => `${a.id}:${a.name}:${a.cpf}`).join(';') || '',
+        existingMeeting.attachments?.map((att: any) => `${att.id}:${att.fileName}`).join(';') || ''
       ].join('|');
       
       updateData.documentHash = crypto.createHash('sha256').update(rawDigest).digest('hex');
@@ -490,25 +523,43 @@ export async function PUT(req: Request) {
 
     // Sincroniza anexos se fornecidos preservando fileData se já existirem
     if (Array.isArray(attachments)) {
-      const existingMap = new Map(existingMeeting.attachments.map(a => [a.id, a.fileData]));
+      const existingMap = new Map(existingMeeting.attachments.map((a: any) => [a.id, a.fileData]));
 
-      await prisma.meetingAttachment.deleteMany({
-        where: { meetingId }
-      });
-      if (attachments.length > 0) {
-        await prisma.meetingAttachment.createMany({
-          data: attachments.slice(0, 10).map((att: any, idx: number) => ({
+      const sanitizedPutAttachments: any[] = [];
+      for (let idx = 0; idx < Math.min(attachments.length, 10); idx++) {
+        const att = attachments[idx];
+        if (att) {
+          const fileData = att.fileData || (att.id ? existingMap.get(att.id) || '' : '');
+          if (fileData) {
+            const attValidation = validateAttachment({ ...att, fileData });
+            if (!attValidation.valid) {
+              return NextResponse.json({ 
+                success: false, 
+                error: `Erro no anexo ${idx + 1}: ${attValidation.error}` 
+              }, { status: 400 });
+            }
+          }
+          sanitizedPutAttachments.push({
             id: att.id && !att.id.startsWith('local_') ? att.id : undefined,
             meetingId,
-            fileName: String(att.fileName || `anexo_${idx+1}`).slice(0, 100),
+            fileName: String(att.fileName || `anexo_${idx+1}`).replace(/[/\\?%*:|"<>]/g, '').slice(0, 100),
             displayName: String(att.displayName || att.fileName || `Anexo ${idx+1}`).slice(0, 100),
             description: att.description ? String(att.description).slice(0, 500).trim() : null,
             mimeType: String(att.mimeType || 'application/pdf').slice(0, 50),
             fileSize: Number(att.fileSize) || 0,
-            fileData: att.fileData || (att.id ? existingMap.get(att.id) || '' : ''),
+            fileData,
             pageCount: Number(att.pageCount) || 1,
             order: typeof att.order === 'number' ? att.order : idx
-          }))
+          });
+        }
+      }
+
+      await prisma.meetingAttachment.deleteMany({
+        where: { meetingId }
+      });
+      if (sanitizedPutAttachments.length > 0) {
+        await prisma.meetingAttachment.createMany({
+          data: sanitizedPutAttachments
         });
       }
     }
@@ -567,7 +618,7 @@ export async function DELETE(req: Request) {
       select: { id: true }
     });
 
-    const authorizedIds = meetingsToDelete.map(m => m.id);
+    const authorizedIds = meetingsToDelete.map((m: any) => m.id);
 
     if (authorizedIds.length === 0) {
       logSecurityEvent('FORBIDDEN_ACCESS', {
@@ -608,3 +659,6 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ success: false, error: 'Erro ao excluir reuniões' }, { status: 500 });
   }
 }
+
+// Suporte a PATCH seguro utilizando as mesmas validações e regras de autorização do PUT
+export { PUT as PATCH };

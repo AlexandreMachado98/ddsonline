@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { logSecurityEvent } from '@/lib/auth';
+import { validateBase64Image } from '@/lib/fileValidation';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,26 +53,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'O link deste DDS expirou.' }, { status: 403 });
     }
 
-    // 5. Validação de formato e tamanho de imagens (Selfie e Assinatura)
+    // 5. Validação de formato e tamanho de imagens por Magic Bytes (Selfie e Assinatura)
     let sanitizedSelfie = '';
-    if (typeof savedSelfie === 'string' && savedSelfie.length > 50) {
-      if (!savedSelfie.startsWith('data:image/') && !savedSelfie.startsWith('http')) {
-        return NextResponse.json({ success: false, error: 'Formato de foto inválido.' }, { status: 400 });
-      }
-      // Limite máximo de segurança: 800KB em Base64
-      if (savedSelfie.length > 850000) {
-        return NextResponse.json({ success: false, error: 'A foto é muito grande. Tente novamente.' }, { status: 400 });
+    if (typeof savedSelfie === 'string' && savedSelfie.trim().length > 0) {
+      const selfieValidation = validateBase64Image(savedSelfie, 1.5 * 1024 * 1024); // Máximo 1.5MB
+      if (!selfieValidation.valid) {
+        return NextResponse.json({ success: false, error: selfieValidation.error || 'Formato de foto inválido.' }, { status: 400 });
       }
       sanitizedSelfie = savedSelfie;
     }
 
     let sanitizedSignature = '';
-    if (typeof savedSignature === 'string' && savedSignature.length > 50) {
-      if (!savedSignature.startsWith('data:image/') && !savedSignature.startsWith('http')) {
-        return NextResponse.json({ success: false, error: 'Formato de assinatura inválido.' }, { status: 400 });
-      }
-      if (savedSignature.length > 500000) {
-        return NextResponse.json({ success: false, error: 'A assinatura excedeu o tamanho permitido.' }, { status: 400 });
+    if (typeof savedSignature === 'string' && savedSignature.trim().length > 0) {
+      const sigValidation = validateBase64Image(savedSignature, 1 * 1024 * 1024); // Máximo 1MB
+      if (!sigValidation.valid) {
+        return NextResponse.json({ success: false, error: sigValidation.error || 'Formato de assinatura inválido.' }, { status: 400 });
       }
       sanitizedSignature = savedSignature;
     }

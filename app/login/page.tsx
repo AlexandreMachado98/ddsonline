@@ -9,10 +9,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import DdsLogo from '@/components/DdsLogo';
 import { useToast } from '@/components/Toast';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
   const router = useRouter();
   const toast = useToast();
+  const { updateUserLocal } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,9 +24,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Credenciais de Demonstração
-  const DEMO_EMAIL = 'admin@dds.com.br';
-  const DEMO_PASS = '123456';
+  const isDev = process.env.NODE_ENV === 'development';
+  const DEMO_EMAIL = isDev ? 'admin@dds.com.br' : '';
+  const DEMO_PASS = isDev ? '123456' : '';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +49,12 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (data.success && data.user) {
+        // Atualiza o contexto do React imediatamente para evitar que o /admin monte com usuário nulo
+        updateUserLocal(data.user);
+        
+        // localStorage já é setado no updateUserLocal, mas fazemos aqui também caso queiramos ser explícitos
         localStorage.setItem('dds_admin_auth', JSON.stringify(data.user));
+        
         toast.success('Login Autorizado', `Bem-vindo de volta, ${data.user.name}.`);
         router.push('/admin');
       } else {
@@ -65,6 +72,7 @@ export default function LoginPage() {
   };
 
   const handleQuickDemo = () => {
+    if (!isDev) return;
     setEmail(DEMO_EMAIL);
     setPassword(DEMO_PASS);
     toast.info('Dados Preenchidos', 'Clique em Entrar no Sistema para acessar o painel demo.');
@@ -99,25 +107,27 @@ export default function LoginPage() {
           <p className="text-slate-400 text-xs">Portal do Técnico de Segurança e Gestor</p>
         </div>
 
-        {/* Card Informativo com Credenciais de Demonstração */}
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1">
-              <KeyRound size={12} /> Acesso de Teste / Demo
-            </span>
-            <button
-              type="button"
-              onClick={handleQuickDemo}
-              className="text-[11px] text-emerald-300 hover:text-white font-bold bg-emerald-600/30 hover:bg-emerald-600/50 px-2.5 py-1 rounded-xl transition-colors flex items-center gap-1 border border-emerald-400/20 min-h-[32px]"
-            >
-              <Sparkles size={11} /> Preencher
-            </button>
+        {/* Card Informativo com Credenciais de Demonstração (Somente em Desenvolvimento) */}
+        {isDev && (
+          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1">
+                <KeyRound size={12} /> Acesso de Teste / Demo (DEV)
+              </span>
+              <button
+                type="button"
+                onClick={handleQuickDemo}
+                className="text-[11px] text-emerald-300 hover:text-white font-bold bg-emerald-600/30 hover:bg-emerald-600/50 px-2.5 py-1 rounded-xl transition-colors flex items-center gap-1 border border-emerald-400/20 min-h-[32px]"
+              >
+                <Sparkles size={11} /> Preencher
+              </button>
+            </div>
+            <div className="text-xs text-slate-300 space-y-0.5 font-mono">
+              <p><strong>E-mail:</strong> <code className="text-emerald-300">{DEMO_EMAIL}</code></p>
+              <p><strong>Senha:</strong> <code className="text-emerald-300">{DEMO_PASS}</code></p>
+            </div>
           </div>
-          <div className="text-xs text-slate-300 space-y-0.5 font-mono">
-            <p><strong>E-mail:</strong> <code className="text-emerald-300">admin@dds.com.br</code></p>
-            <p><strong>Senha:</strong> <code className="text-emerald-300">123456</code></p>
-          </div>
-        </div>
+        )}
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-2xl text-center animate-in fade-in">

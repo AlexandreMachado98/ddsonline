@@ -9,8 +9,17 @@ const BCRYPT_ROUNDS = 10;
 const SESSION_COOKIE_NAME = 'dds_session';
 const SESSION_EXPIRY_SECONDS = 7 * 24 * 60 * 60; // 7 dias
 
-// Chave mestra de assinatura de sessão com fallback seguro
-const SESSION_SECRET = process.env.SESSION_SECRET || 'dds_on_master_session_key_2026_amtst_secret';
+/**
+ * Obtém a chave mestra de assinatura de sessão estritamente da variável de ambiente.
+ * Bloqueia a inicialização se SESSION_SECRET estiver ausente ou fraca (< 32 caracteres).
+ */
+export function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.trim().length < 32) {
+    throw new Error('CONFIGURAÇÃO CRÍTICA DE SEGURANÇA: A variável de ambiente SESSION_SECRET é obrigatória e deve possuir no mínimo 32 caracteres.');
+  }
+  return secret.trim();
+}
 
 export interface SessionUser {
   id: string;
@@ -92,6 +101,7 @@ export async function verifyAndMigratePassword(
  * Cria token de sessão assinado
  */
 export function createSessionToken(user: { id: string; email: string; role: string }): string {
+  const secret = getSessionSecret();
   const now = Math.floor(Date.now() / 1000);
   const payload: SessionTokenPayload = {
     sub: user.id,
@@ -103,7 +113,7 @@ export function createSessionToken(user: { id: string; email: string; role: stri
 
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const signature = crypto
-    .createHmac('sha256', SESSION_SECRET)
+    .createHmac('sha256', secret)
     .update(encodedPayload)
     .digest('base64url');
 
@@ -116,6 +126,13 @@ export function createSessionToken(user: { id: string; email: string; role: stri
 export function verifySessionToken(token: string): SessionTokenPayload | null {
   if (!token || typeof token !== 'string') return null;
 
+  let secret: string;
+  try {
+    secret = getSessionSecret();
+  } catch {
+    return null;
+  }
+
   const parts = token.split('.');
   if (parts.length !== 2) return null;
 
@@ -123,7 +140,7 @@ export function verifySessionToken(token: string): SessionTokenPayload | null {
 
   // Validação de assinatura resistente a Timing Attacks
   const expectedSignature = crypto
-    .createHmac('sha256', SESSION_SECRET)
+    .createHmac('sha256', secret)
     .update(encodedPayload)
     .digest('base64url');
 
@@ -308,3 +325,17 @@ export function logSecurityEvent(
 
   console.info(`[SECURITY] ${timestamp} | ${eventType} |`, JSON.stringify(safeDetails));
 }
+
+/**
+ * Extrai e sanitiza o endereço IP real do cliente
+ */
+export function getClientIp(req: Request): string {
+  const forwarded = req.headers.get('x-forwarded-for');
+  const realIp = req.headers.get('x-real-ip');
+  const rawIp = forwarded ? forwarded.split(',')[0].trim() : realIp?.trim() || '127.0.0.1';
+
+  // Sanitização: remove caracteres inválidos para IPv4 e IPv6
+  const cleanIp = rawIp.replace(/[^a-fA-F0-9:.]/g, '').slice(0, 45);
+  return cleanIp || 'unknown';
+}
+

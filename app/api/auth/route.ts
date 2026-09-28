@@ -11,7 +11,8 @@ import {
   checkAuthRateLimit, 
   recordAuthFailure, 
   resetAuthRateLimit, 
-  logSecurityEvent 
+  logSecurityEvent,
+  getClientIp
 } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const { action, email, password, name, role, company, companyName, secretKey } = body;
 
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const ip = getClientIp(req);
 
     // --- AÇÃO: LOGOUT ---
     if (action === 'logout') {

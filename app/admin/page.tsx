@@ -220,7 +220,7 @@ export default function AdminPanel() {
     } finally {
       setIsLoadingInitial(false);
     }
-  }, [currentUser?.id, startDate, endDate, teamPhotos.length]);
+  }, [currentUser?.id, startDate, endDate]);
 
   // Carga inicial completa imediata sem waterfall
   useEffect(() => {
