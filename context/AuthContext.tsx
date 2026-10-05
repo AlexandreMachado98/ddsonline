@@ -81,6 +81,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           localStorage.removeItem(AUTH_STORAGE_KEY);
         } catch {}
+        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+          window.location.replace('/login');
+        }
         return null;
       }
     } catch (err) {

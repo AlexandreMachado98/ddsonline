@@ -173,6 +173,7 @@ export default function AdminPanel() {
       
       if (res.status === 401) {
         // Redireciona somente se for resposta explícita não autorizada
+        if (typeof window !== 'undefined') window.location.replace('/login');
         return;
       }
 

@@ -221,11 +221,9 @@ export async function GET(req: Request) {
             name: true,
             cpf: true,
             selfie: true,
-            signature: true,
             createdAt: true,
             leftAt: true,
-            exitReason: true,
-            exitSignature: true
+            exitReason: true
           },
           orderBy: { createdAt: 'desc' }
         },
@@ -268,7 +266,6 @@ export async function GET(req: Request) {
         classification: true,
         objective: true,
         programmaticContent: true,
-        groupPhoto: true,
         status: true,
         documentHash: true,
         createdAt: true,
@@ -284,12 +281,9 @@ export async function GET(req: Request) {
             id: true,
             name: true,
             cpf: true,
-            selfie: true,
-            signature: true,
             createdAt: true,
             leftAt: true,
-            exitReason: true,
-            exitSignature: true
+            exitReason: true
           },
           orderBy: { createdAt: 'asc' }
         },
@@ -567,15 +561,50 @@ export async function PUT(req: Request) {
     const updated = await prisma.meeting.update({
       where: { id: meetingId },
       data: updateData,
-      include: {
+      select: {
+        id: true,
+        topic: true,
+        farm: true,
+        type: true,
+        classification: true,
+        objective: true,
+        programmaticContent: true,
+        groupPhoto: true,
+        status: true,
+        documentHash: true,
+        createdAt: true,
+        endedAt: true,
+        instructorName: true,
+        organizerId: true,
+        companyId: true,
+        organizer: {
+          select: { name: true, position: true, company: true }
+        },
         attendees: {
+          select: {
+            id: true,
+            name: true,
+            cpf: true,
+            selfie: true,
+            createdAt: true,
+            leftAt: true,
+            exitReason: true
+          },
           orderBy: { createdAt: 'desc' }
         },
         attachments: {
+          select: {
+            id: true,
+            fileName: true,
+            displayName: true,
+            description: true,
+            mimeType: true,
+            fileSize: true,
+            pageCount: true,
+            order: true,
+            createdAt: true
+          },
           orderBy: { order: 'asc' }
-        },
-        organizer: {
-          select: { name: true, position: true, company: true }
         }
       }
     });
