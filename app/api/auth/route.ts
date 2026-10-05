@@ -243,7 +243,8 @@ export async function POST(req: Request) {
 
   } catch (error) {
     // Sanitização de Logs: Registramos a stack/motivo no servidor para debug (Vercel Logs)
-    console.error('Erro interno na rota /api/auth:', error instanceof Error ? error.message : error);
-    return NextResponse.json({ success: false, error: 'Falha interna ao processar autenticação' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Erro interno na rota /api/auth:', errorMessage);
+    return NextResponse.json({ success: false, error: `Falha interna: ${errorMessage}` }, { status: 500 });
   }
 }
