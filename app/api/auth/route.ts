@@ -240,8 +240,8 @@ export async function POST(req: Request) {
     return response;
 
   } catch (error) {
-    // Sanitização de Logs: Nunca registrar senhas ou dados sensíveis em caso de erro
-    console.error('Erro interno na rota /api/auth');
+    // Sanitização de Logs: Registramos a stack/motivo no servidor para debug (Vercel Logs)
+    console.error('Erro interno na rota /api/auth:', error instanceof Error ? error.message : error);
     return NextResponse.json({ success: false, error: 'Falha interna ao processar autenticação' }, { status: 500 });
   }
 }
