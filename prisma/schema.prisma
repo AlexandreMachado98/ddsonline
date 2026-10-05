@@ -8,19 +8,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  SUPER_ADMIN
-  COMPANY_ADMIN
-  ORGANIZER
-}
-
-enum Status {
-  ACTIVE
-  PENDING_APPROVAL
-  SUSPENDED
-  BLOCKED
-}
-
 model Company {
   id                 String    @id @default(uuid())
   name               String
@@ -29,9 +16,8 @@ model Company {
   secretKey          String?
   autoApproveWithKey Boolean   @default(true)
   createdAt          DateTime  @default(now())
-  
-  users              User[]
   meetings           Meeting[]
+  users              User[]
 }
 
 model User {
@@ -43,12 +29,10 @@ model User {
   status     Status    @default(ACTIVE)
   position   String?   @default("Técnico em Segurança do Trabalho")
   company    String?
-  photoURL   String?
   createdAt  DateTime  @default(now())
-  
   companyId  String?
-  companyRel Company?  @relation(fields: [companyId], references: [id])
   meetings   Meeting[]
+  companyRel Company?  @relation(fields: [companyId], references: [id])
 }
 
 model Meeting {
@@ -60,22 +44,13 @@ model Meeting {
   inviteExpiresAt DateTime?
   inviteToken     String?
   organizerId     String?
-  organizer       User?        @relation(fields: [organizerId], references: [id])
   companyId       String?
+  type            String       @default("PRESENTIAL")
+  objective       String?
+  teamPhotos      String?
+  attendees       Attendance[]
   company         Company?     @relation(fields: [companyId], references: [id])
-  type            String?      @default("REMOTE")
-  groupPhoto          String?
-  objective           String?
-  programmaticContent String?
-  endedAt             DateTime?
-  instructorName      String?
-  classification      String?      @default("DDS")
-  documentHash        String?
-  attendees           Attendance[]
-  attachments         MeetingAttachment[]
-
-  @@index([organizerId, status, createdAt(sort: Desc)])
-  @@index([companyId])
+  organizer       User?        @relation(fields: [organizerId], references: [id])
 }
 
 model Attendance {
@@ -89,24 +64,19 @@ model Attendance {
   leftAt        DateTime?
   createdAt     DateTime  @default(now())
   meetingId     String
-  meeting       Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
-
-  @@index([meetingId, createdAt])
+  status        String    @default("ADMITTED")
+  meeting       Meeting   @relation(fields: [meetingId], references: [id])
 }
 
-model MeetingAttachment {
-  id          String   @id @default(uuid())
-  fileName    String
-  displayName String?
-  description String?
-  mimeType    String
-  fileSize    Int
-  fileData    String
-  pageCount   Int?     @default(1)
-  order       Int      @default(0)
-  createdAt   DateTime @default(now())
-  meetingId   String
-  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+enum Role {
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  ORGANIZER
+}
 
-  @@index([meetingId, order])
+enum Status {
+  ACTIVE
+  PENDING_APPROVAL
+  SUSPENDED
+  BLOCKED
 }

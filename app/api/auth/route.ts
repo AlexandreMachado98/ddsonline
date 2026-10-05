@@ -54,13 +54,15 @@ export async function POST(req: Request) {
 
     const ip = getClientIp(req);
 
-    // --- AÇÃO: LOGOUT ---
+    // AÇÃO: LOGOUT
     if (action === 'logout') {
       const response = NextResponse.json({ success: true, message: 'Sessão encerrada com sucesso' });
       response.headers.set('Set-Cookie', getLogoutCookieHeader());
       logSecurityEvent('LOGOUT', { ip });
       return response;
     }
+
+    console.log(`[AUTH] Iniciando tentativa de login para o email: ${email}`);
 
     // Validações básicas de entrada
     if (!email || typeof email !== 'string') {
