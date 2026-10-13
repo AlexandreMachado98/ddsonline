@@ -1462,8 +1462,8 @@ export default function AdminPanel() {
         {/* Badge de Sincronização e Fila Offline */}
         <OfflineSyncBadge meetingId={activeMeeting?.id} onSyncComplete={() => fetchAllData()} />
 
-        {/* Abas de Navegação (Novo DDS vs Histórico) */}
-        <div className="grid grid-cols-2 bg-slate-900 border border-slate-800 p-1.5 rounded-2xl gap-1.5 shadow-lg">
+        {/* Abas de Navegação (Novo DDS vs Histórico vs Questionários) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 bg-slate-900 border border-slate-800 p-1.5 rounded-2xl gap-1.5 shadow-lg">
           <button
             onClick={() => setActiveTab('NEW_DDS')}
             className={`py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
@@ -1487,6 +1487,16 @@ export default function AdminPanel() {
             <History size={16} />
             <span>Histórico & Atas ({meetingHistory.length})</span>
           </button>
+
+          <Link href="/admin/questionarios" className="w-full">
+            <button
+              type="button"
+              className="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer text-emerald-400 hover:text-white hover:bg-emerald-600/30 border border-emerald-500/30 bg-emerald-950/20 shadow-sm"
+            >
+              <Award size={16} className="text-emerald-400 shrink-0" />
+              <span>Questionários & Provas</span>
+            </button>
+          </Link>
         </div>
 
         {/* ===================================================================== */}
