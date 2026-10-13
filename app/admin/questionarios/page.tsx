@@ -343,6 +343,70 @@ export default function QuestionariosAdminPage() {
     setStatusMessage({ type: 'success', text: `Formulário "${template.title}" carregado no editor! Você pode editar e salvar.` });
   };
 
+  // Transformar qualquer Questionário (vinculado a DDS) em Questionário Independente/Autônomo
+  const handleMakeStandalone = async (quiz: ExistingQuiz) => {
+    try {
+      setIsSaving(true);
+      const res = await fetch('/api/questionarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'clone',
+          sourceQuizId: quiz.id,
+          title: `${quiz.title} (Versão Independente)`,
+          meetingId: null // desvincula de qualquer DDS
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatusMessage({
+          type: 'success',
+          text: `Questionário "${quiz.title}" duplicado com sucesso como Avaliação Independente!`
+        });
+        fetchQuizzes();
+      } else {
+        setStatusMessage({ type: 'error', text: data.error || 'Erro ao criar versão independente.' });
+      }
+    } catch {
+      setStatusMessage({ type: 'error', text: 'Falha de comunicação com o servidor.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Copiar qualquer questionário diretamente para o Banco de Formulários
+  const handleSaveToFormBank = async (quiz: ExistingQuiz) => {
+    try {
+      setIsSaving(true);
+      const res = await fetch('/api/questionarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'clone',
+          sourceQuizId: quiz.id,
+          title: `${quiz.title} (Modelo)`,
+          isTemplate: true,
+          meetingId: null
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatusMessage({
+          type: 'success',
+          text: `Formulário copiado e guardado com sucesso no seu Banco de Formulários!`
+        });
+        fetchQuizzes();
+        setActiveTab('TEMPLATES');
+      } else {
+        setStatusMessage({ type: 'error', text: data.error || 'Erro ao salvar no Banco de Formulários.' });
+      }
+    } catch {
+      setStatusMessage({ type: 'error', text: 'Falha de comunicação com o servidor.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Reabrir Avaliação para Reavaliação (Gera nova rodada de aplicação)
   const handleReevaluate = async (quiz: ExistingQuiz) => {
     try {
@@ -662,18 +726,28 @@ export default function QuestionariosAdminPage() {
 
                         {/* Ações Rápidas */}
                         <div className="flex items-center gap-2 flex-wrap">
-                          {/* Salvar na Biblioteca de Formulários */}
+                          {/* Se for vinculado a um DDS, permite transformar em Avaliação Independente */}
+                          {q.meetingId && (
+                            <button
+                              onClick={() => handleMakeStandalone(q)}
+                              disabled={isSaving}
+                              className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-teal-300 border border-teal-500/30 hover:border-teal-500/60 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                              title="Criar uma cópia deste questionário para rodar de forma independente, sem vínculo com este DDS"
+                            >
+                              <Sparkles size={12} className="text-teal-400" />
+                              <span>Usar como Independente</span>
+                            </button>
+                          )}
+
+                          {/* Copiar para o Banco de Formulários */}
                           <button
-                            onClick={() => handleToggleTemplate(q.id, Boolean(q.isTemplate))}
-                            className={`p-2 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 ${
-                              q.isTemplate 
-                                ? 'bg-cyan-950/60 border-cyan-500 text-cyan-300 hover:bg-cyan-900' 
-                                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
-                            }`}
-                            title={q.isTemplate ? 'Remover do Banco de Formulários' : 'Salvar no Banco de Formulários'}
+                            onClick={() => handleSaveToFormBank(q)}
+                            disabled={isSaving}
+                            className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 hover:border-cyan-500/60 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                            title="Copiar e guardar este modelo diretamente no Banco de Formulários para reutilizar quando quiser"
                           >
-                            <Bookmark size={13} className={q.isTemplate ? 'fill-cyan-400 text-cyan-400' : ''} />
-                            <span className="hidden sm:inline">{q.isTemplate ? 'Salvo no Banco' : 'Guardar Formulário'}</span>
+                            <Bookmark size={12} className="text-cyan-400" />
+                            <span>Jogar no Banco de Formulários</span>
                           </button>
 
                           {q.status === 'DRAFT' && (
