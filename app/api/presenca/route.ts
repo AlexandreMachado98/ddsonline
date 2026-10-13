@@ -84,18 +84,16 @@ export async function POST(req: Request) {
 
     if (existing) {
       // Se for o mesmo colaborador atualizando seus dados na mesma sessão ativa
-      const quizProof = randomBytes(32).toString('hex');
       const updated = await prisma.attendance.update({
         where: { id: existing.id },
         data: {
           name: trimmedName,
           cpf: trimmedCpf,
-          quizProofHash: createHash('sha256').update(quizProof).digest('hex'),
           selfie: sanitizedSelfie || existing.selfie,
           signature: sanitizedSignature || existing.signature
         }
       });
-      return NextResponse.json({ success: true, data: updated, meetingId: meeting.id, updated: true, quizProof });
+      return NextResponse.json({ success: true, data: updated, meetingId: meeting.id, updated: true });
     }
 
     // 7. Salva a presença atrelada estritamente à reunião correta
