@@ -92,6 +92,7 @@ model Attendance {
   meetingId     String
   meeting       Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   quizAttempts QuizAttempt[]
+  quizProofHash String?
 
   @@index([meetingId, createdAt])
 }
