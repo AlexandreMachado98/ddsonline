@@ -29,12 +29,39 @@ export async function POST(req: Request) {
     if (!quiz || quiz.status !== 'PUBLISHED' || quiz.meeting.status !== 'LIVE') return failure('Questionário indisponível.', 403);
     const attendance = await prisma.attendance.findFirst({
       where: { id: attendanceId, meetingId: quiz.meetingId },
-      select: { id: true, signature: true }
+      select: { id: true, quizProofHash: true }
     });
     if (!attendance) return failure('Presença não encontrada neste DDS.', 403);
-    // A API de presenças atual não emite credencial de posse segura. Até isso ser integrado,
-    // NÃO aceitar respostas: attendanceId é público e assinatura não é segredo.
-    // attendanceProof deverá ser um token aleatório, com hash persistido por presença.
-    return failure('Envio temporariamente indisponível até habilitar credencial individual de presença.', 503);
+    if (!attendance.quizProofHash || !equals(attendance.quizProofHash, createHash('sha256').update(attendanceProof).digest('hex'))) return failure('Credencial individual inválida.', 403);
+    if (answers.length !== quiz.questions.length) return failure('Responda todas as perguntas.', 400);
+    const questions: QuizQuestion[] = quiz.questions.map(q => ({
+      id: q.id, text: q.text, type: q.type as QuizQuestion['type'], weight: q.weight,
+      options: q.options.map(o => ({ id: o.id, text: o.text, correct: o.isCorrect })),
+      explanation: q.explanation || undefined
+    }));
+    let result: ReturnType<typeof gradeQuiz>;
+    try {
+      result = gradeQuiz(questions, answers as QuizAnswer[], {
+        passingScore: quiz.passingScore, criticalBelow: quiz.criticalBelow, excellentFrom: quiz.excellentFrom
+      });
+    } catch { return failure('Respostas ou gabarito inválidos.', 400); }
+    try {
+      const attempt = await prisma.quizAttempt.create({ data: {
+        quizId: quiz.id, attendanceId: attendance.id, score: result.score,
+        earnedPoints: result.earnedPoints, possiblePoints: result.possiblePoints,
+        passed: result.passed, level: result.level,
+        answers: { create: result.questions.map(q => ({
+          questionId: q.questionId, selectedOptionIds: q.selectedOptionIds,
+          correct: q.correct, earnedPoints: q.earnedPoints
+        })) }
+      }, select: { id: true } });
+      return NextResponse.json({ success: true, attemptId: attempt.id,
+        result: { score: result.score, correctCount: result.correctCount,
+          totalQuestions: result.totalQuestions, passed: result.passed, level: result.level }
+      }, { status: 201 });
+    } catch (e: any) {
+      if (e?.code === 'P2002') return failure('Este colaborador já respondeu ao questionário.', 409);
+      throw e;
+    }
   } catch { return failure('Não foi possível registrar a avaliação.', 500); }
 }
