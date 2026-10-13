@@ -1,0 +1,31 @@
+name: Validar módulo de questionários
+on:
+  push:
+    branches: [feature/questionarios-dds-preview]
+  pull_request:
+    paths:
+      - 'app/api/questionarios/**'
+      - 'app/admin/questionarios/**'
+      - 'lib/quizGrading.ts'
+      - 'prisma/**'
+      - '.github/workflows/validate-questionarios.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Validar schema Prisma
+        run: npx prisma validate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/dds_test
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/dds_test
+      - name: Validar TypeScript
+        run: npx tsc --noEmit
