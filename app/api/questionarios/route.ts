@@ -51,7 +51,10 @@ export async function GET(req: Request) {
     if (templatesOnly) {
       whereClause.isTemplate = true;
       if (user.role !== 'SUPER_ADMIN') {
-        whereClause.creatorId = user.id;
+        whereClause.OR = [
+          { creatorId: user.id },
+          { creatorId: null }
+        ];
       }
     } else if (meetingId && meetingId !== 'ALL' && meetingId !== 'NONE') {
       const access = await checkMeetingAccess(user, meetingId);
@@ -61,14 +64,18 @@ export async function GET(req: Request) {
       // Apenas questionários autônomos
       whereClause.meetingId = null;
       if (user.role !== 'SUPER_ADMIN') {
-        whereClause.creatorId = user.id;
+        whereClause.OR = [
+          { creatorId: user.id },
+          { creatorId: null }
+        ];
       }
     } else {
-      // Todos os questionários do usuário
+      // Todos os questionários do usuário (vinculados ou desvinculados)
       if (user.role !== 'SUPER_ADMIN') {
         whereClause.OR = [
           { creatorId: user.id },
-          { meeting: { organizerId: user.id } }
+          { meeting: { organizerId: user.id } },
+          { creatorId: null }
         ];
       }
     }
@@ -250,7 +257,10 @@ export async function PATCH(req: Request) {
   if (body.detachMeeting === true || body.meetingId === null) {
     const updated = await prisma.quiz.update({
       where: { id: body.id },
-      data: { meetingId: null }
+      data: {
+        meetingId: null,
+        creatorId: quiz.creatorId || user.id
+      }
     });
     return NextResponse.json({ success: true, quiz: updated, message: 'Questionário desvinculado com sucesso!' });
   }

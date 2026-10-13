@@ -359,8 +359,9 @@ export default function QuestionariosAdminPage() {
       if (data.success) {
         setStatusMessage({
           type: 'success',
-          text: `Questionário "${quiz.title}" desvinculado do DDS! Agora ele é uma Avaliação Autônoma permanente.`
+          text: `Questionário "${quiz.title}" desvinculado com sucesso! Ele agora é uma Avaliação Autônoma permanente.`
         });
+        setSelectedMeetingId('ALL');
         fetchQuizzes();
       } else {
         setStatusMessage({ type: 'error', text: data.error || 'Erro ao desvincular do DDS.' });
