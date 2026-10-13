@@ -31,7 +31,7 @@ export function gradeQuiz(questions: QuizQuestion[], answers: QuizAnswer[], sett
     const valid = new Set(question.options.map(o => o.id));
     if (selected.some(id => !valid.has(id)) || new Set(selected).size !== selected.length) throw new Error("Alternativa desconhecida ou repetida.");
     const correctIds = question.options.filter(o => o.correct).map(o => o.id);
-    const correct = selected.length === correctIds.length && selected.every(id => correctIds.includes(id));
+    const correct = (question.type === "MULTIPLE_CHOICE" || selected.length <= 1) && selected.length === correctIds.length && selected.every(id => correctIds.includes(id));
     return { questionId: question.id, correct, earnedPoints: correct ? question.weight : 0, possiblePoints: question.weight, correctOptionIds: correctIds, selectedOptionIds: selected, explanation: question.explanation };
   });
   const possiblePoints = results.reduce((sum, q) => sum + q.possiblePoints, 0);
