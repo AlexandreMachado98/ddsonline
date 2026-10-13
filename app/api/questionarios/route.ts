@@ -246,6 +246,15 @@ export async function PATCH(req: Request) {
     }
   }
 
+  // AÇÃO: Desvincular de DDS (tornar o questionário autônomo diretamente)
+  if (body.detachMeeting === true || body.meetingId === null) {
+    const updated = await prisma.quiz.update({
+      where: { id: body.id },
+      data: { meetingId: null }
+    });
+    return NextResponse.json({ success: true, quiz: updated, message: 'Questionário desvinculado com sucesso!' });
+  }
+
   // AÇÃO: Alternar se é Template/Formulário Reutilizável
   if (body.toggleTemplate !== undefined) {
     await prisma.quiz.update({

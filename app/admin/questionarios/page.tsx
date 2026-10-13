@@ -343,29 +343,27 @@ export default function QuestionariosAdminPage() {
     setStatusMessage({ type: 'success', text: `Formulário "${template.title}" carregado no editor! Você pode editar e salvar.` });
   };
 
-  // Transformar qualquer Questionário (vinculado a DDS) em Questionário Independente/Autônomo
-  const handleMakeStandalone = async (quiz: ExistingQuiz) => {
+  // Desvincular DIRETAMENTE o questionário do DDS atual (sem criar cópia, alterando o próprio questionário para autônomo)
+  const handleDetachMeeting = async (quiz: ExistingQuiz) => {
     try {
       setIsSaving(true);
       const res = await fetch('/api/questionarios', {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'clone',
-          sourceQuizId: quiz.id,
-          title: `${quiz.title} (Versão Independente)`,
-          meetingId: null // desvincula de qualquer DDS
+          id: quiz.id,
+          detachMeeting: true
         })
       });
       const data = await res.json();
       if (data.success) {
         setStatusMessage({
           type: 'success',
-          text: `Questionário "${quiz.title}" duplicado com sucesso como Avaliação Independente!`
+          text: `Questionário "${quiz.title}" desvinculado do DDS! Agora ele é uma Avaliação Autônoma permanente.`
         });
         fetchQuizzes();
       } else {
-        setStatusMessage({ type: 'error', text: data.error || 'Erro ao criar versão independente.' });
+        setStatusMessage({ type: 'error', text: data.error || 'Erro ao desvincular do DDS.' });
       }
     } catch {
       setStatusMessage({ type: 'error', text: 'Falha de comunicação com o servidor.' });
@@ -726,16 +724,16 @@ export default function QuestionariosAdminPage() {
 
                         {/* Ações Rápidas */}
                         <div className="flex items-center gap-2 flex-wrap">
-                          {/* Se for vinculado a um DDS, permite transformar em Avaliação Independente */}
+                          {/* Se for vinculado a um DDS, permite desvincular a qualquer momento */}
                           {q.meetingId && (
                             <button
-                              onClick={() => handleMakeStandalone(q)}
+                              onClick={() => handleDetachMeeting(q)}
                               disabled={isSaving}
-                              className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-teal-300 border border-teal-500/30 hover:border-teal-500/60 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-                              title="Criar uma cópia deste questionário para rodar de forma independente, sem vínculo com este DDS"
+                              className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/30 hover:border-amber-500/60 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                              title="Desvincular este questionário do DDS para transformá-lo em uma Avaliação Autônoma permanente"
                             >
-                              <Sparkles size={12} className="text-teal-400" />
-                              <span>Usar como Independente</span>
+                              <Sparkles size={12} className="text-amber-400" />
+                              <span>Desvincular do DDS</span>
                             </button>
                           )}
 
