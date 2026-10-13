@@ -247,7 +247,17 @@ function PresencialContent() {
       if (data.success) {
         setIsOfflineSubmitted(false);
         setHasAdmitted(true);
-        try { sessionStorage.removeItem('dds_participant_draft'); } catch {}
+        try { 
+          sessionStorage.removeItem('dds_participant_draft'); 
+          if (data.data?.id && data.quizProof) {
+            localStorage.setItem('dds_last_attendance', JSON.stringify({
+              attendanceId: data.data.id,
+              quizProof: data.quizProof,
+              name: name.trim(),
+              meetingId: meetingId || 'presencial'
+            }));
+          }
+        } catch {}
         toast.success('Presença Presencial Confirmada!', 'Seus dados e foto facial foram registrados com sucesso.');
       } else {
         toast.error('Erro ao Registrar', data.error || 'Não foi possível registrar a presença.');

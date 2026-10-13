@@ -4,9 +4,10 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const source = fs.readFileSync('lib/quizGrading.ts', 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } });
-const exports = {};
-vm.runInNewContext(compiled.outputText, { exports, require }, { filename: 'quizGrading.js' });
-const { gradeQuiz } = exports;
+const moduleObj = { exports: {} };
+const context = { require, console, process, exports: moduleObj.exports, module: moduleObj };
+vm.runInNewContext(compiled.outputText, context, { filename: 'quizGrading.js' });
+const { gradeQuiz } = moduleObj.exports;
 const settings = { passingScore: 70, criticalBelow: 40, excellentFrom: 90 };
 const q = [{ id: '1', text: 'Segurança?', type: 'SINGLE_CHOICE', weight: 2, options: [
   { id: 'a', text: 'Sim', correct: true }, { id: 'b', text: 'Não', correct: false }

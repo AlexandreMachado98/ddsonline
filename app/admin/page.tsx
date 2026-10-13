@@ -6,7 +6,7 @@ import {
   Smartphone, Download, Copy, Check, LogOut, 
   History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet,
   Camera, Image as ImageIcon, Trash2, Target, ExternalLink, Info, CheckSquare, Square, MapPin, Sparkles, ChevronRight, Eye,
-  ArrowLeft, Plus, PenTool
+  ArrowLeft, Plus, PenTool, Award
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
@@ -958,6 +958,17 @@ export default function AdminPanel() {
                 </button>
               </div>
 
+              {/* Acesso rápido às Avaliações e Questionários */}
+              <Link href="/admin/questionarios" className="block w-full">
+                <button
+                  type="button"
+                  className="w-full py-2.5 px-3 bg-slate-900/90 hover:bg-slate-850 border border-emerald-500/30 text-emerald-300 rounded-xl font-bold transition-all text-xs flex items-center justify-center gap-2 cursor-pointer shadow-sm hover:border-emerald-500/60 min-h-[40px]"
+                >
+                  <Award size={15} className="text-emerald-400 shrink-0" />
+                  <span>Questionários & Avaliação de Risco</span>
+                </button>
+              </Link>
+
               {/* Botão de Encerrar DDS com Destaque e Alinhamento Preciso */}
               <button 
                 onClick={handleEndMeeting} 
@@ -1426,6 +1437,26 @@ export default function AdminPanel() {
               <ChevronRight size={15} />
             </div>
           </button>
+
+          {/* Atalho Rápido para Módulo de Questionários */}
+          <Link href="/admin/questionarios" className="block w-full">
+            <div className="w-full flex items-center justify-between p-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-emerald-500/40 rounded-2xl transition-all group cursor-pointer shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500/20 transition-colors">
+                  <Award size={15} />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors">
+                    Módulo de Questionários & Avaliações
+                  </h3>
+                  <p className="text-[10px] text-slate-400">
+                    Crie avaliações de percepção de risco para os colaboradores responderem pelo celular
+                  </p>
+                </div>
+              </div>
+              <ChevronRight size={15} className="text-slate-500 group-hover:text-emerald-400 transition-colors" />
+            </div>
+          </Link>
         </header>
 
         {/* Badge de Sincronização e Fila Offline */}

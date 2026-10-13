@@ -238,7 +238,17 @@ export default function MeetingRoom() {
       if (data.success) {
         setIsOfflineSubmitted(false);
         setHasAdmitted(true);
-        try { sessionStorage.removeItem('dds_participant_draft'); } catch {}
+        try { 
+          sessionStorage.removeItem('dds_participant_draft'); 
+          if (data.data?.id && data.quizProof) {
+            localStorage.setItem('dds_last_attendance', JSON.stringify({
+              attendanceId: data.data.id,
+              quizProof: data.quizProof,
+              name: name.trim(),
+              meetingId: roomId
+            }));
+          }
+        } catch {}
         toast.success('Presença Validada!', 'Sua presença foi registrada com sucesso.');
       } else {
         toast.error('Erro ao Registrar', data.error || 'Não foi possível salvar sua presença.');
