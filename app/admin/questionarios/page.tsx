@@ -142,10 +142,17 @@ export default function QuestionariosAdminPage() {
   }, [fetchMeetings]);
 
   // 2. Carrega questionários
-  const fetchQuizzes = useCallback(async () => {
+  const [allTemplates, setAllTemplates] = useState<ExistingQuiz[]>([]);
+  const [, setIsLoadingTemplates] = useState<boolean>(false);
+  const [attachingQuizId, setAttachingQuizId] = useState<string | null>(null);
+  const [targetMeetingToAttach, setTargetMeetingToAttach] = useState<string>('');
+
+  // 2. Carrega questionários com cache-busting
+  const fetchQuizzes = useCallback(async (forcedFilter?: string) => {
     try {
       setIsLoadingQuizzes(true);
-      const res = await fetch(`/api/questionarios?meetingId=${encodeURIComponent(selectedMeetingId)}`);
+      const filterToUse = forcedFilter !== undefined ? forcedFilter : selectedMeetingId;
+      const res = await fetch(`/api/questionarios?meetingId=${encodeURIComponent(filterToUse)}&_t=${Date.now()}`);
       const data = await res.json();
       if (data.success && Array.isArray(data.quizzes)) {
         setQuizzes(data.quizzes);
@@ -160,12 +167,37 @@ export default function QuestionariosAdminPage() {
     }
   }, [selectedMeetingId]);
 
+  // Busca todos os formulários da biblioteca (templates)
+  const fetchTemplates = useCallback(async () => {
+    try {
+      setIsLoadingTemplates(true);
+      const res = await fetch(`/api/questionarios?templates=true&_t=${Date.now()}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.quizzes)) {
+        setAllTemplates(data.quizzes);
+      }
+    } catch (e) {
+      console.error('Erro ao buscar biblioteca de formulários:', e);
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchQuizzes();
   }, [fetchQuizzes]);
 
-  // Formulários salvos (Templates reutilizáveis)
-  const templateQuizzes = quizzes.filter(q => q.isTemplate);
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
+
+  // Formulários salvos (combina templates da biblioteca com os marcados na lista atual)
+  const templateQuizzes = React.useMemo(() => {
+    const map = new Map<string, ExistingQuiz>();
+    allTemplates.forEach(t => map.set(t.id, t));
+    quizzes.filter(q => q.isTemplate).forEach(q => map.set(q.id, q));
+    return Array.from(map.values());
+  }, [allTemplates, quizzes]);
 
   // Métricas de Business Intelligence (BI)
   const biMetrics = React.useMemo(() => {
@@ -359,12 +391,69 @@ export default function QuestionariosAdminPage() {
       if (data.success) {
         setStatusMessage({
           type: 'success',
-          text: `Questionário "${quiz.title}" desvinculado com sucesso! Ele agora é uma Avaliação Autônoma permanente.`
+          text: `Questionário "${quiz.title}" desvinculado com sucesso! Ele agora é uma Avaliação Autônoma permanente e permanece salvo no sistema.`
         });
         setSelectedMeetingId('ALL');
-        fetchQuizzes();
+        await fetchQuizzes('ALL');
+        await fetchTemplates();
       } else {
         setStatusMessage({ type: 'error', text: data.error || 'Erro ao desvincular do DDS.' });
+      }
+    } catch {
+      setStatusMessage({ type: 'error', text: 'Falha de comunicação com o servidor.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Vincular questionário autônomo a um DDS
+  const handleAttachMeeting = async (quizId: string, meetingId: string) => {
+    if (!meetingId) return;
+    try {
+      setIsSaving(true);
+      const res = await fetch('/api/questionarios', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: quizId,
+          meetingId
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatusMessage({
+          type: 'success',
+          text: 'Questionário vinculado ao DDS com sucesso!'
+        });
+        setAttachingQuizId(null);
+        setTargetMeetingToAttach('');
+        await fetchQuizzes();
+        await fetchTemplates();
+      } else {
+        setStatusMessage({ type: 'error', text: data.error || 'Erro ao vincular ao DDS.' });
+      }
+    } catch {
+      setStatusMessage({ type: 'error', text: 'Falha de comunicação com o servidor.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Excluir avaliação
+  const handleDeleteQuiz = async (quizId: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta avaliação? Esta ação removerá o questionário.')) return;
+    try {
+      setIsSaving(true);
+      const res = await fetch(`/api/questionarios?id=${encodeURIComponent(quizId)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatusMessage({ type: 'success', text: 'Avaliação excluída com sucesso!' });
+        await fetchQuizzes();
+        await fetchTemplates();
+      } else {
+        setStatusMessage({ type: 'error', text: data.error || 'Erro ao excluir avaliação.' });
       }
     } catch {
       setStatusMessage({ type: 'error', text: 'Falha de comunicação com o servidor.' });
@@ -666,7 +755,7 @@ export default function QuestionariosAdminPage() {
                 </select>
 
                 <button
-                  onClick={fetchQuizzes}
+                  onClick={() => fetchQuizzes()}
                   disabled={isLoadingQuizzes}
                   className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 border border-slate-700 min-h-[44px]"
                 >
@@ -726,7 +815,7 @@ export default function QuestionariosAdminPage() {
                         {/* Ações Rápidas */}
                         <div className="flex items-center gap-2 flex-wrap">
                           {/* Se for vinculado a um DDS, permite desvincular a qualquer momento */}
-                          {q.meetingId && (
+                          {q.meetingId ? (
                             <button
                               onClick={() => handleDetachMeeting(q)}
                               disabled={isSaving}
@@ -736,13 +825,55 @@ export default function QuestionariosAdminPage() {
                               <Sparkles size={12} className="text-amber-400" />
                               <span>Desvincular do DDS</span>
                             </button>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              {attachingQuizId === q.id ? (
+                                <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-lg border border-slate-700">
+                                  <select
+                                    value={targetMeetingToAttach}
+                                    onChange={e => setTargetMeetingToAttach(e.target.value)}
+                                    className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none"
+                                  >
+                                    <option value="">Selecione o DDS...</option>
+                                    {meetings.map(m => (
+                                      <option key={m.id} value={m.id}>
+                                        {m.topic}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    onClick={() => handleAttachMeeting(q.id, targetMeetingToAttach)}
+                                    disabled={!targetMeetingToAttach || isSaving}
+                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-xs font-bold rounded cursor-pointer"
+                                  >
+                                    Confirmar
+                                  </button>
+                                  <button
+                                    onClick={() => { setAttachingQuizId(null); setTargetMeetingToAttach(''); }}
+                                    className="px-1.5 py-1 text-slate-400 hover:text-white text-xs cursor-pointer"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setAttachingQuizId(q.id)}
+                                  disabled={isSaving}
+                                  className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 hover:border-slate-500 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                                  title="Vincular esta avaliação autônoma a um DDS específico"
+                                >
+                                  <Layers size={12} className="text-slate-400" />
+                                  <span>Vincular a um DDS</span>
+                                </button>
+                              )}
+                            </div>
                           )}
 
                           {/* Copiar para o Banco de Formulários */}
                           <button
                             onClick={() => handleSaveToFormBank(q)}
                             disabled={isSaving}
-                            className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 hover:border-cyan-500/60 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                            className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 hover:border-cyan-500/60 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
                             title="Copiar e guardar este modelo diretamente no Banco de Formulários para reutilizar quando quiser"
                           >
                             <Bookmark size={12} className="text-cyan-400" />
@@ -752,7 +883,7 @@ export default function QuestionariosAdminPage() {
                           {q.status === 'DRAFT' && (
                             <button
                               onClick={() => handleUpdateStatus(q.id, 'PUBLISHED')}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-xs rounded-lg transition-all"
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-xs rounded-lg transition-all cursor-pointer"
                             >
                               Publicar Avaliação
                             </button>
@@ -762,14 +893,14 @@ export default function QuestionariosAdminPage() {
                             <>
                               <button
                                 onClick={() => handleCopyLink(q.shareToken)}
-                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-all"
+                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer"
                               >
                                 {copiedToken === q.shareToken ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
                                 <span>{copiedToken === q.shareToken ? 'Link Copiado!' : 'Copiar Link'}</span>
                               </button>
                               <button
                                 onClick={() => handleUpdateStatus(q.id, 'CLOSED')}
-                                className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-500 text-white font-bold text-xs rounded-lg transition-all"
+                                className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-500 text-white font-bold text-xs rounded-lg transition-all cursor-pointer"
                               >
                                 Encerrar
                               </button>
@@ -788,6 +919,16 @@ export default function QuestionariosAdminPage() {
                               <span>Aplicar Reavaliação</span>
                             </button>
                           )}
+
+                          {/* Excluir Avaliação */}
+                          <button
+                            onClick={() => handleDeleteQuiz(q.id)}
+                            disabled={isSaving}
+                            className="p-1.5 text-slate-500 hover:text-rose-400 border border-transparent hover:border-rose-500/20 rounded-lg transition-colors cursor-pointer"
+                            title="Excluir esta avaliação"
+                          >
+                            <Trash2 size={13} />
+                          </button>
                         </div>
                       </div>
 

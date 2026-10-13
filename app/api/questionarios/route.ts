@@ -52,8 +52,11 @@ export async function GET(req: Request) {
       whereClause.isTemplate = true;
       if (user.role !== 'SUPER_ADMIN') {
         whereClause.OR = [
+          { meetingId: null },
           { creatorId: user.id },
-          { creatorId: null }
+          { creatorId: null },
+          { meeting: { organizerId: user.id } },
+          ...(user.companyId ? [{ meeting: { companyId: user.companyId } }] : [])
         ];
       }
     } else if (meetingId && meetingId !== 'ALL' && meetingId !== 'NONE') {
@@ -61,21 +64,18 @@ export async function GET(req: Request) {
       if (access.error) return access.error;
       whereClause.meetingId = meetingId;
     } else if (meetingId === 'NONE') {
-      // Apenas questionários autônomos
+      // Apenas questionários autônomos (desvinculados de DDS)
       whereClause.meetingId = null;
-      if (user.role !== 'SUPER_ADMIN') {
-        whereClause.OR = [
-          { creatorId: user.id },
-          { creatorId: null }
-        ];
-      }
     } else {
-      // Todos os questionários do usuário (vinculados ou desvinculados)
+      // 'ALL' ou não especificado:
+      // Mostra todas as avaliações (autônomas/desvinculadas E vinculadas a DDS do usuário)
       if (user.role !== 'SUPER_ADMIN') {
         whereClause.OR = [
+          { meetingId: null }, // Formulários desvinculados/autônomos SEMPRE aparecem!
           { creatorId: user.id },
+          { creatorId: null },
           { meeting: { organizerId: user.id } },
-          { creatorId: null }
+          ...(user.companyId ? [{ meeting: { companyId: user.companyId } }] : [])
         ];
       }
     }
@@ -248,9 +248,8 @@ export async function PATCH(req: Request) {
     if (quiz.meetingId) {
       const access = await checkMeetingAccess(user, quiz.meetingId);
       if (access.error) return access.error;
-    } else {
-      return json('Acesso negado.', 403);
     }
+    // Para questionários autônomos (meetingId: null), qualquer organizador da plataforma tem autorização para gerenciar
   }
 
   // AÇÃO: Desvincular de DDS (tornar o questionário autônomo diretamente)
@@ -263,6 +262,18 @@ export async function PATCH(req: Request) {
       }
     });
     return NextResponse.json({ success: true, quiz: updated, message: 'Questionário desvinculado com sucesso!' });
+  }
+
+  // AÇÃO: Vincular a um DDS existente
+  if (body.attachMeetingId || (typeof body.meetingId === 'string' && body.meetingId && body.meetingId !== 'NONE' && body.meetingId !== 'ALL')) {
+    const targetMeetingId = body.attachMeetingId || body.meetingId;
+    const access = await checkMeetingAccess(user, targetMeetingId);
+    if (access.error) return access.error;
+    const updated = await prisma.quiz.update({
+      where: { id: body.id },
+      data: { meetingId: targetMeetingId }
+    });
+    return NextResponse.json({ success: true, quiz: updated, message: 'Questionário vinculado ao DDS com sucesso!' });
   }
 
   // AÇÃO: Alternar se é Template/Formulário Reutilizável
@@ -290,4 +301,34 @@ export async function PATCH(req: Request) {
   }
 
   return json('Nenhuma ação especificada.', 400);
+}
+
+export async function DELETE(req: Request) {
+  const user = await getAuthenticatedUser(req);
+  if (!user) return json('Sessão inválida.', 401);
+
+  const url = new URL(req.url);
+  const id = url.searchParams.get('id');
+  if (!id) return json('ID do questionário obrigatório.', 400);
+
+  const quiz = await prisma.quiz.findUnique({
+    where: { id },
+    select: { id: true, meetingId: true, creatorId: true }
+  });
+  if (!quiz) return json('Questionário não encontrado.', 404);
+
+  if (user.role !== 'SUPER_ADMIN' && quiz.creatorId !== user.id) {
+    if (quiz.meetingId) {
+      const access = await checkMeetingAccess(user, quiz.meetingId);
+      if (access.error) return access.error;
+    }
+  }
+
+  try {
+    await prisma.quiz.delete({ where: { id } });
+    return NextResponse.json({ success: true, message: 'Questionário excluído com sucesso.' });
+  } catch (err) {
+    console.error('Erro ao excluir questionário:', err);
+    return json('Falha ao excluir questionário.', 500);
+  }
 }
