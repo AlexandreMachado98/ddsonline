@@ -93,7 +93,8 @@ export async function POST(req: Request) {
           signature: sanitizedSignature || existing.signature
         }
       });
-      return NextResponse.json({ success: true, data: updated, meetingId: meeting.id, updated: true });
+      const { quizProofHash: _privateProof, ...safeUpdated } = updated;
+      return NextResponse.json({ success: true, data: safeUpdated, meetingId: meeting.id, updated: true });
     }
 
     // 7. Salva a presença atrelada estritamente à reunião correta
@@ -109,7 +110,8 @@ export async function POST(req: Request) {
       }
     });
 
-    return NextResponse.json({ success: true, data: attendance, meetingId: meeting.id, quizProof });
+    const { quizProofHash: _privateProof, ...safeAttendance } = attendance;
+    return NextResponse.json({ success: true, data: safeAttendance, meetingId: meeting.id, quizProof });
 
   } catch (error) {
     console.error("Erro interno no POST /api/presenca");
