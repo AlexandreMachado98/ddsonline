@@ -6,14 +6,15 @@ import type { QuizQuestion } from '@/lib/quizGrading';
 export const dynamic = 'force-dynamic';
 const json = (error: string, status: number) => NextResponse.json({ success: false, error }, { status });
 
-async function allowed(req: Request, meetingId: string) {
-  const user = await getAuthenticatedUser(req);
-  if (!user) return { error: json('Sessão inválida.', 401) };
-  const meeting = await prisma.meeting.findUnique({ where: { id: meetingId }, select: { id: true, organizerId: true, companyId: true } });
+async function checkMeetingAccess(user: any, meetingId: string) {
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    select: { id: true, organizerId: true, companyId: true }
+  });
   if (!meeting) return { error: json('DDS não encontrado.', 404) };
   const permitted = user.role === 'SUPER_ADMIN' || meeting.organizerId === user.id ||
     (user.role === 'COMPANY_ADMIN' && Boolean(user.companyId && meeting.companyId === user.companyId));
-  return permitted ? { meeting } : { error: json('Acesso negado.', 403) };
+  return permitted ? { meeting } : { error: json('Acesso negado a este DDS.', 403) };
 }
 
 function validate(body: any): { title: string; passingScore: number; criticalBelow: number; excellentFrom: number; questions: QuizQuestion[] } | null {
@@ -37,59 +38,159 @@ function validate(body: any): { title: string; passingScore: number; criticalBel
 }
 
 export async function GET(req: Request) {
-  const meetingId = new URL(req.url).searchParams.get('meetingId');
-  if (!meetingId) return json('Informe meetingId.', 400);
-  const access = await allowed(req, meetingId);
-  if (access.error) return access.error;
+  const user = await getAuthenticatedUser(req);
+  if (!user) return json('Sessão inválida.', 401);
+
+  const url = new URL(req.url);
+  const meetingId = url.searchParams.get('meetingId');
+
   try {
+    const whereClause: any = {};
+
+    if (meetingId && meetingId !== 'ALL' && meetingId !== 'NONE') {
+      const access = await checkMeetingAccess(user, meetingId);
+      if (access.error) return access.error;
+      whereClause.meetingId = meetingId;
+    } else if (meetingId === 'NONE') {
+      // Apenas questionários independentes
+      whereClause.meetingId = null;
+      if (user.role !== 'SUPER_ADMIN') {
+        whereClause.creatorId = user.id;
+      }
+    } else {
+      // Todos os questionários do usuário (vinculados ou independentes)
+      if (user.role !== 'SUPER_ADMIN') {
+        whereClause.OR = [
+          { creatorId: user.id },
+          { meeting: { organizerId: user.id } }
+        ];
+      }
+    }
+
     const quizzes = await prisma.quiz.findMany({
-      where: { meetingId }, orderBy: { createdAt: 'desc' },
-      include: { questions: { orderBy: { position: 'asc' }, include: { options: { orderBy: { position: 'asc' } } } },
-        attempts: { select: { id: true, score: true, passed: true, level: true, submittedAt: true,
-          attendance: { select: { id: true, name: true } } } } }
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        meeting: { select: { id: true, topic: true, farm: true, status: true } },
+        questions: {
+          orderBy: { position: 'asc' },
+          include: { options: { orderBy: { position: 'asc' } } }
+        },
+        attempts: {
+          select: {
+            id: true,
+            score: true,
+            passed: true,
+            level: true,
+            submittedAt: true,
+            participantName: true,
+            attendance: { select: { id: true, name: true } }
+          }
+        }
+      }
     });
+
     return NextResponse.json({ success: true, quizzes }, { headers: { 'Cache-Control': 'no-store' } });
-  } catch { return json('Falha ao consultar questionários. Verifique a migração.', 500); }
+  } catch (err) {
+    console.error('Erro ao consultar questionários:', err);
+    return json('Falha ao consultar questionários.', 500);
+  }
 }
 
 export async function POST(req: Request) {
   const user = await getAuthenticatedUser(req);
   if (!user) return json('Sessão inválida.', 401);
+
   let body: any;
   try { body = await req.json(); } catch { return json('JSON inválido.', 400); }
-  if (typeof body.meetingId !== 'string') return json('Informe o DDS.', 400);
-  const access = await allowed(req, body.meetingId);
-  if (access.error) return access.error;
+
+  const meetingId = (typeof body.meetingId === 'string' && body.meetingId.trim()) ? body.meetingId.trim() : null;
+
+  if (meetingId) {
+    const access = await checkMeetingAccess(user, meetingId);
+    if (access.error) return access.error;
+  }
+
   const data = validate(body);
   if (!data) return json('Revise título, questões, gabarito e limites de desempenho.', 400);
+
   try {
-    const quiz = await prisma.quiz.create({ data: {
-      meetingId: body.meetingId, title: data.title, passingScore: data.passingScore,
-      criticalBelow: data.criticalBelow, excellentFrom: data.excellentFrom,
-      questions: { create: data.questions.map((q, position) => ({
-        text: q.text.trim(), type: q.type, weight: q.weight, position, explanation: typeof q.explanation === 'string' ? q.explanation.slice(0, 1000) : null,
-        options: { create: q.options.map((o, index) => ({ text: o.text.trim(), isCorrect: o.correct, position: index })) }
-      })) }
-    }, select: { id: true, status: true, shareToken: true } });
+    const quiz = await prisma.quiz.create({
+      data: {
+        meetingId: meetingId || null,
+        creatorId: user.id,
+        title: data.title,
+        passingScore: data.passingScore,
+        criticalBelow: data.criticalBelow,
+        excellentFrom: data.excellentFrom,
+        questions: {
+          create: data.questions.map((q, position) => ({
+            text: q.text.trim(),
+            type: q.type,
+            weight: q.weight,
+            position,
+            explanation: typeof q.explanation === 'string' ? q.explanation.slice(0, 1000) : null,
+            options: {
+              create: q.options.map((o, index) => ({
+                text: o.text.trim(),
+                isCorrect: o.correct,
+                position: index
+              }))
+            }
+          }))
+        }
+      },
+      select: { id: true, status: true, shareToken: true, meetingId: true }
+    });
+
     return NextResponse.json({ success: true, quiz }, { status: 201 });
-  } catch { return json('Falha ao criar questionário. Verifique a migração.', 500); }
+  } catch (err) {
+    console.error('Erro ao criar questionário:', err);
+    return json('Falha ao criar questionário no banco de dados.', 500);
+  }
 }
 
 export async function PATCH(req: Request) {
   const user = await getAuthenticatedUser(req);
   if (!user) return json('Sessão inválida.', 401);
+
   let body: any;
   try { body = await req.json(); } catch { return json('JSON inválido.', 400); }
-  if (typeof body.id !== 'string' || !['PUBLISHED', 'CLOSED'].includes(body.status)) return json('Solicitação inválida.', 400);
-  const quiz = await prisma.quiz.findUnique({ where: { id: body.id }, select: { meetingId: true, status: true } });
+
+  if (typeof body.id !== 'string' || !['PUBLISHED', 'CLOSED'].includes(body.status)) {
+    return json('Solicitação inválida.', 400);
+  }
+
+  const quiz = await prisma.quiz.findUnique({
+    where: { id: body.id },
+    select: { id: true, meetingId: true, creatorId: true, status: true }
+  });
   if (!quiz) return json('Questionário não encontrado.', 404);
-  const access = await allowed(req, quiz.meetingId);
-  if (access.error) return access.error;
-  if (!((quiz.status === 'DRAFT' && body.status === 'PUBLISHED') || (quiz.status === 'PUBLISHED' && body.status === 'CLOSED'))) return json('Transição de status não permitida.', 409);
+
+  // Autorização: criador do quiz ou gestor do DDS
+  if (user.role !== 'SUPER_ADMIN' && quiz.creatorId !== user.id) {
+    if (quiz.meetingId) {
+      const access = await checkMeetingAccess(user, quiz.meetingId);
+      if (access.error) return access.error;
+    } else {
+      return json('Acesso negado.', 403);
+    }
+  }
+
+  if (!((quiz.status === 'DRAFT' && body.status === 'PUBLISHED') || (quiz.status === 'PUBLISHED' && body.status === 'CLOSED'))) {
+    return json('Transição de status não permitida.', 409);
+  }
+
   try {
-    const updated = await prisma.quiz.updateMany({ where: { id: body.id, status: quiz.status },
-      data: body.status === 'PUBLISHED' ? { status: 'PUBLISHED', publishedAt: new Date() } : { status: 'CLOSED', closedAt: new Date() } });
+    const updated = await prisma.quiz.updateMany({
+      where: { id: body.id, status: quiz.status },
+      data: body.status === 'PUBLISHED' 
+        ? { status: 'PUBLISHED', publishedAt: new Date() } 
+        : { status: 'CLOSED', closedAt: new Date() }
+    });
     if (!updated.count) return json('Status alterado por outra operação.', 409);
     return NextResponse.json({ success: true, status: body.status });
-  } catch { return json('Falha ao atualizar questionário.', 500); }
+  } catch {
+    return json('Falha ao atualizar questionário.', 500);
+  }
 }

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { 
   ArrowLeft, Plus, Trash2, CheckCircle2, AlertTriangle, 
   HelpCircle, Copy, Check, Radio, Clock, ShieldCheck, 
-  FileText, Users, Award, ExternalLink, RefreshCw, Eye
+  FileText, Users, Award, ExternalLink, RefreshCw, Eye, Sparkles
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import DdsLogo from '@/components/DdsLogo';
@@ -39,10 +39,11 @@ interface AttemptSummary {
   passed: boolean;
   level: string;
   submittedAt: string;
-  attendance: {
+  participantName?: string | null;
+  attendance?: {
     id: string;
     name: string;
-  };
+  } | null;
 }
 
 interface ExistingQuiz {
@@ -56,6 +57,13 @@ interface ExistingQuiz {
   createdAt: string;
   publishedAt?: string;
   closedAt?: string;
+  meetingId?: string | null;
+  meeting?: {
+    id: string;
+    topic: string;
+    farm: string;
+    status: string;
+  } | null;
   questions: any[];
   attempts: AttemptSummary[];
 }
@@ -63,14 +71,18 @@ interface ExistingQuiz {
 export default function QuestionariosAdminPage() {
   const { user: currentUser } = useAuth();
 
-  // Reunião selecionada
+  // Reunião selecionada (filtro / vínculo)
   const [meetings, setMeetings] = useState<MeetingOption[]>([]);
-  const [selectedMeetingId, setSelectedMeetingId] = useState<string>('');
+  // selectedMeetingId pode ser: "ALL" (todos), "NONE" (autônomos), ou o ID de um DDS
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string>('ALL');
   const [isLoadingMeetings, setIsLoadingMeetings] = useState<boolean>(true);
 
-  // Questionários existentes da reunião selecionada
+  // Questionários existentes
   const [quizzes, setQuizzes] = useState<ExistingQuiz[]>([]);
   const [isLoadingQuizzes, setIsLoadingQuizzes] = useState<boolean>(false);
+
+  // Vínculo para a criação do NOVO questionário
+  const [creationMeetingId, setCreationMeetingId] = useState<string>(''); // vazio = autônomo
 
   // Estado do formulário de criação
   const [title, setTitle] = useState('');
@@ -111,24 +123,20 @@ export default function QuestionariosAdminPage() {
           });
         }
         setMeetings(list);
-        if (list.length > 0 && !selectedMeetingId) {
-          setSelectedMeetingId(list[0].id);
-        }
       }
     } catch (e) {
       console.error('Erro ao buscar DDS:', e);
     } finally {
       setIsLoadingMeetings(false);
     }
-  }, [currentUser?.id, selectedMeetingId]);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     fetchMeetings();
   }, [fetchMeetings]);
 
-  // 2. Carrega questionários da reunião selecionada
+  // 2. Carrega questionários
   const fetchQuizzes = useCallback(async () => {
-    if (!selectedMeetingId) return;
     try {
       setIsLoadingQuizzes(true);
       const res = await fetch(`/api/questionarios?meetingId=${encodeURIComponent(selectedMeetingId)}`);
@@ -201,7 +209,6 @@ export default function QuestionariosAdminPage() {
         return q;
       }
       const filtered = q.options.filter(o => o.id !== optionId);
-      // Se removeu a única correta, marca a primeira como correta
       if (!filtered.some(o => o.correct) && filtered.length > 0) {
         filtered[0].correct = true;
       }
@@ -241,11 +248,6 @@ export default function QuestionariosAdminPage() {
     e.preventDefault();
     setStatusMessage(null);
 
-    if (!selectedMeetingId) {
-      setStatusMessage({ type: 'error', text: 'Selecione um DDS para vincular o questionário.' });
-      return;
-    }
-
     if (!title.trim()) {
       setStatusMessage({ type: 'error', text: 'Defina um título para a avaliação.' });
       return;
@@ -273,7 +275,7 @@ export default function QuestionariosAdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          meetingId: selectedMeetingId,
+          meetingId: creationMeetingId || null,
           title: title.trim(),
           passingScore,
           criticalBelow,
@@ -284,7 +286,12 @@ export default function QuestionariosAdminPage() {
 
       const data = await res.json();
       if (data.success) {
-        setStatusMessage({ type: 'success', text: 'Questionário criado com sucesso no banco de dados!' });
+        setStatusMessage({ 
+          type: 'success', 
+          text: creationMeetingId 
+            ? 'Questionário vinculado ao DDS criado com sucesso!' 
+            : 'Questionário autônomo criado com sucesso! Compartilhe o link direto com os participantes.' 
+        });
         setTitle('');
         fetchQuizzes();
       } else {
@@ -328,8 +335,6 @@ export default function QuestionariosAdminPage() {
     setTimeout(() => setCopiedToken(null), 3000);
   };
 
-  const selectedMeeting = meetings.find(m => m.id === selectedMeetingId);
-
   return (
     <main className="min-h-screen bg-slate-950 text-white p-3 sm:p-6 font-sans">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -352,46 +357,47 @@ export default function QuestionariosAdminPage() {
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Crie avaliações de percepção de risco e meça a assimilação dos colaboradores em tempo real.
+                Crie avaliações de percepção de risco autônomas ou vinculadas a DDS e meça o aproveitamento dos participantes.
               </p>
             </div>
           </div>
         </header>
 
-        {/* Seletor de DDS */}
+        {/* Barra de Filtro de Questionários */}
         <section className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2">
-          <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
-            Vincular ao Diálogo Diário de Segurança (DDS)
-          </label>
-          {isLoadingMeetings ? (
-            <div className="text-xs text-slate-400 flex items-center gap-2 py-2">
-              <RefreshCw size={14} className="animate-spin text-emerald-400" /> Carregando reuniões cadastradas...
-            </div>
-          ) : meetings.length === 0 ? (
-            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300">
-              Nenhum DDS encontrado. Crie um DDS no painel principal antes de elaborar questionários.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <select
-                value={selectedMeetingId}
-                onChange={e => setSelectedMeetingId(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-xs text-white font-bold focus:border-emerald-500 outline-none min-h-[44px]"
-              >
-                {meetings.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {m.status === 'LIVE' ? '🟢 AO VIVO: ' : '📁 '} {m.topic} — {m.farm || 'Sem local'}
-                  </option>
-                ))}
-              </select>
-              {selectedMeeting && (
-                <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs flex items-center justify-between text-slate-300">
-                  <span>Status: <strong className={selectedMeeting.status === 'LIVE' ? 'text-emerald-400' : 'text-slate-400'}>{selectedMeeting.status === 'LIVE' ? 'Em Andamento' : 'Arquivado'}</strong></span>
-                  <span className="text-[11px] text-slate-400">{new Date(selectedMeeting.createdAt).toLocaleDateString()}</span>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+              Visualizar Questionários Cadastrados
+            </label>
+            <span className="text-[11px] text-slate-400">
+              Total listado: <strong className="text-emerald-400">{quizzes.length}</strong>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <select
+              value={selectedMeetingId}
+              onChange={e => setSelectedMeetingId(e.target.value)}
+              className="w-full sm:col-span-2 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-xs text-white font-bold focus:border-emerald-500 outline-none min-h-[44px]"
+            >
+              <option value="ALL">📁 Todos os Questionários (Autônomos e Vinculados a DDS)</option>
+              <option value="NONE">✨ Questionários Autônomos (Sem vínculo a DDS)</option>
+              {meetings.map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.status === 'LIVE' ? '🟢 AO VIVO: ' : '📋 DDS: '} {m.topic} — {m.farm || 'Sem local'}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={fetchQuizzes}
+              disabled={isLoadingQuizzes}
+              className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 border border-slate-700 min-h-[44px]"
+            >
+              <RefreshCw size={14} className={isLoadingQuizzes ? 'animate-spin text-emerald-400' : ''} />
+              <span>Atualizar Lista</span>
+            </button>
+          </div>
         </section>
 
         {/* Feedback de Status */}
@@ -406,37 +412,28 @@ export default function QuestionariosAdminPage() {
           </div>
         )}
 
-        {/* Questionários Existentes nesta Reunião */}
+        {/* Questionários Existentes */}
         <section className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-2xl space-y-4 shadow-xl">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
               <Award size={18} className="text-emerald-400" />
               <h2 className="text-sm font-black text-white uppercase tracking-wider">
-                Questionários Vinculados a este DDS ({quizzes.length})
+                Questionários Cadastrados ({quizzes.length})
               </h2>
             </div>
-            <button
-              onClick={fetchQuizzes}
-              disabled={isLoadingQuizzes}
-              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
-              title="Atualizar lista de avaliações"
-            >
-              <RefreshCw size={13} className={isLoadingQuizzes ? 'animate-spin' : ''} />
-              <span className="hidden sm:inline">Atualizar</span>
-            </button>
           </div>
 
           {isLoadingQuizzes ? (
             <p className="text-xs text-slate-400 py-3">Buscando avaliações associadas...</p>
           ) : quizzes.length === 0 ? (
-            <p className="text-xs text-slate-400 py-3">Nenhum questionário cadastrado para este DDS ainda. Use o formulário abaixo para criar o primeiro.</p>
+            <p className="text-xs text-slate-400 py-3">Nenhum questionário encontrado para o filtro selecionado. Use o formulário abaixo para criar um novo.</p>
           ) : (
             <div className="space-y-3">
               {quizzes.map(q => (
                 <div key={q.id} className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${
                           q.status === 'PUBLISHED' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' :
                           q.status === 'CLOSED' ? 'bg-slate-800 border-slate-700 text-slate-400' :
@@ -444,6 +441,11 @@ export default function QuestionariosAdminPage() {
                         }`}>
                           {q.status === 'PUBLISHED' ? 'Ativo / Publicado' : q.status === 'CLOSED' ? 'Encerrado' : 'Rascunho'}
                         </span>
+                        
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-slate-300">
+                          {q.meeting?.topic ? `Vinculado: ${q.meeting.topic}` : '✨ Questionário Autônomo'}
+                        </span>
+
                         <h3 className="text-sm font-bold text-white">{q.title}</h3>
                       </div>
                       <p className="text-[11px] text-slate-400 mt-1">
@@ -488,7 +490,9 @@ export default function QuestionariosAdminPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                         {q.attempts.map(att => (
                           <div key={att.id} className="p-2 bg-slate-900 border border-slate-800 rounded-lg text-[11px] flex items-center justify-between">
-                            <span className="font-semibold text-slate-200 truncate pr-2">{att.attendance.name}</span>
+                            <span className="font-semibold text-slate-200 truncate pr-2">
+                              {att.participantName || att.attendance?.name || 'Participante'}
+                            </span>
                             <span className={`font-black shrink-0 ${att.passed ? 'text-emerald-400' : 'text-amber-400'}`}>
                               {att.score}% ({att.passed ? 'Aprovado' : 'Abaixo'})
                             </span>
@@ -513,6 +517,32 @@ export default function QuestionariosAdminPage() {
           </div>
 
           <form onSubmit={handleSaveQuiz} className="space-y-6">
+            
+            {/* Vínculo Opcional com DDS */}
+            <div className="space-y-1.5 bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                <span>Vínculo a um DDS (Opcional)</span>
+                <span className="text-[10px] text-emerald-400 font-normal lowercase">não é obrigatório</span>
+              </label>
+              <select
+                value={creationMeetingId}
+                onChange={e => setCreationMeetingId(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+              >
+                <option value="">✨ Criar como Questionário Autônomo (Sem vincular a nenhum DDS)</option>
+                {meetings.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.status === 'LIVE' ? '🟢 AO VIVO: ' : '📋 '} {m.topic} — {m.farm || 'Sem local'}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-400">
+                {creationMeetingId 
+                  ? 'Este questionário será atrelado à lista de presença deste DDS específico.' 
+                  : 'Questionários autônomos podem ser compartilhados com qualquer equipe ou público através de link direto ou QR Code.'}
+              </p>
+            </div>
+
             <div className="space-y-2">
               <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
                 Título do Questionário
@@ -521,7 +551,7 @@ export default function QuestionariosAdminPage() {
                 type="text"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                placeholder="Ex: Avaliação de Percepção de Risco - Trabalho em Altura & EPIs"
+                placeholder="Ex: Avaliação Geral de Segurança - Trabalho em Altura & EPIs"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs sm:text-sm text-white font-bold focus:border-emerald-500 outline-none"
                 required
               />
@@ -693,7 +723,7 @@ export default function QuestionariosAdminPage() {
 
             <button
               type="submit"
-              disabled={isSaving || !selectedMeetingId}
+              disabled={isSaving}
               className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 disabled:opacity-50 text-slate-950 font-black text-xs rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 min-h-[44px]"
             >
               {isSaving ? (
@@ -702,7 +732,7 @@ export default function QuestionariosAdminPage() {
                 </>
               ) : (
                 <>
-                  <CheckCircle2 size={16} /> Gravar Questionário no DDS
+                  <CheckCircle2 size={16} /> Salvar e Criar Avaliação
                 </>
               )}
             </button>

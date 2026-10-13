@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { 
   CheckCircle2, AlertTriangle, HelpCircle, ArrowRight, ArrowLeft,
-  ShieldCheck, Award, AlertCircle, RefreshCw, Clock
+  ShieldCheck, Award, AlertCircle, RefreshCw, UserCheck, User
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -27,10 +27,10 @@ interface QuizData {
   id: string;
   title: string;
   passingScore: number;
-  meeting: {
+  meeting?: {
     topic: string;
     status: string;
-  };
+  } | null;
   questions: QuizQuestion[];
 }
 
@@ -43,10 +43,11 @@ export default function QuestionarioPublicoPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Identificação do colaborador
+  // Identificação do participante
   const [attendanceId, setAttendanceId] = useState<string>('');
   const [attendanceProof, setAttendanceProof] = useState<string>('');
   const [collaboratorName, setCollaboratorName] = useState<string>('');
+  const [collaboratorDoc, setCollaboratorDoc] = useState<string>('');
 
   // Respostas { [questionId]: string[] }
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string[]>>({});
@@ -57,7 +58,7 @@ export default function QuestionarioPublicoPage() {
   const [submitResult, setSubmitResult] = useState<any | null>(null);
 
   useEffect(() => {
-    // 1. Tenta recuperar credencial de presença da URL ou sessionStorage
+    // 1. Tenta recuperar credencial de presença da URL ou sessionStorage (quando houver)
     const urlAttId = searchParams.get('attendanceId');
     const urlProof = searchParams.get('proof');
     const urlName = searchParams.get('name');
@@ -111,7 +112,6 @@ export default function QuestionarioPublicoPage() {
         const next = exists ? current.filter(id => id !== optionId) : [...current, optionId];
         return { ...prev, [question.id]: next };
       } else {
-        // SINGLE_CHOICE ou TRUE_FALSE
         return { ...prev, [question.id]: [optionId] };
       }
     });
@@ -120,8 +120,9 @@ export default function QuestionarioPublicoPage() {
   const handleSubmit = async () => {
     if (!quiz) return;
 
-    if (!attendanceId || !attendanceProof) {
-      setError('Credencial de presença não identificada. Por favor, registre sua presença no DDS primeiro.');
+    // Se o questionário não tem DDS ou o participante não tem presença vinculada, exige nome digitado
+    if (!attendanceId && !collaboratorName.trim()) {
+      setError('Por favor, informe seu Nome Completo para registrar seu aproveitamento.');
       return;
     }
 
@@ -137,8 +138,10 @@ export default function QuestionarioPublicoPage() {
 
     const payload = {
       token,
-      attendanceId,
-      attendanceProof,
+      attendanceId: attendanceId || undefined,
+      attendanceProof: attendanceProof || undefined,
+      participantName: collaboratorName.trim(),
+      participantDoc: collaboratorDoc.trim() || undefined,
       answers: quiz.questions.map(q => ({
         questionId: q.id,
         selectedOptionIds: selectedAnswers[q.id] || []
@@ -222,7 +225,7 @@ export default function QuestionarioPublicoPage() {
               {submitResult.score}% de Aproveitamento
             </h2>
             <p className="text-xs text-slate-300">
-              {collaboratorName ? `Colaborador: ${collaboratorName}` : 'Sua avaliação foi registrada com sucesso.'}
+              Participante: <strong className="text-white">{submitResult.participantName || collaboratorName}</strong>
             </p>
           </div>
 
@@ -242,7 +245,7 @@ export default function QuestionarioPublicoPage() {
           </div>
 
           <p className="text-[11px] text-slate-400 leading-relaxed">
-            Seu resultado foi vinculado à sua assinatura oficial de presença do DDS e arquivado para auditoria técnica.
+            Seu resultado foi arquivado com sucesso no registro oficial do DDS ON.
           </p>
 
           <Link href="/">
@@ -262,20 +265,48 @@ export default function QuestionarioPublicoPage() {
     <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center py-6 px-3 sm:px-6 font-sans relative">
       <div className="w-full max-w-xl mx-auto space-y-5">
         {/* Header do Questionário */}
-        <header className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-2xl shadow-lg space-y-2">
+        <header className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-2xl shadow-lg space-y-3">
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span className="font-bold text-emerald-400 flex items-center gap-1.5">
               <ShieldCheck size={14} /> DDS ON • Avaliação
             </span>
             <span className="bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 font-mono text-[11px]">
-              DDS: {quiz?.meeting.topic}
+              {quiz?.meeting?.topic ? `DDS: ${quiz.meeting.topic}` : 'Avaliação Autônoma'}
             </span>
           </div>
+
           <h1 className="text-lg sm:text-xl font-black text-white">{quiz?.title}</h1>
-          {collaboratorName && (
-            <p className="text-xs text-slate-300">
-              Participante: <strong className="text-emerald-400">{collaboratorName}</strong>
-            </p>
+
+          {/* Campo de Identificação do Participante */}
+          {attendanceId ? (
+            <div className="p-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs flex items-center gap-2 text-slate-300">
+              <UserCheck size={16} className="text-emerald-400 shrink-0" />
+              <span>Participante Vinculado: <strong className="text-white">{collaboratorName}</strong></span>
+            </div>
+          ) : (
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center gap-1.5 text-xs text-slate-300 font-bold">
+                <User size={14} className="text-emerald-400" />
+                <span>Identifique-se para Responder:</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={collaboratorName}
+                  onChange={e => setCollaboratorName(e.target.value)}
+                  placeholder="Seu Nome Completo *"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
+                  required
+                />
+                <input
+                  type="text"
+                  value={collaboratorDoc}
+                  onChange={e => setCollaboratorDoc(e.target.value)}
+                  placeholder="Cargo ou CPF (Opcional)"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
+                />
+              </div>
+            </div>
           )}
 
           {/* Barra de Progresso */}

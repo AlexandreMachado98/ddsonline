@@ -49,6 +49,7 @@ model User {
   companyId  String?
   companyRel Company?  @relation(fields: [companyId], references: [id])
   meetings   Meeting[]
+  quizzes    Quiz[]
 }
 
 model Meeting {
@@ -115,8 +116,10 @@ model MeetingAttachment {
 }
 model Quiz {
   id            String         @id @default(uuid())
-  meetingId     String
-  meeting       Meeting        @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  meetingId     String?
+  meeting       Meeting?       @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  creatorId     String?
+  creator       User?          @relation(fields: [creatorId], references: [id], onDelete: SetNull)
   title         String
   status        String         @default("DRAFT")
   passingScore  Int            @default(70)
@@ -130,6 +133,7 @@ model Quiz {
   attempts      QuizAttempt[]
 
   @@index([meetingId])
+  @@index([creatorId])
 }
 
 model QuizQuestion {
@@ -159,21 +163,23 @@ model QuizOption {
 }
 
 model QuizAttempt {
-  id            String       @id @default(uuid())
-  quizId        String
-  quiz          Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  attendanceId  String
-  attendance    Attendance   @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
-  score         Float
-  earnedPoints  Int
-  possiblePoints Int
-  passed        Boolean
-  level         String
-  submittedAt   DateTime     @default(now())
-  answers       QuizAnswer[]
+  id              String       @id @default(uuid())
+  quizId          String
+  quiz            Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  attendanceId    String?
+  attendance      Attendance?  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  participantName String?
+  participantDoc  String?
+  score           Float
+  earnedPoints    Int
+  possiblePoints  Int
+  passed          Boolean
+  level           String
+  submittedAt     DateTime     @default(now())
+  answers         QuizAnswer[]
 
-  @@unique([quizId, attendanceId])
   @@index([quizId, submittedAt])
+  @@index([attendanceId])
 }
 
 model QuizAnswer {
