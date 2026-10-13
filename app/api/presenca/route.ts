@@ -1,3 +1,4 @@
+import { randomBytes, createHash } from 'node:crypto';
 // app/api/presenca/route.ts
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
@@ -83,30 +84,34 @@ export async function POST(req: Request) {
 
     if (existing) {
       // Se for o mesmo colaborador atualizando seus dados na mesma sessão ativa
+      const quizProof = randomBytes(32).toString('hex');
       const updated = await prisma.attendance.update({
         where: { id: existing.id },
         data: {
           name: trimmedName,
           cpf: trimmedCpf,
+          quizProofHash: createHash('sha256').update(quizProof).digest('hex'),
           selfie: sanitizedSelfie || existing.selfie,
           signature: sanitizedSignature || existing.signature
         }
       });
-      return NextResponse.json({ success: true, data: updated, meetingId: meeting.id, updated: true });
+      return NextResponse.json({ success: true, data: updated, meetingId: meeting.id, updated: true, quizProof });
     }
 
     // 7. Salva a presença atrelada estritamente à reunião correta
+    const quizProof = randomBytes(32).toString('hex');
     const attendance = await prisma.attendance.create({
       data: {
         name: trimmedName,
         cpf: trimmedCpf,
         selfie: sanitizedSelfie,
         signature: sanitizedSignature,
+        quizProofHash: createHash('sha256').update(quizProof).digest('hex'),
         meetingId: meeting.id
       }
     });
 
-    return NextResponse.json({ success: true, data: attendance, meetingId: meeting.id });
+    return NextResponse.json({ success: true, data: attendance, meetingId: meeting.id, quizProof });
 
   } catch (error) {
     console.error("Erro interno no POST /api/presenca");
