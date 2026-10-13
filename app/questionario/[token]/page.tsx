@@ -43,11 +43,11 @@ export default function QuestionarioPublicoPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Identificação do participante
+  // Identificação do participante (Apenas Nome e Função)
   const [attendanceId, setAttendanceId] = useState<string>('');
   const [attendanceProof, setAttendanceProof] = useState<string>('');
   const [collaboratorName, setCollaboratorName] = useState<string>('');
-  const [collaboratorDoc, setCollaboratorDoc] = useState<string>('');
+  const [collaboratorRole, setCollaboratorRole] = useState<string>('');
 
   // Respostas { [questionId]: string[] }
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string[]>>({});
@@ -63,10 +63,13 @@ export default function QuestionarioPublicoPage() {
     const urlProof = searchParams.get('proof');
     const urlName = searchParams.get('name');
 
+    const urlRole = searchParams.get('role');
+
     if (urlAttId && urlProof) {
       setAttendanceId(urlAttId);
       setAttendanceProof(urlProof);
       if (urlName) setCollaboratorName(decodeURIComponent(urlName));
+      if (urlRole) setCollaboratorRole(decodeURIComponent(urlRole));
     } else {
       try {
         const stored = localStorage.getItem('dds_last_attendance');
@@ -76,6 +79,7 @@ export default function QuestionarioPublicoPage() {
             setAttendanceId(parsed.attendanceId);
             setAttendanceProof(parsed.quizProof);
             if (parsed.name) setCollaboratorName(parsed.name);
+            if (parsed.role) setCollaboratorRole(parsed.role);
           }
         }
       } catch {}
@@ -120,9 +124,13 @@ export default function QuestionarioPublicoPage() {
   const handleSubmit = async () => {
     if (!quiz) return;
 
-    // Se o questionário não tem DDS ou o participante não tem presença vinculada, exige nome digitado
+    // Se o questionário for autônomo ou não vinculado à presença, exige Nome e Função
     if (!attendanceId && !collaboratorName.trim()) {
-      setError('Por favor, informe seu Nome Completo para registrar seu aproveitamento.');
+      setError('Por favor, informe o Nome Completo do colaborador.');
+      return;
+    }
+    if (!attendanceId && !collaboratorRole.trim()) {
+      setError('Por favor, informe a Função do colaborador na operação.');
       return;
     }
 
@@ -141,7 +149,7 @@ export default function QuestionarioPublicoPage() {
       attendanceId: attendanceId || undefined,
       attendanceProof: attendanceProof || undefined,
       participantName: collaboratorName.trim(),
-      participantDoc: collaboratorDoc.trim() || undefined,
+      participantDoc: collaboratorRole.trim(),
       answers: quiz.questions.map(q => ({
         questionId: q.id,
         selectedOptionIds: selectedAnswers[q.id] || []
@@ -279,32 +287,60 @@ export default function QuestionarioPublicoPage() {
 
           {/* Campo de Identificação do Participante */}
           {attendanceId ? (
-            <div className="p-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs flex items-center gap-2 text-slate-300">
-              <UserCheck size={16} className="text-emerald-400 shrink-0" />
-              <span>Participante Vinculado: <strong className="text-white">{collaboratorName}</strong></span>
+            <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl text-xs space-y-1">
+              <div className="flex items-center gap-2 text-slate-300">
+                <UserCheck size={16} className="text-emerald-400 shrink-0" />
+                <span>Colaborador: <strong className="text-white">{collaboratorName}</strong></span>
+              </div>
+              {collaboratorRole ? (
+                <p className="text-[11px] text-slate-400 pl-6">
+                  Função: <strong className="text-emerald-400">{collaboratorRole}</strong>
+                </p>
+              ) : (
+                <div className="pt-1.5 pl-6">
+                  <input
+                    type="text"
+                    value={collaboratorRole}
+                    onChange={e => setCollaboratorRole(e.target.value)}
+                    placeholder="Sua Função na operação (ex: Motorista, Operador) *"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-emerald-500 outline-none"
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-2 pt-1">
               <div className="flex items-center gap-1.5 text-xs text-slate-300 font-bold">
                 <User size={14} className="text-emerald-400" />
-                <span>Identifique-se para Responder:</span>
+                <span>Identificação do Colaborador:</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  value={collaboratorName}
-                  onChange={e => setCollaboratorName(e.target.value)}
-                  placeholder="Seu Nome Completo *"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
-                  required
-                />
-                <input
-                  type="text"
-                  value={collaboratorDoc}
-                  onChange={e => setCollaboratorDoc(e.target.value)}
-                  placeholder="Cargo ou CPF (Opcional)"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
-                />
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Nome Completo
+                  </label>
+                  <input
+                    type="text"
+                    value={collaboratorName}
+                    onChange={e => setCollaboratorName(e.target.value)}
+                    placeholder="Nome Completo do Colaborador *"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Função na Operação
+                  </label>
+                  <input
+                    type="text"
+                    value={collaboratorRole}
+                    onChange={e => setCollaboratorRole(e.target.value)}
+                    placeholder="Função (Ex: Motorista, Mecânico, etc.) *"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
+                    required
+                  />
+                </div>
               </div>
             </div>
           )}

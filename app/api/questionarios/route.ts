@@ -93,11 +93,23 @@ export async function GET(req: Request) {
           select: {
             id: true,
             score: true,
+            earnedPoints: true,
+            possiblePoints: true,
             passed: true,
             level: true,
             submittedAt: true,
             participantName: true,
-            attendance: { select: { id: true, name: true } }
+            participantDoc: true,
+            attendance: { select: { id: true, name: true } },
+            answers: {
+              select: {
+                id: true,
+                questionId: true,
+                selectedOptionIds: true,
+                correct: true,
+                earnedPoints: true
+              }
+            }
           }
         }
       }

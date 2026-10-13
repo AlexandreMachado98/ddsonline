@@ -6,7 +6,8 @@ import {
   ArrowLeft, Plus, Trash2, CheckCircle2, AlertTriangle, 
   Copy, Check, Clock, Award, RefreshCw, Bookmark, BookmarkCheck,
   TrendingUp, Users, Target, BarChart2, Star, RotateCcw,
-  Sparkles, Layers, BookOpen, ChevronRight, FileText
+  Sparkles, Layers, BookOpen, ChevronRight, FileText, Eye, X, ShieldAlert,
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import DdsLogo from '@/components/DdsLogo';
@@ -34,17 +35,74 @@ interface MeetingOption {
   createdAt: string;
 }
 
+interface AttemptAnswerSummary {
+  id: string;
+  questionId: string;
+  selectedOptionIds: string[];
+  correct: boolean;
+  earnedPoints: number;
+}
+
 interface AttemptSummary {
   id: string;
   score: number;
+  earnedPoints?: number;
+  possiblePoints?: number;
   passed: boolean;
   level: string;
   submittedAt: string;
   participantName?: string | null;
+  participantDoc?: string | null;
   attendance?: {
     id: string;
     name: string;
   } | null;
+  answers?: AttemptAnswerSummary[];
+}
+
+export interface QuestionBreakdownItem {
+  questionId: string;
+  questionText: string;
+  selectedText: string;
+  isCorrect: boolean;
+  correctOptionText: string;
+  explanation?: string;
+}
+
+export interface CollaboratorAttemptDetail {
+  attemptId: string;
+  quizId: string;
+  quizTitle: string;
+  score: number;
+  passed: boolean;
+  level: string;
+  submittedAt: string;
+  answersCount: number;
+  questionsBreakdown: QuestionBreakdownItem[];
+}
+
+export interface ParticipantDetail {
+  name: string;
+  role: string;
+  count: number;
+  totalScore: number;
+  avgScore: number;
+  passedCount: number;
+  attempts: CollaboratorAttemptDetail[];
+}
+
+export interface QuestionFragilityItem {
+  questionId: string;
+  quizTitle: string;
+  questionText: string;
+  totalAnswered: number;
+  correctCount: number;
+  errorCount: number;
+  errorRate: number;
+  correctOptionText: string;
+  mostCommonWrongText: string;
+  fragilityLevel: 'CRITICAL' | 'MODERATE' | 'LOW';
+  actionPlan: string;
 }
 
 interface ExistingQuiz {
@@ -199,7 +257,18 @@ export default function QuestionariosAdminPage() {
     return Array.from(map.values());
   }, [allTemplates, quizzes]);
 
-  // Métricas de Business Intelligence (BI)
+  // Estado para Modal de Detalhes do Colaborador (Gabarito, Acertos e Erros)
+  const [selectedCollaborator, setSelectedCollaborator] = useState<ParticipantDetail | null>(null);
+  const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
+
+  const handleCopyActionPlan = (plan: string, qId: string) => {
+    if (typeof window === 'undefined') return;
+    navigator.clipboard.writeText(plan);
+    setCopiedPlanId(qId);
+    setTimeout(() => setCopiedPlanId(null), 3000);
+  };
+
+  // Métricas de Business Intelligence (BI) e Diagnóstico de Fragilidades Operacionais
   const biMetrics = React.useMemo(() => {
     const totalQuizzesCount = quizzes.length;
     let totalAttemptsCount = 0;
@@ -208,8 +277,20 @@ export default function QuestionariosAdminPage() {
     // Mapa de desempenho por Formulário/Questionário
     const formStats: Record<string, { title: string; count: number; totalScore: number; avgScore: number }> = {};
 
-    // Mapa de desempenho por Colaborador
-    const participantStats: Record<string, { name: string; count: number; totalScore: number; avgScore: number; passedCount: number }> = {};
+    // Mapa de desempenho detalhado por Colaborador
+    const participantStats: Record<string, ParticipantDetail> = {};
+
+    // Mapa de Fragilidades Operacionais por Questão
+    const questionFragilityMap: Record<string, {
+      questionId: string;
+      quizTitle: string;
+      questionText: string;
+      totalAnswered: number;
+      correctCount: number;
+      errorCount: number;
+      correctOptionText: string;
+      wrongOptionsPicked: Record<string, number>;
+    }> = {};
 
     quizzes.forEach(quiz => {
       const attempts = quiz.attempts || [];
@@ -226,34 +307,169 @@ export default function QuestionariosAdminPage() {
         formStats[formKey].count++;
         formStats[formKey].totalScore += att.score;
 
-        // Stats do Colaborador
+        // Nome e Função do Colaborador
         const pName = (att.participantName || att.attendance?.name || 'Anônimo').trim();
+        const pRole = (att.participantDoc || 'Função não informada').trim();
+
         if (!participantStats[pName]) {
-          participantStats[pName] = { name: pName, count: 0, totalScore: 0, avgScore: 0, passedCount: 0 };
+          participantStats[pName] = {
+            name: pName,
+            role: pRole,
+            count: 0,
+            totalScore: 0,
+            avgScore: 0,
+            passedCount: 0,
+            attempts: []
+          };
         }
+        if (participantStats[pName].role === 'Função não informada' && pRole !== 'Função não informada') {
+          participantStats[pName].role = pRole;
+        }
+
         participantStats[pName].count++;
         participantStats[pName].totalScore += att.score;
         if (att.passed) participantStats[pName].passedCount++;
+
+        // Breakdown detalhado de cada pergunta respondida por este colaborador
+        const answersList = att.answers || [];
+        const questionsBreakdown: QuestionBreakdownItem[] = [];
+
+        (quiz.questions || []).forEach(q => {
+          const ans = answersList.find(a => a.questionId === q.id);
+          const correctOpt = (q.options || []).find((o: any) => o.isCorrect || o.correct);
+          const correctOptionText = correctOpt ? correctOpt.text : 'Gabarito não definido';
+
+          let selectedText = 'Não respondeu';
+          let isCorrect = false;
+
+          if (ans) {
+            isCorrect = Boolean(ans.correct);
+            const selIds: string[] = Array.isArray(ans.selectedOptionIds) ? ans.selectedOptionIds : [];
+            const selOpts = (q.options || []).filter((o: any) => selIds.includes(o.id));
+            if (selOpts.length > 0) {
+              selectedText = selOpts.map((o: any) => o.text).join('; ');
+            }
+
+            // Estatísticas globais de Fragilidade por Questão
+            const qKey = q.id;
+            if (!questionFragilityMap[qKey]) {
+              questionFragilityMap[qKey] = {
+                questionId: q.id,
+                quizTitle: quiz.title,
+                questionText: q.text,
+                totalAnswered: 0,
+                correctCount: 0,
+                errorCount: 0,
+                correctOptionText,
+                wrongOptionsPicked: {}
+              };
+            }
+
+            questionFragilityMap[qKey].totalAnswered++;
+            if (isCorrect) {
+              questionFragilityMap[qKey].correctCount++;
+            } else {
+              questionFragilityMap[qKey].errorCount++;
+              if (selectedText !== 'Não respondeu') {
+                questionFragilityMap[qKey].wrongOptionsPicked[selectedText] =
+                  (questionFragilityMap[qKey].wrongOptionsPicked[selectedText] || 0) + 1;
+              }
+            }
+          }
+
+          questionsBreakdown.push({
+            questionId: q.id,
+            questionText: q.text,
+            selectedText,
+            isCorrect,
+            correctOptionText,
+            explanation: q.explanation
+          });
+        });
+
+        participantStats[pName].attempts.push({
+          attemptId: att.id,
+          quizId: quiz.id,
+          quizTitle: quiz.title,
+          score: att.score,
+          passed: att.passed,
+          level: att.level,
+          submittedAt: att.submittedAt,
+          answersCount: answersList.length,
+          questionsBreakdown
+        });
       });
     });
 
-    // Calcula médias
+    // Médias por formulário
     Object.values(formStats).forEach(f => {
       f.avgScore = f.count > 0 ? Math.round((f.totalScore / f.count) * 10) / 10 : 0;
     });
+
+    // Médias por colaborador
     Object.values(participantStats).forEach(p => {
       p.avgScore = p.count > 0 ? Math.round((p.totalScore / p.count) * 10) / 10 : 0;
     });
 
     const overallAvg = totalAttemptsCount > 0 ? Math.round((totalScoreSum / totalAttemptsCount) * 10) / 10 : 0;
 
-    // Melhores Formulários (com ao menos 1 resposta)
+    // Rankings
     const sortedForms = Object.values(formStats).filter(f => f.count > 0).sort((a, b) => b.avgScore - a.avgScore);
     const topForm = sortedForms[0] || null;
 
-    // Melhores Colaboradores (com ao menos 1 resposta)
     const sortedParticipants = Object.values(participantStats).filter(p => p.count > 0).sort((a, b) => b.avgScore - a.avgScore);
     const topParticipant = sortedParticipants[0] || null;
+
+    // Relatório de Fragilidades Operacionais com Plano de Ação
+    const fragilityReports: QuestionFragilityItem[] = Object.values(questionFragilityMap).map(item => {
+      const errorRate = item.totalAnswered > 0
+        ? Math.round((item.errorCount / item.totalAnswered) * 100)
+        : 0;
+
+      let mostCommonWrong = '';
+      let maxCount = 0;
+      Object.entries(item.wrongOptionsPicked).forEach(([text, count]) => {
+        if (count > maxCount) {
+          maxCount = count;
+          mostCommonWrong = text;
+        }
+      });
+
+      const fragilityLevel: 'CRITICAL' | 'MODERATE' | 'LOW' =
+        errorRate >= 50 ? 'CRITICAL' : errorRate >= 20 ? 'MODERATE' : 'LOW';
+
+      let actionPlan = '';
+      if (fragilityLevel === 'CRITICAL') {
+        actionPlan = `🚨 PLANO DE AÇÃO IMEDIATO (${errorRate}% DE ERRO NA OPERAÇÃO):\n` +
+          `• Assunto: ${item.questionText}\n` +
+          `• Desvio Identificado: A equipe está errando esta conduta preventiva (resposta comum: "${mostCommonWrong || 'desvio operacional'}").\n` +
+          `• Ação Corretiva: Realizar DDS prático de reciclagem e reforçar que a conduta obrigatória é: "${item.correctOptionText}".\n` +
+          `• Responsável: Técnico de Segurança / Encarregado de Campo.`;
+      } else if (fragilityLevel === 'MODERATE') {
+        actionPlan = `⚠️ PLANO DE AÇÃO DE ALINHAMENTO (${errorRate}% DE ERRO):\n` +
+          `• Assunto: ${item.questionText}\n` +
+          `• Ação Recomendada: Incluir este ponto na pauta do próximo DDS semanal para esclarecer dúvidas e padronizar o procedimento correto ("${item.correctOptionText}").`;
+      } else {
+        actionPlan = `✅ PROCEDIMENTO CONSOLIDADO (${item.correctCount}/${item.totalAnswered} acertos):\n` +
+          `• A equipe demonstrou pleno domínio sobre esta regra de segurança. Manter observações comportamentais na rotina.`;
+      }
+
+      return {
+        questionId: item.questionId,
+        quizTitle: item.quizTitle,
+        questionText: item.questionText,
+        totalAnswered: item.totalAnswered,
+        correctCount: item.correctCount,
+        errorCount: item.errorCount,
+        errorRate,
+        correctOptionText: item.correctOptionText,
+        mostCommonWrongText: mostCommonWrong,
+        fragilityLevel,
+        actionPlan
+      };
+    }).sort((a, b) => b.errorRate - a.errorRate);
+
+    const criticalFragilities = fragilityReports.filter(f => f.fragilityLevel === 'CRITICAL');
 
     return {
       totalQuizzesCount,
@@ -262,7 +478,9 @@ export default function QuestionariosAdminPage() {
       topForm,
       topParticipant,
       rankingForms: sortedForms.slice(0, 5),
-      rankingParticipants: sortedParticipants.slice(0, 5)
+      rankingParticipants: sortedParticipants,
+      fragilityReports,
+      criticalFragilitiesCount: criticalFragilities.length
     };
   }, [quizzes]);
 
@@ -1276,9 +1494,9 @@ export default function QuestionariosAdminPage() {
           <div className="space-y-6">
             
             {/* Cards de Métricas Gerais */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Aproveitamento Médio Geral</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Aproveitamento Médio</span>
                 <div className="flex items-baseline gap-2">
                   <h3 className="text-2xl font-black text-emerald-400">{biMetrics.overallAvg}%</h3>
                   <span className="text-xs text-slate-400">média da equipe</span>
@@ -1289,15 +1507,25 @@ export default function QuestionariosAdminPage() {
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Avaliações Respondidas</span>
                 <div className="flex items-baseline gap-2">
                   <h3 className="text-2xl font-black text-white">{biMetrics.totalAttemptsCount}</h3>
-                  <span className="text-xs text-slate-400">submissões registradas</span>
+                  <span className="text-xs text-slate-400">submissões</span>
                 </div>
               </div>
 
               <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Questionários Ativos / Histórico</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Formulários no BI</span>
                 <div className="flex items-baseline gap-2">
                   <h3 className="text-2xl font-black text-teal-300">{biMetrics.totalQuizzesCount}</h3>
-                  <span className="text-xs text-slate-400">formulários cadastrados</span>
+                  <span className="text-xs text-slate-400">cadastrados</span>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Fragilidades Críticas</span>
+                <div className="flex items-baseline gap-2">
+                  <h3 className={`text-2xl font-black ${biMetrics.criticalFragilitiesCount > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    {biMetrics.criticalFragilitiesCount}
+                  </h3>
+                  <span className="text-xs text-slate-400">temas com erro &gt; 50%</span>
                 </div>
               </div>
             </div>
@@ -1335,7 +1563,18 @@ export default function QuestionariosAdminPage() {
 
                 {biMetrics.topParticipant ? (
                   <div className="space-y-1.5">
-                    <h4 className="text-base font-bold text-white leading-snug">{biMetrics.topParticipant.name}</h4>
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-base font-bold text-white leading-snug">{biMetrics.topParticipant.name}</h4>
+                      <button
+                        onClick={() => setSelectedCollaborator(biMetrics.topParticipant)}
+                        className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                        title="Ver erros, acertos e gabarito"
+                      >
+                        <Eye size={12} />
+                        <span>Ver Gabarito</span>
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-400">Função: <strong className="text-slate-200">{biMetrics.topParticipant.role}</strong></p>
                     <div className="flex items-center gap-3 text-xs text-slate-300">
                       <span>Média Individual: <strong className="text-teal-300 font-black text-sm">{biMetrics.topParticipant.avgScore}%</strong></span>
                       <span>•</span>
@@ -1348,6 +1587,154 @@ export default function QuestionariosAdminPage() {
               </div>
 
             </div>
+
+            {/* DIAGNÓSTICO DE FRAGILIDADES OPERACIONAIS & PLANO DE AÇÃO */}
+            <section className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert size={18} className="text-amber-400" />
+                    <h2 className="text-sm font-black text-white uppercase tracking-wider">
+                      Diagnóstico de Fragilidades Operacionais & Planos de Ação
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Análise ponto a ponto dos erros cometidos pela equipe para geração imediata de planos de ação preventiva.
+                  </p>
+                </div>
+                <span className="text-[11px] font-bold text-slate-400 self-start sm:self-auto bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                  Total de Questões Avaliadas: <strong className="text-white">{biMetrics.fragilityReports.length}</strong>
+                </span>
+              </div>
+
+              {biMetrics.fragilityReports.length === 0 ? (
+                <p className="text-xs text-slate-400 py-3">Nenhuma resposta registrada ainda para calcular fragilidades.</p>
+              ) : (
+                <div className="space-y-4">
+                  {biMetrics.fragilityReports.map((item, idx) => {
+                    const isCritical = item.fragilityLevel === 'CRITICAL';
+                    const isModerate = item.fragilityLevel === 'MODERATE';
+                    return (
+                      <div 
+                        key={item.questionId || idx}
+                        className={`p-4 rounded-2xl border transition-all space-y-3 ${
+                          isCritical 
+                            ? 'bg-rose-950/20 border-rose-500/30' 
+                            : isModerate
+                            ? 'bg-amber-950/20 border-amber-500/30'
+                            : 'bg-slate-950 border-slate-800'
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                                isCritical 
+                                  ? 'bg-rose-500/20 border-rose-500/40 text-rose-300' 
+                                  : isModerate
+                                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                                  : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                              }`}>
+                                {isCritical ? '🚨 Fragilidade Crítica' : isModerate ? '⚠️ Ponto de Atenção' : '✅ Procedimento Seguro'}
+                              </span>
+                              <span className="text-[11px] text-slate-400">
+                                {item.quizTitle}
+                              </span>
+                            </div>
+                            <h3 className="text-sm font-bold text-white pt-1">{item.questionText}</h3>
+                          </div>
+
+                          {/* Medidor de Erro */}
+                          <div className="text-right shrink-0">
+                            <div className="flex items-baseline gap-1.5 justify-end">
+                              <span className={`text-base font-black ${isCritical ? 'text-rose-400' : isModerate ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                {item.errorRate}%
+                              </span>
+                              <span className="text-[11px] text-slate-400">taxa de erro</span>
+                            </div>
+                            <span className="text-[10px] text-slate-500">
+                              {item.errorCount} erros • {item.correctCount} acertos ({item.totalAnswered} respostas)
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Barra de Proporção */}
+                        <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden flex">
+                          <div 
+                            className="bg-emerald-500 h-full"
+                            style={{ width: `${100 - item.errorRate}%` }}
+                            title={`${100 - item.errorRate}% de Acertos`}
+                          />
+                          <div 
+                            className={`h-full ${isCritical ? 'bg-rose-500' : 'bg-amber-500'}`}
+                            style={{ width: `${item.errorRate}%` }}
+                            title={`${item.errorRate}% de Erros`}
+                          />
+                        </div>
+
+                        {/* Comparação Gabarito vs Desvio */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div className="p-2.5 bg-slate-900/80 rounded-xl border border-emerald-500/20 space-y-0.5">
+                            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                              <CheckCircle2 size={11} /> Gabarito Oficial (Procedimento Correto)
+                            </span>
+                            <p className="text-slate-200 font-semibold">{item.correctOptionText}</p>
+                          </div>
+
+                          {item.mostCommonWrongText ? (
+                            <div className="p-2.5 bg-slate-900/80 rounded-xl border border-rose-500/20 space-y-0.5">
+                              <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1">
+                                <AlertTriangle size={11} /> Desvio Mais Frequente Marcado Pela Equipe
+                              </span>
+                              <p className="text-slate-200 font-semibold">{item.mostCommonWrongText}</p>
+                            </div>
+                          ) : (
+                            <div className="p-2.5 bg-slate-900/80 rounded-xl border border-slate-800 space-y-0.5">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                Desvios Marcados
+                              </span>
+                              <p className="text-slate-400">Nenhum desvio expressivo registrado.</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Box de Plano de Ação Recomendado */}
+                        <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-1.5 text-teal-400 font-bold text-[11px] uppercase tracking-wider">
+                              <Target size={13} />
+                              <span>Plano de Ação Recomendado</span>
+                            </div>
+                            <p className="text-slate-300 text-xs leading-relaxed whitespace-pre-line">
+                              {item.actionPlan}
+                            </p>
+                          </div>
+
+                          <button
+                            onClick={() => handleCopyActionPlan(item.actionPlan, item.questionId)}
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 shrink-0 cursor-pointer"
+                            title="Copiar texto do plano de ação para relatório ou WhatsApp"
+                          >
+                            {copiedPlanId === item.questionId ? (
+                              <>
+                                <Check size={13} className="text-emerald-400" />
+                                <span className="text-emerald-400 font-bold">Copiado!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={13} />
+                                <span>Copiar Ação</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
 
             {/* Tabelas de Ranking */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1376,24 +1763,53 @@ export default function QuestionariosAdminPage() {
                 )}
               </div>
 
-              {/* Top Colaboradores */}
+              {/* Colaboradores (Clique para ver o gabarito) */}
               <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-3 shadow-lg">
-                <h3 className="text-xs font-black text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                  <Users size={15} className="text-teal-400" /> Top Colaboradores por Aproveitamento
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                    <Users size={15} className="text-teal-400" /> Colaboradores ({biMetrics.rankingParticipants.length})
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-semibold">
+                    Clique para ver gabarito
+                  </span>
+                </div>
+
                 {biMetrics.rankingParticipants.length === 0 ? (
                   <p className="text-xs text-slate-500 py-2">Sem respostas registradas.</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
                     {biMetrics.rankingParticipants.map((p, idx) => (
-                      <div key={idx} className="p-2.5 bg-slate-950 border border-slate-800/80 rounded-xl flex items-center justify-between text-xs">
+                      <div 
+                        key={idx} 
+                        onClick={() => setSelectedCollaborator(p)}
+                        className="p-2.5 bg-slate-950 hover:bg-slate-900/90 border border-slate-800 hover:border-teal-500/40 rounded-xl flex items-center justify-between text-xs transition-all cursor-pointer group"
+                      >
                         <div className="flex items-center gap-2 truncate pr-2">
-                          <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-[10px] shrink-0">
+                          <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-[10px] shrink-0 group-hover:bg-teal-600 group-hover:text-white transition-colors">
                             {idx + 1}
                           </span>
-                          <span className="font-semibold text-slate-200 truncate">{p.name}</span>
+                          <div className="truncate">
+                            <span className="font-bold text-white group-hover:text-teal-300 transition-colors block truncate">
+                              {p.name}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block truncate">
+                              {p.role} • {p.count} questionário(s)
+                            </span>
+                          </div>
                         </div>
-                        <span className="font-black text-teal-300 shrink-0">{p.avgScore}%</span>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`font-black ${p.avgScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {p.avgScore}%
+                          </span>
+                          <button
+                            type="button"
+                            className="p-1 bg-slate-900 group-hover:bg-teal-500/20 text-slate-400 group-hover:text-teal-300 rounded-md transition-colors"
+                            title="Ver gabarito e respostas"
+                          >
+                            <Eye size={13} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1402,6 +1818,137 @@ export default function QuestionariosAdminPage() {
 
             </div>
 
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* MODAL DE DETALHES DO COLABORADOR: GABARITO, ACERTOS E ERROS              */}
+        {/* ========================================================================= */}
+        {selectedCollaborator && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto animate-in fade-in duration-200">
+              
+              {/* Header do Modal */}
+              <div className="p-4 sm:p-5 border-b border-slate-800 flex items-start justify-between gap-3 bg-slate-950">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-teal-500/10 text-teal-400 px-2 py-0.5 rounded-md border border-teal-500/20">
+                      Gabarito Individual do Colaborador
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                      selectedCollaborator.avgScore >= 70 
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' 
+                        : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                    }`}>
+                      Aproveitamento: {selectedCollaborator.avgScore}%
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-white">{selectedCollaborator.name}</h3>
+                  <p className="text-xs text-slate-400">
+                    Função: <strong className="text-slate-200">{selectedCollaborator.role}</strong> • Total de Avaliações: {selectedCollaborator.count}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setSelectedCollaborator(null)}
+                  className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                  title="Fechar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Corpo com Avaliações e Gabarito */}
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-6">
+                {selectedCollaborator.attempts.map((att, attIdx) => (
+                  <div key={att.attemptId || attIdx} className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-3 bg-slate-950 rounded-xl border border-slate-800">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avaliação</span>
+                        <h4 className="text-sm font-bold text-white">{att.quizTitle}</h4>
+                        <span className="text-[10px] text-slate-500">
+                          Data: {new Date(att.submittedAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <span className={`text-xs font-black px-2.5 py-1 rounded-lg border ${
+                          att.passed 
+                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' 
+                            : 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                        }`}>
+                          Nota: {att.score}% ({att.passed ? 'Aprovado' : 'Abaixo da Média'})
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Questões e Gabarito */}
+                    <div className="space-y-3">
+                      {att.questionsBreakdown.map((q, qIdx) => (
+                        <div 
+                          key={q.questionId || qIdx}
+                          className={`p-3.5 rounded-xl border space-y-2 text-xs ${
+                            q.isCorrect 
+                              ? 'bg-slate-950/60 border-emerald-500/30' 
+                              : 'bg-rose-950/20 border-rose-500/40'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-bold text-white text-xs leading-snug">
+                              Questão {qIdx + 1}: {q.questionText}
+                            </span>
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border shrink-0 ${
+                              q.isCorrect 
+                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' 
+                                : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+                            }`}>
+                              {q.isCorrect ? '✓ Acertou (+1 pt)' : '✕ Errou (0 pt)'}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5 pt-1">
+                            {/* Resposta do Colaborador */}
+                            <div className="flex items-start gap-1.5">
+                              <span className="text-slate-400 font-semibold shrink-0">Resposta do Colaborador:</span>
+                              <span className={`font-bold ${q.isCorrect ? 'text-emerald-300' : 'text-rose-300 line-through'}`}>
+                                {q.selectedText}
+                              </span>
+                            </div>
+
+                            {/* Gabarito Correto */}
+                            <div className="flex items-start gap-1.5 p-2 bg-slate-900 rounded-lg border border-emerald-500/20">
+                              <ShieldCheck size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                              <div>
+                                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">
+                                  Gabarito Oficial Correto:
+                                </span>
+                                <span className="font-bold text-white">{q.correctOptionText}</span>
+                              </div>
+                            </div>
+
+                            {q.explanation && (
+                              <p className="text-[11px] text-slate-400 italic pt-0.5">
+                                Justificativa: {q.explanation}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-slate-800 bg-slate-950 flex justify-end">
+                <button
+                  onClick={() => setSelectedCollaborator(null)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Fechar Visualização
+                </button>
+              </div>
+
+            </div>
           </div>
         )}
 
