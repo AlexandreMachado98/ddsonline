@@ -73,6 +73,7 @@ model Meeting {
   documentHash        String?
   attendees           Attendance[]
   attachments         MeetingAttachment[]
+  quizzes              Quiz[]
 
   @@index([organizerId, status, createdAt(sort: Desc)])
   @@index([companyId])
@@ -90,6 +91,7 @@ model Attendance {
   createdAt     DateTime  @default(now())
   meetingId     String
   meeting       Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  quizAttempts QuizAttempt[]
 
   @@index([meetingId, createdAt])
 }
@@ -109,4 +111,80 @@ model MeetingAttachment {
   meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
 
   @@index([meetingId, order])
+}
+model Quiz {
+  id            String         @id @default(uuid())
+  meetingId     String
+  meeting       Meeting        @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  title         String
+  status        String         @default("DRAFT")
+  passingScore  Int            @default(70)
+  criticalBelow Int            @default(40)
+  excellentFrom Int            @default(90)
+  shareToken    String         @unique @default(uuid())
+  createdAt     DateTime       @default(now())
+  publishedAt   DateTime?
+  closedAt      DateTime?
+  questions     QuizQuestion[]
+  attempts      QuizAttempt[]
+
+  @@index([meetingId])
+}
+
+model QuizQuestion {
+  id          String       @id @default(uuid())
+  quizId      String
+  quiz        Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  text        String
+  type        String       @default("SINGLE_CHOICE")
+  weight      Int          @default(1)
+  position    Int
+  explanation String?
+  options     QuizOption[]
+  answers     QuizAnswer[]
+
+  @@index([quizId, position])
+}
+
+model QuizOption {
+  id         String       @id @default(uuid())
+  questionId String
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text       String
+  isCorrect  Boolean      @default(false)
+  position   Int
+
+  @@index([questionId, position])
+}
+
+model QuizAttempt {
+  id            String       @id @default(uuid())
+  quizId        String
+  quiz          Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  attendanceId  String
+  attendance    Attendance   @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  score         Float
+  earnedPoints  Int
+  possiblePoints Int
+  passed        Boolean
+  level         String
+  submittedAt   DateTime     @default(now())
+  answers       QuizAnswer[]
+
+  @@unique([quizId, attendanceId])
+  @@index([quizId, submittedAt])
+}
+
+model QuizAnswer {
+  id                String       @id @default(uuid())
+  attemptId         String
+  attempt           QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId        String
+  question          QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOptionIds Json
+  correct           Boolean
+  earnedPoints      Int
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
 }
