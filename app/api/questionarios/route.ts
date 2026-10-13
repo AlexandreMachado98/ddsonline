@@ -43,22 +43,28 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const meetingId = url.searchParams.get('meetingId');
+  const templatesOnly = url.searchParams.get('templates') === 'true';
 
   try {
     const whereClause: any = {};
 
-    if (meetingId && meetingId !== 'ALL' && meetingId !== 'NONE') {
+    if (templatesOnly) {
+      whereClause.isTemplate = true;
+      if (user.role !== 'SUPER_ADMIN') {
+        whereClause.creatorId = user.id;
+      }
+    } else if (meetingId && meetingId !== 'ALL' && meetingId !== 'NONE') {
       const access = await checkMeetingAccess(user, meetingId);
       if (access.error) return access.error;
       whereClause.meetingId = meetingId;
     } else if (meetingId === 'NONE') {
-      // Apenas questionários independentes
+      // Apenas questionários autônomos
       whereClause.meetingId = null;
       if (user.role !== 'SUPER_ADMIN') {
         whereClause.creatorId = user.id;
       }
     } else {
-      // Todos os questionários do usuário (vinculados ou independentes)
+      // Todos os questionários do usuário
       if (user.role !== 'SUPER_ADMIN') {
         whereClause.OR = [
           { creatorId: user.id },
@@ -104,6 +110,70 @@ export async function POST(req: Request) {
   let body: any;
   try { body = await req.json(); } catch { return json('JSON inválido.', 400); }
 
+  const action = body.action;
+
+  // AÇÃO 1: CLONAR QUESTIONÁRIO / REAVALIAÇÃO
+  if (action === 'clone' || action === 'reopen') {
+    const sourceQuizId = body.sourceQuizId;
+    if (typeof sourceQuizId !== 'string') return json('ID do questionário de origem obrigatório.', 400);
+
+    const source = await prisma.quiz.findUnique({
+      where: { id: sourceQuizId },
+      include: {
+        questions: {
+          orderBy: { position: 'asc' },
+          include: { options: { orderBy: { position: 'asc' } } }
+        }
+      }
+    });
+    if (!source) return json('Questionário de origem não encontrado.', 404);
+
+    const newMeetingId = body.meetingId || null;
+    if (newMeetingId) {
+      const access = await checkMeetingAccess(user, newMeetingId);
+      if (access.error) return access.error;
+    }
+
+    const isReevaluation = action === 'reopen';
+    const newTitle = body.title?.trim() || (isReevaluation ? `${source.title} (Reavaliação)` : `${source.title} (Cópia)`);
+
+    const cloned = await prisma.quiz.create({
+      data: {
+        meetingId: newMeetingId,
+        creatorId: user.id,
+        title: newTitle,
+        passingScore: source.passingScore,
+        criticalBelow: source.criticalBelow,
+        excellentFrom: source.excellentFrom,
+        status: isReevaluation ? 'PUBLISHED' : 'DRAFT',
+        publishedAt: isReevaluation ? new Date() : null,
+        templateId: source.templateId || source.id,
+        isTemplate: Boolean(body.isTemplate),
+        questions: {
+          create: source.questions.map((q, qPos) => ({
+            text: q.text,
+            type: q.type,
+            weight: q.weight,
+            position: qPos,
+            explanation: q.explanation,
+            options: {
+              create: q.options.map((o, oPos) => ({
+                text: o.text,
+                isCorrect: o.isCorrect,
+                position: oPos
+              }))
+            }
+          }))
+        }
+      },
+      select: { id: true, title: true, status: true, shareToken: true }
+    });
+
+    return NextResponse.json({ success: true, quiz: cloned }, { status: 201 });
+  }
+
+  // AÇÃO 2: SALVAR COMO FORMULÁRIO BASE (TEMPLATE REUTILIZÁVEL)
+  const isTemplate = Boolean(body.isTemplate);
   const meetingId = (typeof body.meetingId === 'string' && body.meetingId.trim()) ? body.meetingId.trim() : null;
 
   if (meetingId) {
@@ -123,6 +193,7 @@ export async function POST(req: Request) {
         passingScore: data.passingScore,
         criticalBelow: data.criticalBelow,
         excellentFrom: data.excellentFrom,
+        isTemplate,
         questions: {
           create: data.questions.map((q, position) => ({
             text: q.text.trim(),
@@ -140,7 +211,7 @@ export async function POST(req: Request) {
           }))
         }
       },
-      select: { id: true, status: true, shareToken: true, meetingId: true }
+      select: { id: true, status: true, shareToken: true, meetingId: true, isTemplate: true }
     });
 
     return NextResponse.json({ success: true, quiz }, { status: 201 });
@@ -157,17 +228,15 @@ export async function PATCH(req: Request) {
   let body: any;
   try { body = await req.json(); } catch { return json('JSON inválido.', 400); }
 
-  if (typeof body.id !== 'string' || !['PUBLISHED', 'CLOSED'].includes(body.status)) {
-    return json('Solicitação inválida.', 400);
-  }
+  if (typeof body.id !== 'string') return json('Solicitação inválida.', 400);
 
   const quiz = await prisma.quiz.findUnique({
     where: { id: body.id },
-    select: { id: true, meetingId: true, creatorId: true, status: true }
+    select: { id: true, meetingId: true, creatorId: true, status: true, isTemplate: true }
   });
   if (!quiz) return json('Questionário não encontrado.', 404);
 
-  // Autorização: criador do quiz ou gestor do DDS
+  // Autorização
   if (user.role !== 'SUPER_ADMIN' && quiz.creatorId !== user.id) {
     if (quiz.meetingId) {
       const access = await checkMeetingAccess(user, quiz.meetingId);
@@ -177,20 +246,29 @@ export async function PATCH(req: Request) {
     }
   }
 
-  if (!((quiz.status === 'DRAFT' && body.status === 'PUBLISHED') || (quiz.status === 'PUBLISHED' && body.status === 'CLOSED'))) {
-    return json('Transição de status não permitida.', 409);
+  // AÇÃO: Alternar se é Template/Formulário Reutilizável
+  if (body.toggleTemplate !== undefined) {
+    await prisma.quiz.update({
+      where: { id: body.id },
+      data: { isTemplate: Boolean(body.toggleTemplate) }
+    });
+    return NextResponse.json({ success: true, isTemplate: Boolean(body.toggleTemplate) });
   }
 
-  try {
-    const updated = await prisma.quiz.updateMany({
-      where: { id: body.id, status: quiz.status },
-      data: body.status === 'PUBLISHED' 
-        ? { status: 'PUBLISHED', publishedAt: new Date() } 
-        : { status: 'CLOSED', closedAt: new Date() }
+  // Transição de Status (DRAFT, PUBLISHED, CLOSED) + Reabertura direta (CLOSED -> PUBLISHED)
+  if (body.status) {
+    if (!['PUBLISHED', 'CLOSED', 'DRAFT'].includes(body.status)) return json('Status inválido.', 400);
+
+    const updateData: any = { status: body.status };
+    if (body.status === 'PUBLISHED') updateData.publishedAt = new Date();
+    if (body.status === 'CLOSED') updateData.closedAt = new Date();
+
+    const updated = await prisma.quiz.update({
+      where: { id: body.id },
+      data: updateData
     });
-    if (!updated.count) return json('Status alterado por outra operação.', 409);
-    return NextResponse.json({ success: true, status: body.status });
-  } catch {
-    return json('Falha ao atualizar questionário.', 500);
+    return NextResponse.json({ success: true, status: updated.status });
   }
+
+  return json('Nenhuma ação especificada.', 400);
 }
