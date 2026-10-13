@@ -29,3 +29,6 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/dds_test
       - name: Validar TypeScript
         run: npx tsc --noEmit
+
+      - name: Testes unitários de correção
+        run: node tests/quizGrading.test.cjs
