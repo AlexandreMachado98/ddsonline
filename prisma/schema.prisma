@@ -181,6 +181,7 @@ model QuizAttempt {
   passed          Boolean
   level           String
   submittedAt     DateTime     @default(now())
+  timeSpentSeconds Int?
   answers         QuizAnswer[]
 
   @@index([quizId, submittedAt])

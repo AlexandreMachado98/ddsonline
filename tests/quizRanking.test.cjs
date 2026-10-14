@@ -123,4 +123,28 @@ assert.equal(sanitizePublicName('Carlos Souza'), 'Carlos Souza');
 assert.equal(sanitizePublicName('Roberto'), 'Roberto');
 console.log('✓ Teste 7: Anonimização e proteção LGPD validada.');
 
-console.log('✅ TODOS OS 7 TESTES AUTOMATIZADOS DO MOTOR DE RANKING PASSARAM!');
+// 8. Teste: Desempate por menor tempo de conclusão quando nota e acertos são iguais
+const timeTieAttempts = [
+  { id: '1', participantName: 'Carlos Devagar', score: 100, earnedPoints: 5, possiblePoints: 5, timeSpentSeconds: 120, passed: true },
+  { id: '2', participantName: 'Alexandre Rapido', score: 100, earnedPoints: 5, possiblePoints: 5, timeSpentSeconds: 45, passed: true },
+  { id: '3', participantName: 'Sebastião Medio', score: 100, earnedPoints: 5, possiblePoints: 5, timeSpentSeconds: 80, passed: true }
+];
+const timeTieResult = computeQuizRanking(timeTieAttempts, 5);
+assert.equal(timeTieResult.ranking[0].participantName, 'Alexandre Rapido');
+assert.equal(timeTieResult.ranking[0].position, 1);
+assert.equal(timeTieResult.ranking[0].timeSpentFormatted, '45s');
+
+assert.equal(timeTieResult.ranking[1].participantName, 'Sebastião Medio');
+assert.equal(timeTieResult.ranking[1].position, 2);
+assert.equal(timeTieResult.ranking[1].timeSpentFormatted, '1m 20s');
+
+assert.equal(timeTieResult.ranking[2].participantName, 'Carlos Devagar');
+assert.equal(timeTieResult.ranking[2].position, 3);
+assert.equal(timeTieResult.ranking[2].timeSpentFormatted, '2m 00s');
+
+assert.equal(timeTieResult.podium.first[0].participantName, 'Alexandre Rapido');
+assert.equal(timeTieResult.podium.second[0].participantName, 'Sebastião Medio');
+assert.equal(timeTieResult.podium.third[0].participantName, 'Carlos Devagar');
+console.log('✓ Teste 8: Desempate por menor tempo de conclusão validado com sucesso.');
+
+console.log('✅ TODOS OS 8 TESTES AUTOMATIZADOS DO MOTOR DE RANKING PASSARAM!');

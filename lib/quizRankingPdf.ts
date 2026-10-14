@@ -180,7 +180,8 @@ export async function generateQuizRankingPdf(params: GenerateRankingPdfParams): 
       doc.setTextColor(textDark[0], textDark[1], textDark[2]);
       doc.text(truncatedName, podX + podiumBoxWidth / 2, currentY + 11.5, { align: 'center' });
 
-      const scoreText = `${pod.items[0].score}% (${pod.items[0].correctCount}/${pod.items[0].totalQuestions} acertos)`;
+      const timeStr = pod.items[0].timeSpentFormatted && pod.items[0].timeSpentFormatted !== '—' ? ` • ${pod.items[0].timeSpentFormatted}` : '';
+      const scoreText = `${pod.items[0].score}% (${pod.items[0].correctCount}/${pod.items[0].totalQuestions} acertos${timeStr})`;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(emeraldDark[0], emeraldDark[1], emeraldDark[2]);
@@ -220,6 +221,7 @@ export async function generateQuizRankingPdf(params: GenerateRankingPdfParams): 
       item.participantName,
       item.participantRole || 'Colaborador',
       `${item.correctCount}/${item.totalQuestions}`,
+      item.timeSpentFormatted || '—',
       `${item.score}%`,
       item.passed ? 'APROVADO' : 'INSUFICIENTE',
       formattedDate
@@ -229,8 +231,8 @@ export async function generateQuizRankingPdf(params: GenerateRankingPdfParams): 
   autoTable(doc, {
     startY: currentY,
     margin: { top: 15, bottom: 20, left: margin, right: margin },
-    head: [['POSIÇÃO', 'COLABORADOR', 'FUNÇÃO', 'ACERTOS', 'NOTA (%)', 'SITUAÇÃO', 'DATA']],
-    body: tableRows.length > 0 ? tableRows : [['-', 'Nenhum participante concluiu a avaliação ainda', '-', '-', '-', '-', '-']],
+    head: [['POSIÇÃO', 'COLABORADOR', 'FUNÇÃO', 'ACERTOS', 'TEMPO', 'NOTA (%)', 'SITUAÇÃO', 'DATA']],
+    body: tableRows.length > 0 ? tableRows : [['-', 'Nenhum participante concluiu a avaliação ainda', '-', '-', '-', '-', '-', '-']],
     theme: 'plain',
     headStyles: {
       fillColor: primaryDark,
@@ -254,17 +256,18 @@ export async function generateQuizRankingPdf(params: GenerateRankingPdfParams): 
       fillColor: [248, 250, 252]
     },
     columnStyles: {
-      0: { cellWidth: 24, halign: 'center', fontStyle: 'bold' },
-      1: { cellWidth: 46, halign: 'left', fontStyle: 'bold' },
-      2: { cellWidth: 32, halign: 'left' },
-      3: { cellWidth: 18, halign: 'center' },
-      4: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
-      5: { cellWidth: 24, halign: 'center', fontStyle: 'bold' },
-      6: { cellWidth: 20, halign: 'center' }
+      0: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
+      1: { cellWidth: 42, halign: 'left', fontStyle: 'bold' },
+      2: { cellWidth: 30, halign: 'left' },
+      3: { cellWidth: 16, halign: 'center' },
+      4: { cellWidth: 16, halign: 'center' },
+      5: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
+      6: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
+      7: { cellWidth: 18, halign: 'center' }
     },
     didParseCell: (data) => {
-      // Destaque de cor para a coluna SITUAÇÃO
-      if (data.section === 'body' && data.column.index === 5) {
+      // Destaque de cor para a coluna SITUAÇÃO (índice 6)
+      if (data.section === 'body' && data.column.index === 6) {
         if (data.cell.raw === 'APROVADO') {
           data.cell.styles.textColor = emeraldDark;
         } else if (data.cell.raw === 'INSUFICIENTE') {

@@ -42,6 +42,7 @@ async function ensureQuizColumns() {
   if (quizDbInitialized) return;
   try {
     await prisma.$executeRawUnsafe('ALTER TABLE "Quiz" ADD COLUMN IF NOT EXISTS "showRanking" BOOLEAN DEFAULT false;');
+    await prisma.$executeRawUnsafe('ALTER TABLE "QuizAttempt" ADD COLUMN IF NOT EXISTS "timeSpentSeconds" INTEGER;');
     quizDbInitialized = true;
   } catch (e) {
     console.error('ensureQuizColumns error:', e);

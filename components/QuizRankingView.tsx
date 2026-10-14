@@ -5,7 +5,7 @@ import {
   Trophy, Award, Medal, Crown, Sparkles, Download, RefreshCw, 
   Search, Filter, CheckCircle2, AlertTriangle, Users, FileText, 
   Lock, Globe, Copy, Check, Eye, UserCheck, ShieldCheck, ArrowRight,
-  ExternalLink, BarChart3, AlertCircle
+  ExternalLink, BarChart3, AlertCircle, Clock
 } from 'lucide-react';
 import { QuizRankingSummary, QuizRankingItem } from '@/lib/quizRanking';
 import { generateQuizRankingPdf } from '@/lib/quizRankingPdf';
@@ -390,7 +390,14 @@ export default function QuizRankingView({
                         </div>
                       </div>
                       <div className="flex items-center justify-between pt-1 text-xs">
-                        <span className="text-slate-400 text-[11px]">{item.correctCount}/{item.totalQuestions} acertos</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-slate-400 text-[11px]">{item.correctCount}/{item.totalQuestions} acertos</span>
+                          {item.timeSpentFormatted && item.timeSpentFormatted !== '—' && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1">
+                              <Clock size={10} className="text-slate-400" /> {item.timeSpentFormatted}
+                            </span>
+                          )}
+                        </div>
                         <span className="font-black text-slate-200 text-sm">{item.score}%</span>
                       </div>
                     </div>
@@ -431,7 +438,14 @@ export default function QuizRankingView({
                         </div>
                       </div>
                       <div className="flex items-center justify-between pt-1 text-xs">
-                        <span className="text-slate-300 text-[11px] font-medium">{item.correctCount}/{item.totalQuestions} acertos</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-slate-300 text-[11px] font-medium">{item.correctCount}/{item.totalQuestions} acertos</span>
+                          {item.timeSpentFormatted && item.timeSpentFormatted !== '—' && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                              <Clock size={11} className="text-amber-400" /> {item.timeSpentFormatted}
+                            </span>
+                          )}
+                        </div>
                         <span className="font-black text-amber-400 text-base">{item.score}%</span>
                       </div>
                     </div>
@@ -470,7 +484,14 @@ export default function QuizRankingView({
                         </div>
                       </div>
                       <div className="flex items-center justify-between pt-1 text-xs">
-                        <span className="text-slate-400 text-[11px]">{item.correctCount}/{item.totalQuestions} acertos</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-slate-400 text-[11px]">{item.correctCount}/{item.totalQuestions} acertos</span>
+                          {item.timeSpentFormatted && item.timeSpentFormatted !== '—' && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-800/60 flex items-center gap-1">
+                              <Clock size={10} className="text-amber-500" /> {item.timeSpentFormatted}
+                            </span>
+                          )}
+                        </div>
                         <span className="font-black text-amber-400 text-sm">{item.score}%</span>
                       </div>
                     </div>
@@ -581,6 +602,7 @@ export default function QuizRankingView({
                   <th className="py-3 px-3">Colaborador</th>
                   <th className="py-3 px-3 hidden sm:table-cell">Função</th>
                   <th className="py-3 px-3 text-center">Acertos</th>
+                  <th className="py-3 px-3 text-center">Tempo</th>
                   <th className="py-3 px-3 text-center">Aproveitamento</th>
                   <th className="py-3 px-3 text-center">Situação</th>
                   <th className="py-3 px-3 text-right hidden md:table-cell">Conclusão</th>
@@ -592,7 +614,7 @@ export default function QuizRankingView({
               <tbody className="divide-y divide-slate-800/60">
                 {filteredRanking.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-500">
+                    <td colSpan={9} className="py-8 text-center text-slate-500">
                       Nenhum colaborador encontrado para o filtro selecionado.
                     </td>
                   </tr>
@@ -617,7 +639,7 @@ export default function QuizRankingView({
                             {item.position === 3 && <Award size={14} className="text-amber-500" />}
                             <span className={posColor}>{item.position}º</span>
                             {item.isTie && (
-                              <span className="text-[9px] font-bold text-amber-300 bg-amber-500/10 px-1 rounded" title="Empate de pontuação">
+                              <span className="text-[9px] font-bold text-amber-300 bg-amber-500/10 px-1 rounded" title="Empate de pontuação e tempo">
                                 =
                               </span>
                             )}
@@ -651,6 +673,18 @@ export default function QuizRankingView({
                         {/* Acertos */}
                         <td className="py-3 px-3 text-center font-bold text-slate-200 whitespace-nowrap">
                           {item.correctCount}/{item.totalQuestions}
+                        </td>
+
+                        {/* Tempo */}
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          {item.timeSpentFormatted && item.timeSpentFormatted !== '—' ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700/60">
+                              <Clock size={11} className="text-emerald-400" />
+                              {item.timeSpentFormatted}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 text-[11px]">—</span>
+                          )}
                         </td>
 
                         {/* Aproveitamento */}

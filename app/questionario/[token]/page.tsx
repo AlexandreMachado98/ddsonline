@@ -56,6 +56,7 @@ function QuestionarioPublicoContent() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   // Submissão e Resultado
+  const [startTime] = useState<number>(() => Date.now());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<any | null>(null);
   const [viewingPublicRanking, setViewingPublicRanking] = useState(false);
@@ -147,12 +148,15 @@ function QuestionarioPublicoContent() {
     setIsSubmitting(true);
     setError(null);
 
+    const timeSpentSeconds = Math.max(5, Math.round((Date.now() - startTime) / 1000));
+
     const payload = {
       token,
       attendanceId: attendanceId || undefined,
       attendanceProof: attendanceProof || undefined,
       participantName: collaboratorName.trim(),
       participantDoc: collaboratorRole.trim(),
+      timeSpentSeconds,
       answers: quiz.questions.map(q => ({
         questionId: q.id,
         selectedOptionIds: selectedAnswers[q.id] || []

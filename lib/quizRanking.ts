@@ -9,6 +9,7 @@ export interface RawAttempt {
   passed: boolean;
   level: string;
   submittedAt: string | Date;
+  timeSpentSeconds?: number | null;
   participantName?: string | null;
   participantDoc?: string | null; // Usado para Função ou documento anonimizado
   attendance?: { id: string; name: string } | null;
@@ -28,6 +29,8 @@ export interface QuizRankingItem {
   passed: boolean;
   level: string;
   submittedAt: string;
+  timeSpentSeconds?: number | null;
+  timeSpentFormatted: string;
   isTie: boolean;
 }
 
@@ -65,6 +68,18 @@ export function sanitizePublicName(fullName: string): string {
   const last = parts[parts.length - 1];
   const middle = parts.slice(1, -1).map(p => `${p[0].toUpperCase()}.`).join(' ');
   return `${first} ${middle} ${last}`;
+}
+
+/**
+ * Formata o tempo de conclusão em segundos para visualização amigável
+ * Ex: 45 -> "45s", 75 -> "1m 15s", 132 -> "2m 12s"
+ */
+export function formatTimeSpent(seconds?: number | null): string {
+  if (typeof seconds !== 'number' || seconds <= 0) return '—';
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (mins === 0) return `${secs}s`;
+  return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
 }
 
 /**
@@ -133,10 +148,14 @@ export function computeQuizRanking(
     if (!existing) {
       participantBestMap.set(key, { attempt: att, correctCount });
     } else {
-      // Prioriza maior pontuação; se empate, maior quantidade de acertos
+      // Prioriza maior pontuação; se empate, maior quantidade de acertos; se empate, menor tempo
+      const prevTime = typeof existing.attempt.timeSpentSeconds === 'number' && existing.attempt.timeSpentSeconds > 0 ? existing.attempt.timeSpentSeconds : Infinity;
+      const currTime = typeof att.timeSpentSeconds === 'number' && att.timeSpentSeconds > 0 ? att.timeSpentSeconds : Infinity;
+
       const isBetter =
         att.score > existing.attempt.score ||
-        (att.score === existing.attempt.score && correctCount > existing.correctCount);
+        (att.score === existing.attempt.score && correctCount > existing.correctCount) ||
+        (att.score === existing.attempt.score && correctCount === existing.correctCount && currTime < prevTime);
 
       if (isBetter) {
         participantBestMap.set(key, { attempt: att, correctCount });
@@ -149,7 +168,8 @@ export function computeQuizRanking(
   // 2. Ordenação rigorosa conforme regras de negócio
   // Critério 1: Maior percentual de aproveitamento (score)
   // Critério 2: Maior quantidade de acertos (correctCount / earnedPoints)
-  // Critério 3: Empate mantido na mesma colocação (sem ordenar por envio)
+  // Critério 3: Menor tempo de conclusão (quem finalizou mais rápido desempata!)
+  // Critério 4: Persistindo o empate exato, mantêm-se na mesma colocação
   uniqueCandidates.sort((a, b) => {
     if (b.attempt.score !== a.attempt.score) {
       return b.attempt.score - a.attempt.score;
@@ -157,7 +177,12 @@ export function computeQuizRanking(
     if (b.correctCount !== a.correctCount) {
       return b.correctCount - a.correctCount;
     }
-    return 0; // Empate absoluto mantido
+    const timeA = typeof a.attempt.timeSpentSeconds === 'number' && a.attempt.timeSpentSeconds > 0 ? a.attempt.timeSpentSeconds : Infinity;
+    const timeB = typeof b.attempt.timeSpentSeconds === 'number' && b.attempt.timeSpentSeconds > 0 ? b.attempt.timeSpentSeconds : Infinity;
+    if (timeA !== timeB) {
+      return timeA - timeB; // Menor tempo de finalização vence o desempate
+    }
+    return 0; // Empate absoluto mantido se tudo for estritamente idêntico
   });
 
   // 3. Atribuição de Posição com Empate Compartilhado (Classificação de Competição 1224)
@@ -170,10 +195,15 @@ export function computeQuizRanking(
     let position = i + 1;
     let isTie = false;
 
+    const timeCurr = typeof current.attempt.timeSpentSeconds === 'number' && current.attempt.timeSpentSeconds > 0 ? current.attempt.timeSpentSeconds : null;
+    const timePrev = prev && typeof prev.attempt.timeSpentSeconds === 'number' && prev.attempt.timeSpentSeconds > 0 ? prev.attempt.timeSpentSeconds : null;
+    const isSameTime = timeCurr === timePrev;
+
     if (
       prev &&
       current.attempt.score === prev.attempt.score &&
-      current.correctCount === prev.correctCount
+      current.correctCount === prev.correctCount &&
+      isSameTime
     ) {
       position = rankingItems[i - 1].position;
       isTie = true;
@@ -199,6 +229,8 @@ export function computeQuizRanking(
       submittedAt: current.attempt.submittedAt instanceof Date
         ? current.attempt.submittedAt.toISOString()
         : String(current.attempt.submittedAt || new Date().toISOString()),
+      timeSpentSeconds: current.attempt.timeSpentSeconds ?? null,
+      timeSpentFormatted: formatTimeSpent(current.attempt.timeSpentSeconds),
       isTie
     });
   }

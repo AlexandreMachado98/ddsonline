@@ -11,7 +11,9 @@ function equals(a: string, b: string) { return timingSafeEqual(fingerprint(a), f
 export async function POST(req: Request) {
   let body: any;
   try { body = await req.json(); } catch { return failure('JSON inválido.', 400); }
-  const { token, attendanceId, answers, attendanceProof, participantName, participantDoc } = body || {};
+  const { token, attendanceId, answers, attendanceProof, participantName, participantDoc, timeSpentSeconds: incomingTimeSpent } = body || {};
+  const parsedTimeSpent = Number(incomingTimeSpent);
+  const timeSpentSeconds = Number.isInteger(parsedTimeSpent) && parsedTimeSpent > 0 && parsedTimeSpent <= 14400 ? parsedTimeSpent : null;
 
   if (typeof token !== 'string' || !/^[a-f0-9-]{36}$/i.test(token) ||
       !Array.isArray(answers) || answers.length > 100 ||
@@ -96,6 +98,7 @@ export async function POST(req: Request) {
           possiblePoints: result.possiblePoints,
           passed: result.passed,
           level: result.level,
+          timeSpentSeconds,
           answers: {
             create: result.questions.map(q => ({
               questionId: q.questionId,
