@@ -4,9 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { 
   CheckCircle2, AlertTriangle, HelpCircle, ArrowRight, ArrowLeft,
-  ShieldCheck, Award, AlertCircle, RefreshCw, UserCheck, User
+  ShieldCheck, Award, AlertCircle, RefreshCw, UserCheck, User, Trophy
 } from 'lucide-react';
 import Link from 'next/link';
+import QuizRankingView from '@/components/QuizRankingView';
 
 interface QuizOption {
   id: string;
@@ -27,6 +28,7 @@ interface QuizData {
   id: string;
   title: string;
   passingScore: number;
+  showRanking?: boolean;
   meeting?: {
     topic: string;
     status: string;
@@ -56,6 +58,7 @@ export default function QuestionarioPublicoPage() {
   // Submissão e Resultado
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<any | null>(null);
+  const [viewingPublicRanking, setViewingPublicRanking] = useState(false);
 
   useEffect(() => {
     // 1. Tenta recuperar credencial de presença da URL ou sessionStorage (quando houver)
@@ -209,6 +212,47 @@ export default function QuestionarioPublicoPage() {
   // Tela de Resultado pós-submissão
   if (submitResult) {
     const isPassed = submitResult.passed;
+
+    // Visualização da Classificação Pública da Equipe
+    if (viewingPublicRanking && quiz) {
+      return (
+        <main className="min-h-screen bg-slate-950 text-white py-6 px-3 sm:px-6 font-sans relative">
+          <div className="max-w-3xl w-full mx-auto space-y-4">
+            <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+              <div>
+                <span className="text-[10px] font-black uppercase text-amber-400">Classificação dos Colaboradores</span>
+                <h2 className="text-sm font-bold text-white">{quiz.title}</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingPublicRanking(false)}
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <ArrowLeft size={13} /> Voltar ao Meu Resultado
+              </button>
+            </div>
+
+            <QuizRankingView
+              quizId={quiz.id}
+              quizTitle={quiz.title}
+              passingScore={quiz.passingScore}
+              ddsTopic={quiz.meeting?.topic}
+              isPublicMode={true}
+              shareToken={token}
+            />
+
+            <div className="text-center pt-2">
+              <Link href="/">
+                <button className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold rounded-xl transition-all">
+                  Finalizar e Sair
+                </button>
+              </Link>
+            </div>
+          </div>
+        </main>
+      );
+    }
+
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-600/10 blur-[130px] rounded-full pointer-events-none"></div>
@@ -256,11 +300,25 @@ export default function QuestionarioPublicoPage() {
             Seu resultado foi arquivado com sucesso no registro oficial do DDS ON.
           </p>
 
-          <Link href="/">
-            <button className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-slate-950 font-black text-xs rounded-2xl transition-all shadow-lg min-h-[44px]">
-              Concluir Avaliação
-            </button>
-          </Link>
+          <div className="space-y-2.5">
+            {/* Botão de Acesso ao Ranking Público se habilitado pelo gestor */}
+            {quiz?.showRanking && (
+              <button
+                type="button"
+                onClick={() => setViewingPublicRanking(true)}
+                className="w-full py-3 bg-gradient-to-r from-amber-600/30 to-yellow-600/30 hover:from-amber-600/40 text-amber-300 border border-amber-500/40 font-bold text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Trophy size={15} className="text-amber-400" />
+                <span>Ver Classificação da Equipe (Ranking)</span>
+              </button>
+            )}
+
+            <Link href="/">
+              <button className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-slate-950 font-black text-xs rounded-2xl transition-all shadow-lg min-h-[44px] cursor-pointer">
+                Concluir Avaliação
+              </button>
+            </Link>
+          </div>
         </div>
       </main>
     );

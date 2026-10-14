@@ -8,7 +8,7 @@ export async function GET(req: Request) {
   try {
     const quiz = await prisma.quiz.findUnique({
       where: { shareToken: token },
-      select: { id: true, title: true, status: true, passingScore: true,
+      select: { id: true, title: true, status: true, passingScore: true, showRanking: true,
         meeting: { select: { topic: true, status: true } },
         questions: { orderBy: { position: 'asc' }, select: {
           id: true, text: true, type: true, weight: true, position: true,

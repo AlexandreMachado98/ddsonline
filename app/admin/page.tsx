@@ -6,7 +6,7 @@ import {
   Smartphone, Download, Copy, Check, LogOut, 
   History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet,
   Camera, Image as ImageIcon, Trash2, Target, ExternalLink, Info, CheckSquare, Square, MapPin, Sparkles, ChevronRight, Eye,
-  ArrowLeft, Plus, PenTool, Award
+  ArrowLeft, Plus, PenTool, Award, Trophy
 } from 'lucide-react';
 import Link from 'next/link';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
@@ -1462,8 +1462,8 @@ export default function AdminPanel() {
         {/* Badge de Sincronização e Fila Offline */}
         <OfflineSyncBadge meetingId={activeMeeting?.id} onSyncComplete={() => fetchAllData()} />
 
-        {/* Abas de Navegação (Novo DDS vs Histórico vs Questionários) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 bg-slate-900 border border-slate-800 p-1.5 rounded-2xl gap-1.5 shadow-lg">
+        {/* Abas de Navegação (Novo DDS vs Histórico vs Questionários vs Ranking) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 bg-slate-900 border border-slate-800 p-1.5 rounded-2xl gap-1.5 shadow-lg">
           <button
             onClick={() => setActiveTab('NEW_DDS')}
             className={`py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
@@ -1473,7 +1473,7 @@ export default function AdminPanel() {
             }`}
           >
             <PlusCircle size={16} />
-            <span>Iniciar Novo DDS</span>
+            <span>Novo DDS</span>
           </button>
 
           <button
@@ -1485,7 +1485,7 @@ export default function AdminPanel() {
             }`}
           >
             <History size={16} />
-            <span>Histórico & Atas ({meetingHistory.length})</span>
+            <span>Histórico ({meetingHistory.length})</span>
           </button>
 
           <Link href="/admin/questionarios" className="w-full">
@@ -1494,7 +1494,17 @@ export default function AdminPanel() {
               className="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer text-emerald-400 hover:text-white hover:bg-emerald-600/30 border border-emerald-500/30 bg-emerald-950/20 shadow-sm"
             >
               <Award size={16} className="text-emerald-400 shrink-0" />
-              <span>Questionários & Provas</span>
+              <span>Questionários</span>
+            </button>
+          </Link>
+
+          <Link href="/admin/questionarios?tab=RANKING" className="w-full">
+            <button
+              type="button"
+              className="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer text-amber-300 hover:text-white hover:bg-amber-600/30 border border-amber-500/30 bg-amber-950/20 shadow-sm"
+            >
+              <Trophy size={16} className="text-amber-400 shrink-0" />
+              <span>🏆 Ranking & Pódio</span>
             </button>
           </Link>
         </div>

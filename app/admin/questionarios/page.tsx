@@ -7,10 +7,12 @@ import {
   Copy, Check, Clock, Award, RefreshCw, Bookmark, BookmarkCheck,
   TrendingUp, Users, Target, BarChart2, Star, RotateCcw,
   Sparkles, Layers, BookOpen, ChevronRight, FileText, Eye, X, ShieldAlert,
-  ShieldCheck
+  ShieldCheck, Trophy
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useSearchParams } from 'next/navigation';
 import DdsLogo from '@/components/DdsLogo';
+import QuizRankingView from '@/components/QuizRankingView';
 
 interface QuizOptionInput {
   id: string;
@@ -115,6 +117,7 @@ interface ExistingQuiz {
   shareToken: string;
   isTemplate?: boolean;
   templateId?: string | null;
+  showRanking?: boolean;
   createdAt: string;
   publishedAt?: string;
   closedAt?: string;
@@ -131,9 +134,23 @@ interface ExistingQuiz {
 
 export default function QuestionariosAdminPage() {
   const { user: currentUser } = useAuth();
+  const searchParams = useSearchParams();
 
-  // Abas da tela: Avaliações Ativas, Banco de Formulários, e Inteligência BI
-  const [activeTab, setActiveTab] = useState<'QUIZZES' | 'TEMPLATES' | 'BI'>('QUIZZES');
+  // Abas da tela: Avaliações Ativas, Ranking de Desempenho, Banco de Formulários, e Inteligência BI
+  const [activeTab, setActiveTab] = useState<'QUIZZES' | 'TEMPLATES' | 'RANKING' | 'BI'>('QUIZZES');
+  const [selectedRankingQuizId, setSelectedRankingQuizId] = useState<string>('');
+
+  // Sincroniza aba e quiz da URL
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['QUIZZES', 'TEMPLATES', 'RANKING', 'BI'].includes(tab)) {
+      setActiveTab(tab as any);
+    }
+    const qId = searchParams.get('quizId');
+    if (qId) {
+      setSelectedRankingQuizId(qId);
+    }
+  }, [searchParams]);
 
   // Reuniões
   const [meetings, setMeetings] = useState<MeetingOption[]>([]);
@@ -479,10 +496,31 @@ export default function QuestionariosAdminPage() {
       topParticipant,
       rankingForms: sortedForms.slice(0, 5),
       rankingParticipants: sortedParticipants,
+      participantStats,
       fragilityReports,
       criticalFragilitiesCount: criticalFragilities.length
     };
   }, [quizzes]);
+
+  // Questionário ativo selecionado para o Ranking Inteligente
+  const selectedRankingQuiz = React.useMemo(() => {
+    if (selectedRankingQuizId) {
+      const found = quizzes.find(q => q.id === selectedRankingQuizId);
+      if (found) return found;
+    }
+    // Se não tiver selecionado ou não achar, prioriza questionário com respostas
+    const withAttempts = quizzes.find(q => q.attempts && q.attempts.length > 0);
+    return withAttempts || (quizzes.length > 0 ? quizzes[0] : null);
+  }, [quizzes, selectedRankingQuizId]);
+
+  // Abre modal de gabarito a partir do ranking
+  const handleOpenCollaboratorByName = (collabName: string) => {
+    if (!collabName || !biMetrics?.participantStats) return;
+    const detail = biMetrics.participantStats[collabName.trim()];
+    if (detail) {
+      setSelectedCollaborator(detail);
+    }
+  };
 
   // Manipuladores de perguntas e alternativas
   const handleAddQuestion = () => {
@@ -890,7 +928,7 @@ export default function QuestionariosAdminPage() {
         </header>
 
         {/* Abas de Navegação Superior */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 bg-slate-900 border border-slate-800 p-1.5 rounded-2xl gap-1.5 shadow-lg">
+        <div className="grid grid-cols-2 sm:grid-cols-4 bg-slate-900 border border-slate-800 p-1.5 rounded-2xl gap-1.5 shadow-lg">
           <button
             onClick={() => setActiveTab('QUIZZES')}
             className={`py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
@@ -900,7 +938,19 @@ export default function QuestionariosAdminPage() {
             }`}
           >
             <Award size={16} />
-            <span>Avaliações & Provas ({quizzes.length})</span>
+            <span>Avaliações ({quizzes.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('RANKING')}
+            className={`py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              activeTab === 'RANKING'
+                ? 'bg-gradient-to-r from-amber-600 to-yellow-600 text-slate-950 font-black shadow-md'
+                : 'text-amber-400 hover:text-amber-300 hover:bg-slate-800/60'
+            }`}
+          >
+            <Trophy size={16} />
+            <span>Ranking & Pódio</span>
           </button>
 
           <button
@@ -912,7 +962,7 @@ export default function QuestionariosAdminPage() {
             }`}
           >
             <Layers size={16} />
-            <span>Banco de Formulários ({templateQuizzes.length})</span>
+            <span>Formulários ({templateQuizzes.length})</span>
           </button>
 
           <button
@@ -924,7 +974,7 @@ export default function QuestionariosAdminPage() {
             }`}
           >
             <BarChart2 size={16} />
-            <span>Relatório BI & Desempenho</span>
+            <span>Inteligência BI</span>
           </button>
         </div>
 
@@ -946,6 +996,36 @@ export default function QuestionariosAdminPage() {
         {activeTab === 'QUIZZES' && (
           <div className="space-y-6">
             
+            {/* Banner de Acesso Rápido ao Ranking */}
+            <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/30 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 shadow-md">
+                  <Trophy size={22} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                      Novo Recurso
+                    </span>
+                    <h4 className="text-xs sm:text-sm font-black text-white">
+                      Ranking Inteligente & Pódio dos Colaboradores
+                    </h4>
+                  </div>
+                  <p className="text-[11px] text-slate-300 mt-1">
+                    Consulte a classificação em tempo real, pódio Ouro/Prata/Bronze, empates compartilhados e exporte o relatório oficial em PDF.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('RANKING')}
+                className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+              >
+                <Trophy size={15} />
+                <span>Ver Ranking & Pódio</span>
+              </button>
+            </div>
+
             {/* Barra de Filtro */}
             <section className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1086,6 +1166,19 @@ export default function QuestionariosAdminPage() {
                               )}
                             </div>
                           )}
+
+                          {/* Ver Ranking Oficial e Pódio */}
+                          <button
+                            onClick={() => {
+                              setSelectedRankingQuizId(q.id);
+                              setActiveTab('RANKING');
+                            }}
+                            className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/60 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                            title="Ver Ranking Oficial e Pódio desta Avaliação"
+                          >
+                            <Trophy size={12} className="text-amber-400" />
+                            <span>Ranking & Pódio</span>
+                          </button>
 
                           {/* Copiar para o Banco de Formulários */}
                           <button
@@ -1414,6 +1507,93 @@ export default function QuestionariosAdminPage() {
                 </button>
               </form>
             </section>
+
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* ABA: RANKING INTELIGENTE DE DESEMPENHO E PÓDIO                            */}
+        {/* ========================================================================= */}
+        {activeTab === 'RANKING' && (
+          <div className="space-y-6">
+            
+            {/* Barra de Seleção e Filtro de Questionário */}
+            <div className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-2xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                  <Trophy size={13} className="text-amber-400" /> Auditoria de Classificação Oficial
+                </span>
+                <h3 className="text-sm font-bold text-white">Selecione a Avaliação para Auditar o Ranking:</h3>
+                <p className="text-xs text-slate-400">
+                  Consulte os melhores desempenhos, empate compartilhado e exporte o relatório oficial.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <div className="relative">
+                  <select
+                    value={selectedRankingQuiz?.id || ''}
+                    onChange={e => setSelectedRankingQuizId(e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-amber-500 outline-none w-full sm:w-80 cursor-pointer"
+                  >
+                    {quizzes.length === 0 ? (
+                      <option value="">Nenhuma avaliação criada ainda</option>
+                    ) : (
+                      quizzes.map(q => (
+                        <option key={q.id} value={q.id}>
+                          {q.status === 'PUBLISHED' ? '🟢 ' : q.status === 'CLOSED' ? '⏹️ ' : '📝 '}
+                          {q.title} ({q.attempts?.length || 0} respostas) {q.meeting?.topic ? `• DDS: ${q.meeting.topic}` : '• Autônomo'}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('QUIZZES')}
+                  className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <ArrowLeft size={13} />
+                  <span>Voltar às Provas</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Componente Modular do Ranking */}
+            {selectedRankingQuiz ? (
+              <QuizRankingView
+                key={selectedRankingQuiz.id}
+                quizId={selectedRankingQuiz.id}
+                quizTitle={selectedRankingQuiz.title}
+                passingScore={selectedRankingQuiz.passingScore}
+                ddsTopic={selectedRankingQuiz.meeting?.topic}
+                ddsFarm={selectedRankingQuiz.meeting?.farm}
+                initialShowRanking={selectedRankingQuiz.showRanking}
+                shareToken={selectedRankingQuiz.shareToken}
+                organizerName={currentUser?.name || 'Técnico de Segurança'}
+                companyName={currentUser?.company || 'DDS Online'}
+                onOpenCollaboratorModal={handleOpenCollaboratorByName}
+              />
+            ) : (
+              <div className="p-12 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-4 shadow-xl">
+                <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center mx-auto text-amber-400">
+                  <Trophy size={32} />
+                </div>
+                <div className="space-y-1.5 max-w-md mx-auto">
+                  <h3 className="text-base font-black text-white">Nenhuma Avaliação Disponível</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Você ainda não possui questionários cadastrados. Acesse a aba Avaliações para criar sua primeira prova de treinamento ou DDS.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('QUIZZES')}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-all cursor-pointer inline-flex items-center gap-2"
+                >
+                  <Plus size={14} /> Criar Nova Avaliação
+                </button>
+              </div>
+            )}
 
           </div>
         )}

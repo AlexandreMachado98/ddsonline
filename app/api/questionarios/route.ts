@@ -37,7 +37,19 @@ function validate(body: any): { title: string; passingScore: number; criticalBel
   return { title: body.title.trim(), passingScore, criticalBelow, excellentFrom, questions };
 }
 
+let quizDbInitialized = false;
+async function ensureQuizColumns() {
+  if (quizDbInitialized) return;
+  try {
+    await prisma.$executeRawUnsafe('ALTER TABLE "Quiz" ADD COLUMN IF NOT EXISTS "showRanking" BOOLEAN DEFAULT false;');
+    quizDbInitialized = true;
+  } catch (e) {
+    console.error('ensureQuizColumns error:', e);
+  }
+}
+
 export async function GET(req: Request) {
+  await ensureQuizColumns();
   const user = await getAuthenticatedUser(req);
   if (!user) return json('Sessão inválida.', 401);
 
@@ -295,6 +307,16 @@ export async function PATCH(req: Request) {
       data: { isTemplate: Boolean(body.toggleTemplate) }
     });
     return NextResponse.json({ success: true, isTemplate: Boolean(body.toggleTemplate) });
+  }
+
+  // AÇÃO: Alternar Visibilidade do Ranking aos Colaboradores
+  if (body.showRanking !== undefined) {
+    await ensureQuizColumns();
+    const updated = await prisma.quiz.update({
+      where: { id: body.id },
+      data: { showRanking: Boolean(body.showRanking) }
+    });
+    return NextResponse.json({ success: true, showRanking: updated.showRanking });
   }
 
   // Transição de Status (DRAFT, PUBLISHED, CLOSED) + Reabertura direta (CLOSED -> PUBLISHED)
