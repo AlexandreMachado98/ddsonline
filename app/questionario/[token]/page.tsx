@@ -4,7 +4,8 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { 
   CheckCircle2, AlertTriangle, HelpCircle, ArrowRight, ArrowLeft,
-  ShieldCheck, Award, AlertCircle, RefreshCw, UserCheck, User, Trophy, Loader2
+  ShieldCheck, Award, AlertCircle, RefreshCw, UserCheck, User, Trophy, Loader2,
+  Clock, Printer, Check, X, FileCheck, Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
 import QuizRankingView from '@/components/QuizRankingView';
@@ -60,6 +61,16 @@ function QuestionarioPublicoContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<any | null>(null);
   const [viewingPublicRanking, setViewingPublicRanking] = useState(false);
+  const [isFinishedConfirmed, setIsFinishedConfirmed] = useState(false);
+
+  function formatExecutionTime(seconds?: number | null): string {
+    if (typeof seconds !== 'number' || seconds <= 0) return 'Menos de 1 min';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins === 0) return `${secs} seg`;
+    if (secs === 0) return `${mins} min`;
+    return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
+  }
 
   useEffect(() => {
     // 1. Tenta recuperar credencial de presença da URL ou sessionStorage (quando houver)
@@ -222,7 +233,7 @@ function QuestionarioPublicoContent() {
       return (
         <main className="min-h-screen bg-slate-950 text-white py-6 px-3 sm:px-6 font-sans relative">
           <div className="max-w-3xl w-full mx-auto space-y-4">
-            <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+            <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg">
               <div>
                 <span className="text-[10px] font-black uppercase text-amber-400">Classificação dos Colaboradores</span>
                 <h2 className="text-sm font-bold text-white">{quiz.title}</h2>
@@ -232,7 +243,7 @@ function QuestionarioPublicoContent() {
                 onClick={() => setViewingPublicRanking(false)}
                 className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
               >
-                <ArrowLeft size={13} /> Voltar ao Meu Resultado
+                <ArrowLeft size={13} /> Voltar ao Meu Gabarito
               </button>
             </div>
 
@@ -246,82 +257,318 @@ function QuestionarioPublicoContent() {
             />
 
             <div className="text-center pt-2">
-              <Link href="/">
-                <button className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold rounded-xl transition-all">
-                  Finalizar e Sair
-                </button>
-              </Link>
+              <button
+                type="button"
+                onClick={() => setIsFinishedConfirmed(true)}
+                className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                Concluir e Finalizar
+              </button>
             </div>
           </div>
         </main>
       );
     }
 
-    return (
-      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-600/10 blur-[130px] rounded-full pointer-events-none"></div>
-        <div className="max-w-md w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-5 relative z-10 backdrop-blur-md">
-          <div className={`inline-flex p-4 rounded-3xl border ${
-            isPassed 
-              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-              : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-          }`}>
-            {isPassed ? <Award size={48} /> : <AlertTriangle size={48} />}
-          </div>
+    // Tela de Confirmação de Finalização (Sem Redirecionar para Login)
+    if (isFinishedConfirmed) {
+      return (
+        <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-600/10 blur-[130px] rounded-full pointer-events-none"></div>
+          <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-5 relative z-10 backdrop-blur-md">
+            <div className="inline-flex p-4 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-inner">
+              <CheckCircle2 size={52} />
+            </div>
 
-          <div className="space-y-1">
-            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border inline-block mb-1 ${
-              isPassed 
-                ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
-                : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-            }`}>
-              {isPassed ? 'Aproveitamento Aprovado' : 'Abaixo da Média Exigida'}
-            </span>
-            <h2 className="text-2xl font-black text-white">
-              {submitResult.score}% de Aproveitamento
-            </h2>
-            <p className="text-xs text-slate-300">
-              Participante: <strong className="text-white">{submitResult.participantName || collaboratorName}</strong>
+            <div className="space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 inline-block">
+                Tudo Pronto!
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-white">Avaliação Finalizada!</h2>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Suas respostas e seu tempo de execução foram arquivados com sucesso no DDS Online.
+              </p>
+            </div>
+
+            <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-slate-400 space-y-1 text-left">
+              <div className="flex justify-between text-slate-300">
+                <span>Colaborador:</span>
+                <strong className="text-white">{submitResult.participantName || collaboratorName}</strong>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>Tempo Gasto:</span>
+                <strong className="text-emerald-400 font-bold">{formatExecutionTime(submitResult.timeSpentSeconds)}</strong>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>Aproveitamento:</span>
+                <strong className="text-white font-bold">{submitResult.score}%</strong>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-500">
+              Você já pode fechar esta janela no seu celular ou computador.
             </p>
+
+            <button
+              type="button"
+              onClick={() => setIsFinishedConfirmed(false)}
+              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer border border-slate-700"
+            >
+              <ArrowLeft size={14} /> Rever Meu Gabarito e Questões
+            </button>
+          </div>
+        </main>
+      );
+    }
+
+    const questionsBreakdown = submitResult.questions || [];
+
+    return (
+      <main className="min-h-screen bg-slate-950 text-white py-6 px-3 sm:px-6 font-sans relative">
+        <div className="max-w-2xl w-full mx-auto space-y-5">
+          {/* Header de Confirmação de Sucesso */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                <CheckCircle2 size={28} />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-md border border-emerald-500/20 inline-block mb-1">
+                  Avaliação Respondida com Sucesso
+                </span>
+                <h1 className="text-base sm:text-lg font-black text-white leading-tight">
+                  {quiz?.title || 'Avaliação de Segurança'}
+                </h1>
+                {quiz?.meeting?.topic && (
+                  <p className="text-xs text-slate-400 mt-0.5">DDS: <strong className="text-slate-300">{quiz.meeting.topic}</strong></p>
+                )}
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase font-bold">Participante Identificado</span>
+                <strong className="text-white text-sm">{submitResult.participantName || collaboratorName}</strong>
+                {(submitResult.participantRole || collaboratorRole) && (
+                  <span className="text-slate-400 block text-[11px]">{submitResult.participantRole || collaboratorRole}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 self-start sm:self-auto bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+                <ShieldCheck size={14} className="text-emerald-400" />
+                <span className="text-[11px] text-slate-300 font-semibold">Registro Oficial Arquivado</span>
+              </div>
+            </div>
+
+            {/* Grid com Métricas Principais: Aproveitamento, Acertos e Tempo */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+              {/* Aproveitamento */}
+              <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl text-center space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Aproveitamento</span>
+                <div className="flex items-baseline justify-center gap-1">
+                  <h3 className={`text-2xl font-black ${isPassed ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {submitResult.score}%
+                  </h3>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md inline-block ${
+                  isPassed ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'
+                }`}>
+                  {isPassed ? 'Aprovado' : 'Abaixo da Média'}
+                </span>
+              </div>
+
+              {/* Acertos */}
+              <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl text-center space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Acertos</span>
+                <div className="flex items-baseline justify-center gap-1">
+                  <h3 className="text-2xl font-black text-white">
+                    {submitResult.correctCount}
+                  </h3>
+                  <span className="text-xs text-slate-400">/ {submitResult.totalQuestions}</span>
+                </div>
+                <span className="text-[10px] text-slate-400 block">questões corretas</span>
+              </div>
+
+              {/* Tempo de Execução */}
+              <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl text-center space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tempo de Execução</span>
+                <div className="flex items-center justify-center gap-1.5 text-cyan-300">
+                  <Clock size={16} />
+                  <h3 className="text-xl font-black">
+                    {formatExecutionTime(submitResult.timeSpentSeconds)}
+                  </h3>
+                </div>
+                <span className="text-[10px] text-slate-400 block">duração da avaliação</span>
+              </div>
+            </div>
           </div>
 
-          <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs space-y-2 text-left">
-            <div className="flex justify-between text-slate-300">
-              <span>Questões Corretas:</span>
-              <strong className="text-white">{submitResult.correctCount} de {submitResult.totalQuestions}</strong>
+          {/* ========================================================================= */}
+          {/* GABARITO DETALHADO QUESTÃO POR QUESTÃO (ACERTOS E ERROS)                 */}
+          {/* ========================================================================= */}
+          <section className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <FileCheck size={18} className="text-emerald-400" />
+                <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
+                  Gabarito da Avaliação (Seus Acertos e Erros)
+                </h2>
+              </div>
+              <span className="text-[11px] text-slate-400 font-bold">
+                {submitResult.correctCount} de {submitResult.totalQuestions} acertos
+              </span>
             </div>
-            <div className="flex justify-between text-slate-300">
-              <span>Classificação de Percepção:</span>
-              <strong className={isPassed ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
-                {submitResult.level === 'EXCELLENT' ? 'Excelente' :
-                 submitResult.level === 'SATISFACTORY' ? 'Satisfatório' :
-                 submitResult.level === 'NEEDS_IMPROVEMENT' ? 'Requer Atenção' : 'Crítico'}
-              </strong>
+
+            <div className="space-y-4">
+              {questionsBreakdown.map((q: any, qIdx: number) => {
+                const isCorrect = Boolean(q.isCorrect);
+                return (
+                  <div
+                    key={q.questionId || qIdx}
+                    className={`p-4 rounded-2xl border transition-all space-y-3 ${
+                      isCorrect 
+                        ? 'bg-emerald-950/15 border-emerald-500/30' 
+                        : 'bg-rose-950/15 border-rose-500/30'
+                    }`}
+                  >
+                    {/* Cabeçalho da Questão */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md inline-block border ${
+                          isCorrect 
+                            ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300' 
+                            : 'bg-rose-500/20 border-rose-500/30 text-rose-300'
+                        }`}>
+                          {isCorrect ? '✅ Você Acertou' : '❌ Você Errou'}
+                        </span>
+                        <h3 className="text-xs sm:text-sm font-bold text-white leading-snug pt-1">
+                          {qIdx + 1}. {q.questionText}
+                        </h3>
+                      </div>
+                    </div>
+
+                    {/* Alternativas com Destaque de Escolha e Gabarito Correto */}
+                    <div className="space-y-2 pt-1 text-xs">
+                      {q.options?.map((opt: any) => {
+                        const isSelected = Boolean(opt.isSelected);
+                        const isOptCorrect = Boolean(opt.isCorrect);
+
+                        // Estilo 1: Resposta que o colaborador marcou e estava CORRETA
+                        if (isSelected && isOptCorrect) {
+                          return (
+                            <div
+                              key={opt.id}
+                              className="p-3 rounded-xl bg-emerald-500/20 border-2 border-emerald-500 text-emerald-200 font-semibold flex items-center justify-between gap-2 shadow-sm"
+                            >
+                              <div className="flex items-center gap-2">
+                                <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                                <span>{opt.text}</span>
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded-md shrink-0">
+                                Sua Resposta (Correta) ✅
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        // Estilo 2: Resposta que o colaborador marcou e estava INCORRETA (ERRO)
+                        if (isSelected && !isOptCorrect) {
+                          return (
+                            <div
+                              key={opt.id}
+                              className="p-3 rounded-xl bg-rose-500/20 border-2 border-rose-500 text-rose-200 font-semibold flex items-center justify-between gap-2 shadow-sm"
+                            >
+                              <div className="flex items-center gap-2">
+                                <X size={16} className="text-rose-400 shrink-0" />
+                                <span>{opt.text}</span>
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-wider bg-rose-500/30 text-rose-300 px-2 py-0.5 rounded-md shrink-0">
+                                Sua Resposta (Incorreta) ❌
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        // Estilo 3: Gabarito Oficial (quando o colaborador errou, mostra qual era o correto!)
+                        if (!isSelected && isOptCorrect) {
+                          return (
+                            <div
+                              key={opt.id}
+                              className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 font-semibold flex items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Check size={16} className="text-emerald-400 shrink-0" />
+                                <span>{opt.text}</span>
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md shrink-0">
+                                Gabarito Correto 🎯
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        // Estilo 4: Opção neutra não marcada
+                        return (
+                          <div
+                            key={opt.id}
+                            className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800 text-slate-400 flex items-center gap-2"
+                          >
+                            <span className="w-2 h-2 rounded-full bg-slate-700 shrink-0"></span>
+                            <span>{opt.text}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Explicação Pedagógica da Questão (se houver) */}
+                    {q.explanation && (
+                      <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300 flex items-start gap-2">
+                        <Sparkles size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="text-amber-300 block text-[11px] uppercase">Nota Explicativa de Segurança:</strong>
+                          <p className="text-slate-300 mt-0.5 leading-relaxed">{q.explanation}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          </section>
 
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            Seu resultado foi arquivado com sucesso no registro oficial do DDS ON.
-          </p>
-
-          <div className="space-y-2.5">
-            {/* Botão de Acesso ao Ranking Público se habilitado pelo gestor */}
+          {/* ========================================================================= */}
+          {/* BOTÕES DE AÇÃO (SEM REDIRECIONAMENTO PARA TELA DE LOGIN)                  */}
+          {/* ========================================================================= */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl space-y-3">
             {quiz?.showRanking && (
               <button
                 type="button"
                 onClick={() => setViewingPublicRanking(true)}
                 className="w-full py-3 bg-gradient-to-r from-amber-600/30 to-yellow-600/30 hover:from-amber-600/40 text-amber-300 border border-amber-500/40 font-bold text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Trophy size={15} className="text-amber-400" />
-                <span>Ver Classificação da Equipe (Ranking)</span>
+                <Trophy size={16} className="text-amber-400" />
+                <span>Ver Classificação da Equipe (Ranking Completo)</span>
               </button>
             )}
 
-            <Link href="/">
-              <button className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-slate-950 font-black text-xs rounded-2xl transition-all shadow-lg min-h-[44px] cursor-pointer">
-                Concluir Avaliação
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer border border-slate-700"
+              >
+                <Printer size={15} />
+                <span>Imprimir / Salvar Gabarito</span>
               </button>
-            </Link>
+
+              <button
+                type="button"
+                onClick={() => setIsFinishedConfirmed(true)}
+                className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-slate-950 font-black text-xs rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <CheckCircle2 size={16} />
+                <span>Concluir Avaliação</span>
+              </button>
+            </div>
           </div>
         </div>
       </main>

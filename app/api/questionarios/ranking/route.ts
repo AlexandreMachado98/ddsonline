@@ -9,7 +9,20 @@ import { computeQuizRanking } from '@/lib/quizRanking';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+let rankingDbInitialized = false;
+async function ensureRankingColumns() {
+  if (rankingDbInitialized) return;
+  try {
+    await prisma.$executeRawUnsafe('ALTER TABLE "Quiz" ADD COLUMN IF NOT EXISTS "showRanking" BOOLEAN DEFAULT false;');
+    await prisma.$executeRawUnsafe('ALTER TABLE "QuizAttempt" ADD COLUMN IF NOT EXISTS "timeSpentSeconds" INTEGER;');
+    rankingDbInitialized = true;
+  } catch (e) {
+    console.error('ensureRankingColumns error:', e);
+  }
+}
+
 export async function GET(req: Request) {
+  await ensureRankingColumns();
   const url = new URL(req.url);
   const token = url.searchParams.get('token');
   const quizId = url.searchParams.get('quizId');

@@ -111,6 +111,26 @@ export async function POST(req: Request) {
         select: { id: true }
       });
 
+      const feedbackBreakdown = quiz.questions.map(q => {
+        const qRes = result.questions.find(r => r.questionId === q.id);
+        const selectedIds = qRes?.selectedOptionIds || [];
+        const isCorrect = Boolean(qRes?.correct);
+
+        return {
+          questionId: q.id,
+          questionText: q.text,
+          type: q.type,
+          isCorrect,
+          explanation: q.explanation || null,
+          options: q.options.map(o => ({
+            id: o.id,
+            text: o.text,
+            isCorrect: o.isCorrect,
+            isSelected: selectedIds.includes(o.id)
+          }))
+        };
+      });
+
       return NextResponse.json({
         success: true,
         attemptId: attempt.id,
@@ -120,7 +140,10 @@ export async function POST(req: Request) {
           totalQuestions: result.totalQuestions,
           passed: result.passed,
           level: result.level,
-          participantName: finalParticipantName
+          participantName: finalParticipantName,
+          participantRole: typeof participantDoc === 'string' ? participantDoc.trim() : null,
+          timeSpentSeconds,
+          questions: feedbackBreakdown
         }
       }, { status: 201 });
     } catch (e: any) {
