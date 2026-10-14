@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { 
   ArrowLeft, Plus, Trash2, CheckCircle2, AlertTriangle, 
   Copy, Check, Clock, Award, RefreshCw, Bookmark, BookmarkCheck,
   TrendingUp, Users, Target, BarChart2, Star, RotateCcw,
   Sparkles, Layers, BookOpen, ChevronRight, FileText, Eye, X, ShieldAlert,
-  ShieldCheck, Trophy
+  ShieldCheck, Trophy, Loader2
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useSearchParams } from 'next/navigation';
@@ -132,7 +132,7 @@ interface ExistingQuiz {
   attempts: AttemptSummary[];
 }
 
-export default function QuestionariosAdminPage() {
+function QuestionariosContent() {
   const { user: currentUser } = useAuth();
   const searchParams = useSearchParams();
 
@@ -2134,5 +2134,19 @@ export default function QuestionariosAdminPage() {
 
       </div>
     </main>
+  );
+}
+
+export const dynamic = 'force-dynamic';
+
+export default function QuestionariosAdminPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <Loader2 size={36} className="animate-spin text-emerald-500" />
+      </div>
+    }>
+      <QuestionariosContent />
+    </Suspense>
   );
 }

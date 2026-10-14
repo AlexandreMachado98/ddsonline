@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { 
   CheckCircle2, AlertTriangle, HelpCircle, ArrowRight, ArrowLeft,
-  ShieldCheck, Award, AlertCircle, RefreshCw, UserCheck, User, Trophy
+  ShieldCheck, Award, AlertCircle, RefreshCw, UserCheck, User, Trophy, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import QuizRankingView from '@/components/QuizRankingView';
@@ -36,7 +36,7 @@ interface QuizData {
   questions: QuizQuestion[];
 }
 
-export default function QuestionarioPublicoPage() {
+function QuestionarioPublicoContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const token = params.token as string;
@@ -508,3 +508,18 @@ export default function QuestionarioPublicoPage() {
     </main>
   );
 }
+
+export const dynamic = 'force-dynamic';
+
+export default function QuestionarioPublicoPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <Loader2 size={36} className="animate-spin text-emerald-500" />
+      </div>
+    }>
+      <QuestionarioPublicoContent />
+    </Suspense>
+  );
+}
+

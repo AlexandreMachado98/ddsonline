@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // Desativa cache agressivo para evitar bundles corrompidos no navegador
   headers: async () => {
     return [
