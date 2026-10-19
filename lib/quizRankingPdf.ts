@@ -4,6 +4,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { QuizRankingSummary } from './quizRanking';
+import { cleanTextForPdf } from './pdfGenerator';
 
 export interface GenerateRankingPdfParams {
   ddsTopic?: string;
@@ -18,15 +19,16 @@ export interface GenerateRankingPdfParams {
 
 export async function generateQuizRankingPdf(params: GenerateRankingPdfParams): Promise<jsPDF> {
   const {
-    ddsTopic,
-    ddsFarm,
-    quizTitle,
     passingScore,
-    organizerName = 'Técnico de Segurança do Trabalho',
-    companyName = 'DDS Online',
     summary,
     generatedAt = new Date()
   } = params;
+
+  const ddsTopic = cleanTextForPdf(params.ddsTopic);
+  const ddsFarm = cleanTextForPdf(params.ddsFarm);
+  const quizTitle = cleanTextForPdf(params.quizTitle);
+  const organizerName = cleanTextForPdf(params.organizerName || 'Técnico de Segurança do Trabalho');
+  const companyName = cleanTextForPdf(params.companyName || 'DDS Online');
 
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -150,15 +152,15 @@ export async function generateQuizRankingPdf(params: GenerateRankingPdfParams): 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(primaryDark[0], primaryDark[1], primaryDark[2]);
-  doc.text('🏆 PÓDIO DOS MELHORES COLOCADOS', margin, currentY);
+  doc.text('PÓDIO DOS MELHORES COLOCADOS', margin, currentY);
 
   currentY += 4;
 
   const podiumBoxWidth = (pageWidth - margin * 2 - 6) / 3;
   const podiumOrder = [
-    { label: '🥇 1º LUGAR (OURO)', items: summary.podium.first, color: goldColor, bgColor: [254, 243, 199] },
-    { label: '🥈 2º LUGAR (PRATA)', items: summary.podium.second, color: silverColor, bgColor: [241, 245, 249] },
-    { label: '🥉 3º LUGAR (BRONZE)', items: summary.podium.third, color: bronzeColor, bgColor: [255, 237, 213] }
+    { label: '1º LUGAR (OURO)', items: summary.podium.first, color: goldColor, bgColor: [254, 243, 199] },
+    { label: '2º LUGAR (PRATA)', items: summary.podium.second, color: silverColor, bgColor: [241, 245, 249] },
+    { label: '3º LUGAR (BRONZE)', items: summary.podium.third, color: bronzeColor, bgColor: [255, 237, 213] }
   ];
 
   podiumOrder.forEach((pod, idx) => {
@@ -173,7 +175,7 @@ export async function generateQuizRankingPdf(params: GenerateRankingPdfParams): 
     doc.text(pod.label, podX + podiumBoxWidth / 2, currentY + 5.5, { align: 'center' });
 
     if (pod.items.length > 0) {
-      const topName = pod.items.map(it => it.participantName).join(' / ');
+      const topName = pod.items.map(it => cleanTextForPdf(it.participantName)).join(' / ');
       const truncatedName = topName.length > 25 ? topName.slice(0, 23) + '...' : topName;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
@@ -200,7 +202,7 @@ export async function generateQuizRankingPdf(params: GenerateRankingPdfParams): 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(primaryDark[0], primaryDark[1], primaryDark[2]);
-  doc.text('📋 CLASSIFICAÇÃO COMPLETA DA EQUIPE', margin, currentY);
+  doc.text('CLASSIFICAÇÃO COMPLETA DA EQUIPE', margin, currentY);
 
   currentY += 3;
 
@@ -209,17 +211,17 @@ export async function generateQuizRankingPdf(params: GenerateRankingPdfParams): 
       ? new Date(item.submittedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
       : '-';
 
-    const posLabel = item.position === 1 ? '🥇 1º' :
-                     item.position === 2 ? '🥈 2º' :
-                     item.position === 3 ? '🥉 3º' :
+    const posLabel = item.position === 1 ? '1º (Ouro)' :
+                     item.position === 2 ? '2º (Prata)' :
+                     item.position === 3 ? '3º (Bronze)' :
                      `${item.position}º`;
 
     const tieSuffix = item.isTie ? ' (Empate)' : '';
 
     return [
       `${posLabel}${tieSuffix}`,
-      item.participantName,
-      item.participantRole || 'Colaborador',
+      cleanTextForPdf(item.participantName),
+      cleanTextForPdf(item.participantRole || 'Colaborador'),
       `${item.correctCount}/${item.totalQuestions}`,
       item.timeSpentFormatted || '—',
       `${item.score}%`,

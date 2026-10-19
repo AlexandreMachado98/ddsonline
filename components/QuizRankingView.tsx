@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { 
   Trophy, Award, Medal, Crown, Sparkles, Download, RefreshCw, 
   Search, Filter, CheckCircle2, AlertTriangle, Users, FileText, 
@@ -51,8 +51,17 @@ export default function QuizRankingView({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PASSED' | 'INSUFFICIENT'>('ALL');
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // Busca os dados do ranking pela API dedicada
   const fetchRankingData = useCallback(async (isSilent = false) => {
+    // Cancela requisição pendente anterior para evitar sobrecarga de rede
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       if (!isSilent) setIsLoading(true);
       else setIsRefreshing(true);
@@ -63,6 +72,7 @@ export default function QuizRankingView({
         : `/api/questionarios/ranking?quizId=${encodeURIComponent(quizId)}&_t=${Date.now()}`;
 
       const res = await fetch(endpoint, {
+        signal: controller.signal,
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
       });
@@ -78,7 +88,8 @@ export default function QuizRankingView({
       } else {
         setErrorMsg(data.error || 'Não foi possível carregar a classificação.');
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return; // Cancelamento intencional, ignora
       console.error('Erro ao buscar ranking:', err);
       setErrorMsg('Falha de conexão ao carregar ranking.');
     } finally {
@@ -106,6 +117,9 @@ export default function QuizRankingView({
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, [fetchRankingData]);
 

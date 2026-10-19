@@ -191,11 +191,92 @@ export function parseGroupPhotos(groupPhoto?: any): string[] {
 }
 
 /**
+ * Converte emojis e caracteres Unicode fora da faixa padrão WinAnsi/ISO-8859-1
+ * em equivalentes textuais legíveis ou marcadores profissionais, evitando corrupção
+ * de caracteres (Mojibake) na engine de fontes do jsPDF.
+ */
+export function cleanTextForPdf(input: string | null | undefined): string {
+  if (!input) return '';
+  const EMOJI_MAP: Record<string, string> = {
+    '⚠️': '[ATENÇÃO] ',
+    '🚨': '[ALERTA] ',
+    '🛑': '[PARE] ',
+    '✅': '• ',
+    '✔️': '• ',
+    '☑️': '• ',
+    '❌': '[X] ',
+    '💡': '[DICA] ',
+    '📌': '• ',
+    '📍': '• ',
+    '🛡️': '[SEGURANÇA] ',
+    '🛡': '[SEGURANÇA] ',
+    '🚐': '',
+    '🚗': '',
+    '🚚': '',
+    '🚜': '',
+    '🌿': '• ',
+    '🌱': '• ',
+    '🌳': '• ',
+    '📢': '[AVISO] ',
+    '👉': '• ',
+    '🔹': '• ',
+    '🔸': '• ',
+    '▪️': '• ',
+    '▫️': '• ',
+    '⭐': '* ',
+    '🌟': '* ',
+    '🎯': '• ',
+    '🏆': '',
+    '🥇': '1º',
+    '🥈': '2º',
+    '🥉': '3º',
+    '📋': '',
+    '⏱️': '',
+    '⏱': '',
+    '👤': '',
+    '👥': '',
+    '🏢': '',
+    '📅': '',
+    '🕒': '',
+    '⏰': '',
+    '📝': '',
+    '📄': '',
+    '📑': '',
+    '🔒': '',
+    '🔓': '',
+    '🔗': '',
+    '✨': '',
+    '🔥': '[FOGO] ',
+    '⚡': '[ELÉTRICO] ',
+    '🌧️': '[CHUVA] ',
+    '☀️': '[SOL] ',
+  };
+
+  let result = input;
+  for (const [emoji, replacement] of Object.entries(EMOJI_MAP)) {
+    result = result.split(emoji).join(replacement);
+  }
+
+  // Remove qualquer outro emoji remanescente (pares substitutos UTF-16, dingbats, símbolos gráficos)
+  result = result.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '');
+  result = result.replace(/[\u2600-\u27BF]/g, '');
+  result = result.replace(/[\uFE00-\uFE0F]/g, ''); // Seletores de variação de emoji
+
+  // Normaliza aspas curvas e travessões para caracteres ASCII seguros
+  result = result.replace(/[\u2018\u2019]/g, "'");
+  result = result.replace(/[\u201C\u201D]/g, '"');
+  result = result.replace(/[\u2013\u2014]/g, '-');
+  result = result.replace(/\u00A0/g, ' '); // Espaço não separável
+
+  return result;
+}
+
+/**
  * Normaliza e limpa Markdown para campos que necessitam de texto limpo de linha única
  */
 export function sanitizeMarkdownText(text: string | null | undefined): string {
   if (!text) return '';
-  return text
+  return cleanTextForPdf(text)
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/__(.*?)__/g, '$1')
     .replace(/\*(.*?)\*/g, '$1')
@@ -237,8 +318,9 @@ export function renderFormattedMarkdownInPdf(
     return { totalHeight: 0, endY: startY };
   }
 
+  const cleanedText = cleanTextForPdf(rawText);
   let currentY = startY;
-  const rawLines = rawText.split(/\r?\n/);
+  const rawLines = cleanedText.split(/\r?\n/);
 
   for (let lIdx = 0; lIdx < rawLines.length; lIdx++) {
     const rawLine = rawLines[lIdx];
@@ -280,7 +362,7 @@ export function renderFormattedMarkdownInPdf(
     let currentXOffset = startX;
     let availableWidth = maxWidth;
 
-    const bulletMatch = trimmedLine.match(/^([\*\-\+\•])\s+(.*)$/);
+    const bulletMatch = trimmedLine.match(/^([\*\-\+\•]|\[•\])\s+(.*)$/);
     const numMatch = trimmedLine.match(/^(\d+[\.\)])\s+(.*)$/);
 
     if (bulletMatch) {
@@ -289,10 +371,9 @@ export function renderFormattedMarkdownInPdf(
       currentXOffset = startX + bulletIndent;
 
       if (!dryRun) {
-        doc.setFontSize(baseFontSize);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(headerColor[0], headerColor[1], headerColor[2]);
-        doc.text('•', startX + 0.5, currentY);
+        doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
+        // Marcador circular vetorial nítido e perfeito, imune a problemas de fontes
+        doc.circle(startX + 1.2, currentY - 1, 0.5, 'F');
       }
     } else if (numMatch) {
       const numPrefix = numMatch[1];
