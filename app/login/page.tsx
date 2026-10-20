@@ -79,22 +79,22 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-x-hidden">
+    <main className="min-h-screen bg-[#F5F7FB] text-[#0F172A] flex flex-col items-center justify-center p-4 font-sans relative overflow-x-hidden">
       
       {/* Luz de fundo decorativa */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-600/15 blur-[130px] rounded-full pointer-events-none"></div>
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500/10 blur-[130px] rounded-full pointer-events-none"></div>
 
-      <div className="w-full max-w-md bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative z-10 space-y-6">
+      <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xl relative z-10 space-y-6">
         
         {/* Topo com Botão Voltar */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <Link 
             href="/"
-            className="text-xs text-slate-400 hover:text-white font-bold flex items-center gap-1.5 transition-colors p-1"
+            className="text-xs text-slate-500 hover:text-slate-900 font-bold flex items-center gap-1.5 transition-colors p-1"
           >
             <ArrowLeft size={16} /> Voltar ao Início
           </Link>
-          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+          <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
             Acesso Seguro
           </span>
         </div>
@@ -104,33 +104,33 @@ export default function LoginPage() {
           <div className="flex justify-center">
             <DdsLogo size="lg" showSubtitle={true} />
           </div>
-          <p className="text-slate-400 text-xs">Portal do Técnico de Segurança e Gestor</p>
+          <p className="text-slate-500 text-xs">Portal do Técnico de Segurança e Gestor</p>
         </div>
 
         {/* Card Informativo com Credenciais de Demonstração (Somente em Desenvolvimento) */}
         {isDev && (
-          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 space-y-2">
+          <div className="bg-blue-50/60 border border-blue-200 rounded-2xl p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1">
+              <span className="text-[10px] font-extrabold text-blue-800 uppercase tracking-widest flex items-center gap-1">
                 <KeyRound size={12} /> Acesso de Teste / Demo (DEV)
               </span>
               <button
                 type="button"
                 onClick={handleQuickDemo}
-                className="text-[11px] text-emerald-300 hover:text-white font-bold bg-emerald-600/30 hover:bg-emerald-600/50 px-2.5 py-1 rounded-xl transition-colors flex items-center gap-1 border border-emerald-400/20 min-h-[32px]"
+                className="text-[11px] text-blue-700 hover:text-blue-900 font-bold bg-white hover:bg-blue-100 px-2.5 py-1 rounded-xl transition-colors flex items-center gap-1 border border-blue-200 shadow-sm min-h-[32px]"
               >
                 <Sparkles size={11} /> Preencher
               </button>
             </div>
-            <div className="text-xs text-slate-300 space-y-0.5 font-mono">
-              <p><strong>E-mail:</strong> <code className="text-emerald-300">{DEMO_EMAIL}</code></p>
-              <p><strong>Senha:</strong> <code className="text-emerald-300">{DEMO_PASS}</code></p>
+            <div className="text-xs text-slate-700 space-y-0.5 font-mono">
+              <p><strong>E-mail:</strong> <code className="text-blue-700 font-bold">{DEMO_EMAIL}</code></p>
+              <p><strong>Senha:</strong> <code className="text-blue-700 font-bold">{DEMO_PASS}</code></p>
             </div>
           </div>
         )}
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-2xl text-center animate-in fade-in">
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-2xl text-center animate-in fade-in font-medium">
             {error}
           </div>
         )}
@@ -139,31 +139,31 @@ export default function LoginPage() {
           {isRegisterMode && (
             <>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Seu Nome Completo</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Seu Nome Completo</label>
                 <div className="relative flex items-center">
-                  <User className="absolute left-3.5 text-slate-500" size={18} />
+                  <User className="absolute left-3.5 text-slate-400" size={18} />
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Ex: Carlos Silva"
                     required
-                    className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-10 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-10 py-3.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none transition-all"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Nome da Empresa / Fazenda</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Nome da Empresa / Fazenda</label>
                 <div className="relative flex items-center">
-                  <Building2 className="absolute left-3.5 text-slate-500" size={18} />
+                  <Building2 className="absolute left-3.5 text-slate-400" size={18} />
                   <input
                     type="text"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     placeholder="Ex: Fazenda Santa Maria Agro"
                     required
-                    className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-10 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-10 py-3.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none transition-all"
                   />
                 </div>
               </div>
@@ -171,31 +171,31 @@ export default function LoginPage() {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">E-mail Corporativo</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">E-mail Corporativo</label>
             <div className="relative flex items-center">
-              <Mail className="absolute left-3.5 text-slate-500" size={18} />
+              <Mail className="absolute left-3.5 text-slate-400" size={18} />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@dds.com.br"
                 required
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-10 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-10 py-3.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none transition-all"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Senha de Acesso</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Senha de Acesso</label>
             <div className="relative flex items-center">
-              <Lock className="absolute left-3.5 text-slate-500" size={18} />
+              <Lock className="absolute left-3.5 text-slate-400" size={18} />
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-10 py-3.5 text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-10 py-3.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none transition-all"
               />
             </div>
           </div>
@@ -203,7 +203,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.99] text-slate-950 font-black rounded-2xl text-sm flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-950/60 min-h-[48px]"
+            className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-2xl text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-900/20 min-h-[48px]"
           >
             {loading ? (
               <>
@@ -228,36 +228,36 @@ export default function LoginPage() {
               setIsRegisterMode(!isRegisterMode);
               setError('');
             }}
-            className="text-emerald-400 hover:text-emerald-300 font-bold transition-colors underline min-h-[36px]"
+            className="text-blue-600 hover:text-blue-800 font-bold transition-colors underline min-h-[36px]"
           >
             {isRegisterMode ? 'Já tem uma conta? Fazer Login' : 'Cadastrar novo técnico / organizador'}
           </button>
         </div>
 
         {/* Rodapé Oficial DDS ON */}
-        <footer className="pt-4 border-t border-slate-800/80 text-center space-y-1.5">
-          <p className="text-[10px] text-slate-400">
+        <footer className="pt-4 border-t border-slate-100 text-center space-y-1.5">
+          <p className="text-[10px] text-slate-500">
             © 2026 <strong>AM TST</strong>. Todos os direitos reservados.
           </p>
-          <p className="text-[10px] text-slate-400 font-medium">
+          <p className="text-[10px] text-slate-500 font-medium">
             <strong>DDS ON</strong> é uma plataforma da <strong>AM TST</strong>.
           </p>
-          <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500 pt-0.5">
-            <Link href="/termos" className="text-slate-400 hover:text-emerald-400 underline underline-offset-2 transition-colors">
+          <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400 pt-0.5">
+            <Link href="/termos" className="text-slate-500 hover:text-blue-600 underline underline-offset-2 transition-colors">
               Termos de Uso
             </Link>
             <span>•</span>
-            <Link href="/privacidade" className="text-slate-400 hover:text-emerald-400 underline underline-offset-2 transition-colors">
+            <Link href="/privacidade" className="text-slate-500 hover:text-blue-600 underline underline-offset-2 transition-colors">
               Privacidade (LGPD)
             </Link>
           </div>
-          <div className="flex items-center justify-center gap-1 text-[10px] text-slate-500">
+          <div className="flex items-center justify-center gap-1 text-[10px] text-slate-400">
             <span>Desenvolvido por</span>
             <a 
               href="https://amtst.vercel.app" 
               target="_blank" 
               rel="noopener noreferrer" 
-              className="text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2"
+              className="text-blue-600 hover:text-blue-800 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2"
             >
               AM TST <ExternalLink size={9} />
             </a>

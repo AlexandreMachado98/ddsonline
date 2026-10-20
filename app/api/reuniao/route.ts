@@ -52,6 +52,8 @@ export async function GET(req: Request) {
     const attachmentId = searchParams.get('attachmentId');
     const isFull = searchParams.get('full') === 'true' || searchParams.get('includeFiles') === 'true';
     const activeOnly = searchParams.get('activeOnly') === 'true';
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
 
     // Cenário 0: Download sob demanda de um anexo específico
     if (attachmentId) {
@@ -191,11 +193,18 @@ export async function GET(req: Request) {
     }
 
     // Definição da query do DDS Ativo com selfies e assinaturas preservadas
+    const activeWhere: any = {
+      status: 'LIVE',
+      ...(sessionUser.role === 'SUPER_ADMIN'
+        ? {}
+        : sessionUser.role === 'COMPANY_ADMIN' && sessionUser.companyId
+        ? { OR: [{ organizerId: sessionUser.id }, { companyId: sessionUser.companyId }] }
+        : { organizerId: sessionUser.id })
+    };
+
     const activeMeetingPromise = prisma.meeting.findFirst({
-      where: {
-        status: 'LIVE',
-        organizerId: sessionUser.id
-      },
+      where: activeWhere,
+      orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         topic: true,
@@ -251,11 +260,29 @@ export async function GET(req: Request) {
     }
 
     // Histórico de DDS concluídos com evidências preservadas
+    const historyWhere: any = {
+      status: 'ENDED',
+      ...(sessionUser.role === 'SUPER_ADMIN'
+        ? {}
+        : sessionUser.role === 'COMPANY_ADMIN' && sessionUser.companyId
+        ? { OR: [{ organizerId: sessionUser.id }, { companyId: sessionUser.companyId }] }
+        : { organizerId: sessionUser.id })
+    };
+
+    if (startDate || endDate) {
+      historyWhere.createdAt = {};
+      if (startDate) {
+        historyWhere.createdAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        historyWhere.createdAt.lte = end;
+      }
+    }
+
     const historyPromise = prisma.meeting.findMany({
-      where: {
-        status: 'ENDED',
-        organizerId: sessionUser.id
-      },
+      where: historyWhere,
       orderBy: { createdAt: 'desc' },
       take: 50,
       select: {

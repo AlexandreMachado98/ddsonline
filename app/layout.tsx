@@ -9,7 +9,7 @@ import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 const inter = Inter({ subsets: ["latin"] });
 
 export const viewport: Viewport = {
-  themeColor: "#020617",
+  themeColor: "#0F1F38",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -63,7 +63,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className="dark">
+    <html lang="pt-BR">
       <head>
         <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
         <meta httpEquiv="Pragma" content="no-cache" />
@@ -85,7 +85,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${inter.className} bg-slate-950 text-slate-100 antialiased min-h-screen selection:bg-emerald-600 selection:text-white`}>
+      <body className={`${inter.className} bg-[#F5F7FB] text-[#0F172A] antialiased min-h-screen selection:bg-blue-600 selection:text-white`}>
         <AuthProvider>
           <ToastProvider>
             <OfflineBanner />

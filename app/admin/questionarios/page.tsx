@@ -14,6 +14,7 @@ import { useSearchParams } from 'next/navigation';
 import DdsLogo from '@/components/DdsLogo';
 import QuizRankingView from '@/components/QuizRankingView';
 import QuizBiDashboard from '@/components/QuizBiDashboard';
+import AppShell from '@/components/layout/AppShell';
 
 interface QuizOptionInput {
   id: string;
@@ -900,83 +901,96 @@ function QuestionariosContent() {
     setTimeout(() => setCopiedToken(null), 3000);
   };
 
+  const scrollToCreateQuiz = () => {
+    setActiveTab('QUIZZES');
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        document.getElementById('create-quiz-section')?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  };
+
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-3 sm:p-6 font-sans">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <AppShell
+      breadcrumbs={[
+        { label: 'Painel Geral', href: '/admin' },
+        { label: 'Questionários & Avaliações' }
+      ]}
+      actions={
+        <div className="flex items-center gap-2">
+          <button
+            onClick={scrollToCreateQuiz}
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+          >
+            <Plus size={15} />
+            <span>Nova Avaliação</span>
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-6">
         
-        {/* Top Header */}
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
-          <div className="flex items-center gap-3">
-            <Link 
-              href="/admin" 
-              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition-colors border border-slate-700 flex items-center justify-center shrink-0"
-              title="Voltar ao Painel Principal"
+        {/* Abas de Navegação Segmentadas */}
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3 flex-wrap">
+          <div className="inline-flex p-1 bg-white border border-slate-200/90 rounded-2xl shadow-sm gap-1 overflow-x-auto max-w-full">
+            <button
+              onClick={() => setActiveTab('QUIZZES')}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'QUIZZES'
+                  ? 'bg-[#0F1F38] text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
             >
-              <ArrowLeft size={16} />
-            </Link>
-            <div>
-              <div className="flex items-center gap-2">
-                <DdsLogo size="sm" showSubtitle={false} clickable href="/admin" />
-                <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                  Central de Avaliações & Inteligência
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Crie, reutilize formulários, aplique reavaliações e acompanhe a evolução do time via BI.
-              </p>
-            </div>
+              <Award size={15} />
+              <span>Avaliações ({quizzes.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('RANKING')}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'RANKING'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-amber-800 hover:text-amber-950 hover:bg-amber-50'
+              }`}
+            >
+              <Trophy size={15} />
+              <span>Ranking & Pódio</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('TEMPLATES')}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'TEMPLATES'
+                  ? 'bg-[#0F1F38] text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Layers size={15} />
+              <span>Modelos NR ({templateQuizzes.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('BI')}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'BI'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-blue-700 hover:text-blue-900 hover:bg-blue-50'
+              }`}
+            >
+              <BarChart2 size={15} />
+              <span>Inteligência BI</span>
+            </button>
           </div>
-        </header>
 
-        {/* Abas de Navegação Superior */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 bg-slate-900 border border-slate-800 p-1.5 rounded-2xl gap-1.5 shadow-lg">
-          <button
-            onClick={() => setActiveTab('QUIZZES')}
-            className={`py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'QUIZZES'
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <Award size={16} />
-            <span>Avaliações ({quizzes.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('RANKING')}
-            className={`py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'RANKING'
-                ? 'bg-gradient-to-r from-amber-600 to-yellow-600 text-slate-950 font-black shadow-md'
-                : 'text-amber-400 hover:text-amber-300 hover:bg-slate-800/60'
-            }`}
-          >
-            <Trophy size={16} />
-            <span>Ranking & Pódio</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('TEMPLATES')}
-            className={`py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'TEMPLATES'
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <Layers size={16} />
-            <span>Formulários ({templateQuizzes.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('BI')}
-            className={`py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'BI'
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <BarChart2 size={16} />
-            <span>Inteligência BI</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={scrollToCreateQuiz}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+            >
+              <Plus size={15} />
+              <span>Criar Questionário</span>
+            </button>
+          </div>
         </div>
 
         {/* Feedback de Status */}
@@ -998,21 +1012,21 @@ function QuestionariosContent() {
           <div className="space-y-6">
             
             {/* Banner de Acesso Rápido ao Ranking */}
-            <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/30 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+            <div className="bg-gradient-to-r from-amber-50 via-amber-50/40 to-white border border-amber-200/90 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
               <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 shadow-md">
+                <div className="w-11 h-11 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-600 shrink-0 shadow-sm">
                   <Trophy size={22} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded border border-amber-200">
                       Novo Recurso
                     </span>
-                    <h4 className="text-xs sm:text-sm font-black text-white">
+                    <h4 className="text-xs sm:text-sm font-black text-slate-900">
                       Ranking Inteligente & Pódio dos Colaboradores
                     </h4>
                   </div>
-                  <p className="text-[11px] text-slate-300 mt-1">
+                  <p className="text-[11px] text-slate-600 mt-1">
                     Consulte a classificação em tempo real, pódio Ouro/Prata/Bronze, empates compartilhados e exporte o relatório oficial em PDF.
                   </p>
                 </div>
@@ -1020,7 +1034,7 @@ function QuestionariosContent() {
               <button
                 type="button"
                 onClick={() => setActiveTab('RANKING')}
-                className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
               >
                 <Trophy size={15} />
                 <span>Ver Ranking & Pódio</span>
@@ -1028,13 +1042,13 @@ function QuestionariosContent() {
             </div>
 
             {/* Barra de Filtro */}
-            <section className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2">
+            <section className="bg-white border border-slate-200/90 p-4 rounded-2xl space-y-2 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Filtrar Avaliações em Andamento
                 </label>
-                <span className="text-[11px] text-slate-400">
-                  Total encontrado: <strong className="text-emerald-400">{quizzes.length}</strong>
+                <span className="text-[11px] text-slate-500">
+                  Total encontrado: <strong className="text-blue-600 font-bold">{quizzes.length}</strong>
                 </span>
               </div>
 
@@ -1042,7 +1056,7 @@ function QuestionariosContent() {
                 <select
                   value={selectedMeetingId}
                   onChange={e => setSelectedMeetingId(e.target.value)}
-                  className="w-full sm:col-span-2 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-xs text-white font-bold focus:border-emerald-500 outline-none min-h-[44px]"
+                  className="w-full sm:col-span-2 bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-3 text-xs text-slate-800 font-semibold focus:bg-white focus:border-blue-600 outline-none min-h-[44px]"
                 >
                   <option value="ALL">📁 Todas as Avaliações (Autônomas e Vinculadas a DDS)</option>
                   <option value="NONE">✨ Apenas Avaliações Autônomas (Sem vínculo)</option>
@@ -1056,20 +1070,20 @@ function QuestionariosContent() {
                 <button
                   onClick={() => fetchQuizzes()}
                   disabled={isLoadingQuizzes}
-                  className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 border border-slate-700 min-h-[44px]"
+                  className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 border border-slate-200 min-h-[44px] cursor-pointer"
                 >
-                  <RefreshCw size={14} className={isLoadingQuizzes ? 'animate-spin text-emerald-400' : ''} />
+                  <RefreshCw size={14} className={isLoadingQuizzes ? 'animate-spin text-blue-600' : ''} />
                   <span>Atualizar Lista</span>
                 </button>
               </div>
             </section>
 
             {/* Listagem de Questionários com Ações de Reavaliação e Salvar Formulário */}
-            <section className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-2xl space-y-4 shadow-xl">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <section className="bg-white border border-slate-200/90 p-4 sm:p-5 rounded-2xl space-y-4 shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
-                  <Award size={18} className="text-emerald-400" />
-                  <h2 className="text-sm font-black text-white uppercase tracking-wider">
+                  <Award size={18} className="text-blue-600" />
+                  <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">
                     Avaliações Cadastradas ({quizzes.length})
                   </h2>
                 </div>
@@ -1269,10 +1283,10 @@ function QuestionariosContent() {
             </section>
 
             {/* Criador de Questionários */}
-            <section className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-xl space-y-6">
-              <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
-                <Plus size={18} className="text-emerald-400" />
-                <h2 className="text-sm font-black text-white uppercase tracking-wider">
+            <section id="create-quiz-section" className="bg-white border border-slate-200/80 p-5 sm:p-8 rounded-3xl shadow-sm space-y-6 text-slate-900">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Plus size={18} className="text-blue-600" />
+                <h2 className="text-sm sm:text-base font-black text-[#0F1F38] uppercase tracking-wider">
                   Criar Nova Avaliação de Segurança
                 </h2>
               </div>
@@ -1280,15 +1294,15 @@ function QuestionariosContent() {
               <form onSubmit={handleSaveQuiz} className="space-y-6">
                 
                 {/* Vínculo Opcional */}
-                <div className="space-y-1.5 bg-slate-950 p-4 rounded-xl border border-slate-800">
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                <div className="space-y-1.5 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
                     <span>Vínculo a um DDS (Opcional)</span>
-                    <span className="text-[10px] text-emerald-400 font-normal lowercase">opcional</span>
+                    <span className="text-[10px] text-blue-600 font-semibold lowercase">opcional</span>
                   </label>
                   <select
                     value={creationMeetingId}
                     onChange={e => setCreationMeetingId(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-3 text-xs text-slate-800 font-semibold focus:border-blue-600 outline-none"
                   >
                     <option value="">✨ Criar como Avaliação Autônoma (Sem vincular a DDS)</option>
                     {meetings.map(m => (
@@ -1308,13 +1322,13 @@ function QuestionariosContent() {
                     value={title}
                     onChange={e => setTitle(e.target.value)}
                     placeholder="Ex: Avaliação de Percepção de Risco - NR-35 Trabalho em Altura"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs sm:text-sm text-white font-bold focus:border-emerald-500 outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-xs sm:text-sm text-slate-800 font-semibold focus:border-blue-600 outline-none"
                     required
                   />
                 </div>
 
                 {/* Opção para Salvar como Formulário Reutilizável */}
-                <div className="flex items-center gap-2.5 p-3 bg-emerald-950/20 border border-emerald-500/20 rounded-xl">
+                <div className="flex items-center gap-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900">
                   <input
                     type="checkbox"
                     id="saveTemplateCheck"
@@ -1322,7 +1336,7 @@ function QuestionariosContent() {
                     onChange={e => setSaveAsTemplate(e.target.checked)}
                     className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-400 bg-slate-900 border-slate-700"
                   />
-                  <label htmlFor="saveTemplateCheck" className="text-xs text-slate-200 cursor-pointer select-none">
+                  <label htmlFor="saveTemplateCheck" className="text-xs text-emerald-900 font-medium cursor-pointer select-none">
                     <strong>Salvar também no Banco de Formulários</strong> (permite reutilizar e aplicar reavaliações no futuro)
                   </label>
                 </div>
@@ -1339,7 +1353,7 @@ function QuestionariosContent() {
                       max="100"
                       value={passingScore}
                       onChange={e => setPassingScore(Number(e.target.value))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 font-semibold focus:border-blue-600 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1352,7 +1366,7 @@ function QuestionariosContent() {
                       max={passingScore}
                       value={criticalBelow}
                       onChange={e => setCriticalBelow(Number(e.target.value))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 font-semibold focus:border-blue-600 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1365,7 +1379,7 @@ function QuestionariosContent() {
                       max="100"
                       value={excellentFrom}
                       onChange={e => setExcellentFrom(Number(e.target.value))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold focus:border-emerald-500 outline-none"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 font-semibold focus:border-blue-600 outline-none"
                     />
                   </div>
                 </div>
@@ -1386,9 +1400,9 @@ function QuestionariosContent() {
                   </div>
 
                   {questions.map((q, qIndex) => (
-                    <div key={q.id} className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-4">
+                    <div key={q.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
                       <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                        <span className="text-xs font-black text-emerald-400">
+                        <span className="text-xs font-black text-blue-600">
                           Questão {qIndex + 1}
                         </span>
                         <button
@@ -1407,7 +1421,7 @@ function QuestionariosContent() {
                           value={q.text}
                           onChange={e => handleUpdateQuestion(q.id, { text: e.target.value })}
                           placeholder="Enunciado da pergunta de segurança..."
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
+                          className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:border-blue-600 outline-none"
                           required
                         />
                       </div>
@@ -1418,7 +1432,7 @@ function QuestionariosContent() {
                           <select
                             value={q.type}
                             onChange={e => handleUpdateQuestion(q.id, { type: e.target.value as any })}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
+                            className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:border-blue-600 outline-none"
                           >
                             <option value="SINGLE_CHOICE">Escolha Única (Uma Correta)</option>
                             <option value="MULTIPLE_CHOICE">Múltipla Escolha (Mais de uma)</option>
@@ -1434,7 +1448,7 @@ function QuestionariosContent() {
                             max="10"
                             value={q.weight}
                             onChange={e => handleUpdateQuestion(q.id, { weight: Number(e.target.value) })}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
+                            className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:border-blue-600 outline-none"
                           />
                         </div>
                       </div>
@@ -1519,13 +1533,13 @@ function QuestionariosContent() {
           <div className="space-y-6">
             
             {/* Barra de Seleção e Filtro de Questionário */}
-            <div className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-2xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="bg-white border border-slate-200/90 p-4 sm:p-5 rounded-2xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                  <Trophy size={13} className="text-amber-400" /> Auditoria de Classificação Oficial
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 flex items-center gap-1.5 font-bold">
+                  <Trophy size={13} className="text-amber-500" /> Auditoria de Classificação Oficial
                 </span>
-                <h3 className="text-sm font-bold text-white">Selecione a Avaliação para Auditar o Ranking:</h3>
-                <p className="text-xs text-slate-400">
+                <h3 className="text-sm font-extrabold text-slate-900">Selecione a Avaliação para Auditar o Ranking:</h3>
+                <p className="text-xs text-slate-500">
                   Consulte os melhores desempenhos, empate compartilhado e exporte o relatório oficial.
                 </p>
               </div>
@@ -1815,7 +1829,7 @@ function QuestionariosContent() {
         )}
 
       </div>
-    </main>
+    </AppShell>
   );
 }
 
@@ -1824,8 +1838,8 @@ export const dynamic = 'force-dynamic';
 export default function QuestionariosAdminPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-        <Loader2 size={36} className="animate-spin text-emerald-500" />
+      <div className="min-h-screen bg-[#F5F7FB] flex items-center justify-center">
+        <Loader2 size={36} className="animate-spin text-blue-600" />
       </div>
     }>
       <QuestionariosContent />

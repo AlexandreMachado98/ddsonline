@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { 
   Play, Users, FileText, CheckCircle2, 
   Smartphone, Download, Copy, Check, LogOut, 
   History, PlusCircle, Calendar, AlertTriangle, X, Radio, Clock, RefreshCw, Loader2, Filter, FileSpreadsheet,
   Camera, Image as ImageIcon, Trash2, Target, ExternalLink, Info, CheckSquare, Square, MapPin, Sparkles, ChevronRight, Eye,
-  ArrowLeft, Plus, PenTool, Award, Trophy
+  ArrowLeft, Plus, PenTool, Award, Trophy, BookmarkCheck, Shield
 } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
 import GroupPhotoCapture, { parseGroupPhotos, serializeGroupPhotos } from '@/components/GroupPhotoCapture';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
@@ -19,15 +20,30 @@ import OfflineSyncBadge from '@/components/OfflineSyncBadge';
 import { cacheMeetingData } from '@/lib/offlineStorage';
 import DdsLogo from '@/components/DdsLogo';
 import { useAuth } from '@/context/AuthContext';
+import AppShell from '@/components/layout/AppShell';
+import MetricCard from '@/components/ui/MetricCard';
+import StatusBadge from '@/components/ui/StatusBadge';
 
-export default function AdminPanel() {
+function AdminPanelContent() {
   const { user: currentUser, logout: handleLogout, updateUserLocal } = useAuth();
+  const searchParams = useSearchParams();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'NEW_DDS' | 'HISTORY'>('NEW_DDS');
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
+
+  // Sincroniza abas via URL querystrings
+  useEffect(() => {
+    const view = searchParams?.get('view');
+    const action = searchParams?.get('action');
+    if (view === 'history') {
+      setActiveTab('HISTORY');
+    } else if (action === 'new') {
+      setActiveTab('NEW_DDS');
+    }
+  }, [searchParams]);
 
   // Formulário do Novo DDS
   const [meetingType, setMeetingType] = useState<'PRESENTIAL' | 'REMOTE'>('PRESENTIAL');
@@ -610,7 +626,24 @@ export default function AdminPanel() {
     const isPresential = activeMeeting.type === 'PRESENTIAL';
 
     return (
-      <main className="min-h-screen bg-slate-950 p-3 sm:p-6 font-sans text-white flex flex-col justify-between">
+      <AppShell
+        breadcrumbs={[
+          { label: 'Painel Geral', href: '/admin' },
+          { label: `Ao Vivo: ${activeMeeting.topic}` }
+        ]}
+        actions={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsLiveMode(false)}
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <ArrowLeft size={14} />
+              <span>Voltar ao Painel</span>
+            </button>
+            <OfflineSyncBadge meetingId={activeMeeting?.id} onSyncComplete={() => fetchAllData()} />
+          </div>
+        }
+      >
         {/* Toast rendering removed as requested */}
         
         {/* EDIT MODAL */}
@@ -1152,667 +1185,738 @@ export default function AdminPanel() {
             }}
           />
         )}
-      </main>
+      </AppShell>
     );
   }
 
   // =========================================================================
   // DASHBOARD PRINCIPAL (NOVO DDS / HISTÓRICO)
   // =========================================================================
-  return (
-    <main className="min-h-screen bg-slate-950 p-3 sm:p-6 font-sans text-slate-100">
+  const totalMeetings = meetingHistory.length;
+  const totalAttendees = useMemo(() => {
+    return meetingHistory.reduce((acc, m) => acc + (m.attendees?.length || 0), 0) + (activeMeeting?.attendees?.length || 0);
+  }, [meetingHistory, activeMeeting]);
+  const totalAttachments = useMemo(() => {
+    return meetingHistory.reduce((acc, m) => acc + (m.attachments?.length || 0), 0);
+  }, [meetingHistory]);
 
-{/* EDIT MODAL */}
-        {editingMeeting && (
-          <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-            <div className="bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-3xl max-w-md w-full max-h-[90dvh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex items-center justify-between mb-4 sticky top-0 bg-slate-900/90 backdrop-blur-md pb-2 z-10 border-b border-slate-800">
-                <h2 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
-                  <span className="text-emerald-400">✏️</span>
-                  Editar Treinamento / DDS
-                </h2>
-                <button onClick={() => setEditingMeeting(null)} className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg">
-                  <X size={20} />
-                </button>
+  return (
+    <AppShell
+      breadcrumbs={[{ label: 'Painel Geral' }]}
+      actions={
+        <div className="flex items-center gap-2">
+          {/* Logo da Empresa para Atas em PDF */}
+          <label 
+            className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm" 
+            title={companyLogo ? "Substituir Logo da Empresa no PDF" : "Adicionar Logo da Empresa ao PDF"}
+          >
+            {companyLogo ? (
+              <img src={companyLogo} alt="Logo" className="h-4 w-auto rounded-sm object-contain" />
+            ) : (
+              <ImageIcon size={14} className="text-blue-600" />
+            )}
+            <span className="hidden sm:inline">{companyLogo ? 'Alterar Logo' : 'Logo PDF'}</span>
+            <input 
+              type="file" 
+              accept="image/*" 
+              className="hidden" 
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    const img = new Image();
+                    img.onload = () => {
+                      const canvas = document.createElement('canvas');
+                      const MAX_WIDTH = 400;
+                      const MAX_HEIGHT = 200;
+                      let width = img.width;
+                      let height = img.height;
+
+                      if (width > height) {
+                        if (width > MAX_WIDTH) {
+                          height *= MAX_WIDTH / width;
+                          width = MAX_WIDTH;
+                        }
+                      } else {
+                        if (height > MAX_HEIGHT) {
+                          width *= MAX_HEIGHT / height;
+                          height = MAX_HEIGHT;
+                        }
+                      }
+                      canvas.width = width;
+                      canvas.height = height;
+                      const ctx = canvas.getContext('2d');
+                      ctx?.drawImage(img, 0, 0, width, height);
+                      
+                      const base64 = canvas.toDataURL('image/png', 0.8);
+                      try {
+                        localStorage.setItem('dds_company_logo', base64);
+                        setCompanyLogo(base64);
+                        showToast('Logo atualizada com sucesso!', 'success');
+                      } catch (err) {
+                        console.error(err);
+                        showToast('Erro: Imagem muito grande.', 'error');
+                      }
+                    };
+                    img.src = reader.result as string;
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }} 
+            />
+          </label>
+
+          {companyLogo && (
+            <button
+              onClick={() => {
+                localStorage.removeItem('dds_company_logo');
+                setCompanyLogo(null);
+                showToast('Logo removida.', 'info');
+              }}
+              className="p-1.5 text-slate-400 hover:text-rose-500 rounded-xl hover:bg-rose-50 transition-colors"
+              title="Remover Logo"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+
+          <OfflineSyncBadge meetingId={activeMeeting?.id} onSyncComplete={() => fetchAllData()} />
+        </div>
+      }
+    >
+      {/* Modais de Edição e Confirmação */}
+      {editingMeeting && (
+        <div className="fixed inset-0 z-[99999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 p-5 sm:p-6 rounded-3xl max-w-lg w-full max-h-[90dvh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-4 sticky top-0 bg-white/95 backdrop-blur-md pb-2 z-10 border-b border-slate-100">
+              <h2 className="text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-2">
+                <span className="text-blue-600">✏️</span>
+                Editar Treinamento / DDS
+              </h2>
+              <button onClick={() => setEditingMeeting(null)} className="text-slate-400 hover:text-slate-700 transition-colors p-1 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveEditMeeting} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Tipo de Conteúdo</label>
+                <select
+                  value={editForm.classification}
+                  onChange={(e) => setEditForm({...editForm, classification: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-xs sm:text-sm text-slate-900 font-bold focus:bg-white focus:border-blue-600 outline-none min-h-[44px]"
+                >
+                  <option value="DDS">DDS</option>
+                  <option value="Treinamento">Treinamento</option>
+                  <option value="Campanha">Campanha</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Responsável pelo Treinamento / DDS</label>
+                <input
+                  type="text"
+                  value={editForm.instructorName}
+                  onChange={(e) => setEditForm({...editForm, instructorName: e.target.value})}
+                  placeholder={currentUser?.name || 'Nome do Instrutor'}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-xs sm:text-sm text-slate-900 font-bold focus:bg-white focus:border-blue-600 outline-none min-h-[44px]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Objetivo</label>
+                <textarea
+                  rows={2}
+                  value={editForm.objective}
+                  onChange={(e) => setEditForm({...editForm, objective: e.target.value})}
+                  placeholder="Objetivo do DDS / Treinamento..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 outline-none leading-relaxed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>Conteúdo Programático</span>
+                  <span className="text-[10px] text-emerald-600 font-bold">sai na ata em pdf</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={editForm.programmaticContent}
+                  onChange={(e) => setEditForm({...editForm, programmaticContent: e.target.value})}
+                  placeholder="Ex: Módulo 1: Conceitos e NRs&#10;Módulo 2: Procedimentos de segurança&#10;Módulo 3: Prática operacional"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 outline-none leading-relaxed font-sans"
+                />
               </div>
               
-              <form onSubmit={handleSaveEditMeeting} className="space-y-3.5">
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Tipo de Conteúdo</label>
-                  <select
-                    value={editForm.classification}
-                    onChange={(e) => setEditForm({...editForm, classification: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-base sm:text-xs text-white font-bold focus:border-emerald-500 outline-none min-h-[44px]"
-                  >
-                    <option value="DDS">DDS</option>
-                    <option value="Treinamento">Treinamento</option>
-                    <option value="Campanha">Campanha</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Responsável pelo Treinamento / DDS</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Data/Hora Início</label>
                   <input
-                    type="text"
-                    value={editForm.instructorName}
-                    onChange={(e) => setEditForm({...editForm, instructorName: e.target.value})}
-                    placeholder={currentUser?.name || 'Nome do Instrutor'}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-base sm:text-xs text-white font-bold focus:border-emerald-500 outline-none min-h-[44px]"
+                    type="datetime-local"
+                    value={editForm.createdAt}
+                    onChange={(e) => setEditForm({...editForm, createdAt: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 outline-none min-h-[44px]"
+                    required
                   />
                 </div>
                 
-
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Objetivo</label>
-                  <textarea
-                    rows={2}
-                    value={editForm.objective}
-                    onChange={(e) => setEditForm({...editForm, objective: e.target.value})}
-                    placeholder="Objetivo do DDS / Treinamento..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white font-medium focus:border-emerald-500 outline-none leading-relaxed"
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Data/Hora Fim</label>
+                  <input
+                    type="datetime-local"
+                    value={editForm.endedAt}
+                    onChange={(e) => setEditForm({...editForm, endedAt: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 outline-none min-h-[44px]"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
-                    <span>Conteúdo Programático</span>
-                    <span className="text-[10px] text-emerald-400 font-normal lowercase">sai na ata em pdf</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={editForm.programmaticContent}
-                    onChange={(e) => setEditForm({...editForm, programmaticContent: e.target.value})}
-                    placeholder="Ex: Módulo 1: Conceitos e NRs&#10;Módulo 2: Procedimentos de segurança&#10;Módulo 3: Prática operacional"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-white font-medium focus:border-emerald-500 outline-none leading-relaxed font-sans"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data/Hora Início</label>
-                    <input
-                      type="datetime-local"
-                      value={editForm.createdAt}
-                      onChange={(e) => setEditForm({...editForm, createdAt: e.target.value})}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-base sm:text-xs text-white font-medium focus:border-emerald-500 outline-none min-h-[44px]"
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Data/Hora Fim</label>
-                    <input
-                      type="datetime-local"
-                      value={editForm.endedAt}
-                      onChange={(e) => setEditForm({...editForm, endedAt: e.target.value})}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-base sm:text-xs text-white font-medium focus:border-emerald-500 outline-none min-h-[44px]"
-                    />
-                  </div>
-                </div>
-                
-                <div className="flex gap-2.5 pt-3">
-                  <button type="button" onClick={() => setEditingMeeting(null)} className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-colors min-h-[44px]">Cancelar</button>
-                  <button type="submit" className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all min-h-[44px]">Salvar Alterações</button>
-                </div>
-              </form>
-            </div>
+              {/* Gestão de Anexos no Modal de Edição */}
+              <div className="pt-2 border-t border-slate-100">
+                <AttachmentManager
+                  attachments={editAttachments}
+                  onChange={setEditAttachments}
+                />
+              </div>
+              
+              <div className="flex gap-2.5 pt-3">
+                <button type="button" onClick={() => setEditingMeeting(null)} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors min-h-[44px]">Cancelar</button>
+                <button type="submit" className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all min-h-[44px]">Salvar Alterações</button>
+              </div>
+            </form>
           </div>
-        )}
+        </div>
+      )}
 
       {confirmDialog && (
-        <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3 mb-3 text-amber-400">
+        <div className="fixed inset-0 z-[99999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 p-6 rounded-3xl max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-3 text-amber-600">
               <AlertTriangle size={22} />
-              <h2 className="text-base font-extrabold text-white">{confirmDialog.title}</h2>
+              <h2 className="text-base font-extrabold text-slate-900">{confirmDialog.title}</h2>
             </div>
-            <p className="text-xs text-slate-300 mb-5 leading-relaxed">{confirmDialog.message}</p>
+            <p className="text-xs text-slate-600 mb-5 leading-relaxed">{confirmDialog.message}</p>
             <div className="flex gap-2.5">
-              <button onClick={() => setConfirmDialog(null)} className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-colors">Cancelar</button>
-              <button onClick={confirmDialog.onConfirm} className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all">Confirmar</button>
+              <button onClick={() => setConfirmDialog(null)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors">Cancelar</button>
+              <button onClick={confirmDialog.onConfirm} className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-md transition-all">Confirmar</button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="max-w-6xl w-full mx-auto space-y-4 sm:space-y-6">
-        {/* Topbar do Painel Responsiva */}
-        <header className="w-full bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-3xl shadow-xl overflow-hidden max-w-full space-y-2.5 sm:space-y-3">
-          {/* Linha 1: Marca DDS ON e Ações Rápidas */}
-          <div className="flex items-center justify-between gap-3 min-w-0">
-            <DdsLogo size="sm" showSubtitle={false} clickable href="/admin" />
+      {/* ===================================================================== */}
+      {/* CENTRAL OPERACIONAL DE SEGURANÇA (KPIS E MÉTRICAS REAIS)              */}
+      {/* ===================================================================== */}
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <MetricCard
+          title="DDS Realizados"
+          value={totalMeetings}
+          subtitle="atas arquivadas"
+          icon={FileText}
+          variant="default"
+          onClick={() => setActiveTab('HISTORY')}
+        />
+        <MetricCard
+          title="Presenças Auditadas"
+          value={totalAttendees}
+          subtitle="colaboradores"
+          icon={Users}
+          variant="emerald"
+        />
+        <MetricCard
+          title="Status Operacional"
+          value={activeMeeting ? '1 Ao Vivo' : 'Regular'}
+          subtitle={activeMeeting ? 'sala aberta' : 'sem pendências'}
+          icon={Radio}
+          variant={activeMeeting ? 'emerald' : 'blue'}
+          onClick={() => {
+            if (activeMeeting) setIsLiveMode(true);
+            else setActiveTab('NEW_DDS');
+          }}
+        />
+        <MetricCard
+          title="Materiais & Anexos"
+          value={totalAttachments}
+          subtitle="arquivos SST"
+          icon={BookmarkCheck}
+          variant="navy"
+        />
+      </section>
 
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              {activeMeeting && (
-                <button
-                  onClick={() => setIsLiveMode(true)}
-                  className="hidden sm:flex px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md items-center gap-1.5 animate-pulse cursor-pointer min-h-[36px]"
-                >
-                  <Radio size={14} /> DDS em Aberto
-                </button>
-              )}
-
-              <div className="flex items-center gap-1">
-                <label className="p-2 sm:px-3 text-slate-300 hover:text-emerald-400 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1.5 border border-slate-800 hover:border-slate-700 min-h-[36px]" title={companyLogo ? "Substituir Logo da Empresa" : "Adicionar Logo da Empresa ao PDF"}>
-                  {companyLogo ? (
-                    <img src={companyLogo} alt="Logo" className="h-4 sm:h-5 w-auto rounded-sm object-contain bg-white" />
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-                  )}
-                  <span className="text-xs font-bold hidden sm:inline">{companyLogo ? 'Mudar Logo' : 'Logo PDF'}</span>
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        const img = new Image();
-                        img.onload = () => {
-                          const canvas = document.createElement('canvas');
-                          const MAX_WIDTH = 400;
-                          const MAX_HEIGHT = 200;
-                          let width = img.width;
-                          let height = img.height;
-
-                          if (width > height) {
-                            if (width > MAX_WIDTH) {
-                              height *= MAX_WIDTH / width;
-                              width = MAX_WIDTH;
-                            }
-                          } else {
-                            if (height > MAX_HEIGHT) {
-                              width *= MAX_HEIGHT / height;
-                              height = MAX_HEIGHT;
-                            }
-                          }
-                          canvas.width = width;
-                          canvas.height = height;
-                          const ctx = canvas.getContext('2d');
-                          ctx?.drawImage(img, 0, 0, width, height);
-                          
-                          const base64 = canvas.toDataURL('image/png', 0.8);
-                          try {
-                            localStorage.setItem('dds_company_logo', base64);
-                            setCompanyLogo(base64);
-                            showToast('Logo atualizada com sucesso!', 'success');
-                          } catch (err) {
-                            console.error(err);
-                            showToast('Erro: Imagem muito grande.', 'error');
-                          }
-                        };
-                        img.src = reader.result as string;
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }} />
-                </label>
-                
-                {companyLogo && (
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem('dds_company_logo');
-                      setCompanyLogo(null);
-                      showToast('Logo removida.', 'info');
-                    }}
-                    className="p-2 text-slate-500 hover:text-red-400 rounded-xl hover:bg-slate-800 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
-                    title="Remover Logo"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                  </button>
-                )}
+      {/* Banner de Reunião em Andamento */}
+      {activeMeeting && (
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/90 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm animate-in fade-in duration-300">
+          <div className="flex items-start gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm animate-pulse">
+              <Radio size={20} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <StatusBadge status="LIVE" label="Reunião em Andamento" size="sm" />
+                <span className="text-xs text-slate-500 font-bold truncate">
+                  📍 {activeMeeting.farm}
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  Iniciado às {new Date(activeMeeting.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
-
-              <button
-                onClick={handleLogout}
-                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
-                title="Sair do Painel"
-              >
-                <LogOut size={16} />
-              </button>
+              <h3 className="text-base sm:text-lg font-black text-slate-900 mt-1 truncate">
+                {activeMeeting.topic}
+              </h3>
+              <p className="text-xs text-emerald-800 font-bold mt-0.5">
+                {activeMeeting.attendees?.length || 0} colaborador(es) com presença confirmada até o momento
+              </p>
             </div>
           </div>
 
-          {/* Banner Chamativo em Mobile quando houver DDS em Aberto */}
-          {activeMeeting && (
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             <button
               onClick={() => setIsLiveMode(true)}
-              className="sm:hidden w-full py-2 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-between transition-all animate-pulse cursor-pointer"
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer"
             >
-              <span className="flex items-center gap-1.5 truncate">
-                <Radio size={14} className="shrink-0" />
-                <span className="truncate">DDS Aberto: {activeMeeting.topic}</span>
-              </span>
-              <span className="bg-black/25 px-2 py-0.5 rounded-lg text-[10px] font-mono shrink-0">
-                Acessar &rarr;
-              </span>
+              <Play size={14} />
+              <span>Acessar Sala / Presenças</span>
             </button>
-          )}
+            <button
+              onClick={() => handleOpenPreview(activeMeeting)}
+              className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-200/90 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+            >
+              <Eye size={14} />
+              <span>Ver Ata</span>
+            </button>
+            <button
+              onClick={handleDownloadActivePdf}
+              className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-200/90 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+            >
+              <Download size={14} />
+              <span>PDF</span>
+            </button>
+          </div>
+        </div>
+      )}
 
-          {/* Linha 2: Cartão de Perfil do Técnico (Largura Total, Organizado e Sem Quebras Estranhas) */}
-          <button
-            type="button"
-            onClick={() => setIsProfileOpen(true)}
-            className="w-full flex items-center justify-between gap-2.5 p-2 sm:p-2.5 bg-slate-950/70 hover:bg-slate-800/80 border border-slate-800/80 rounded-2xl transition-all group cursor-pointer text-left"
-            title="Abrir Meu Perfil"
-          >
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              {/* Avatar Circular com Foto ou Iniciais */}
-              <div className="w-9 h-9 rounded-full bg-slate-800 ring-2 ring-emerald-500/30 group-hover:ring-emerald-400 p-0.5 shrink-0 flex items-center justify-center overflow-hidden transition-all shadow-md">
-                {currentUser?.photoURL ? (
-                  <img
-                    src={currentUser.photoURL}
-                    alt={currentUser.name}
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full rounded-full bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white text-xs font-black select-none">
-                    {currentUser?.name ? (
-                      currentUser.name.split(' ').length > 1
-                        ? (currentUser.name.split(' ')[0][0] + currentUser.name.split(' ')[currentUser.name.split(' ').length - 1][0]).toUpperCase()
-                        : currentUser.name.slice(0, 2).toUpperCase()
-                    ) : 'TST'}
-                  </div>
-                )}
-              </div>
-
-              <div className="min-w-0 flex-1 overflow-hidden">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-300 transition-colors truncate">
-                    {currentUser?.name || 'Técnico de Segurança'}
-                  </span>
-                  <span className="text-[9px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 shrink-0">
-                    Meu Perfil
-                  </span>
-                </div>
-                
-                {/* Empresa */}
-                <p className="text-[10px] sm:text-xs text-slate-400 truncate mt-0.5">
-                  {currentUser?.company || 'AM TST'}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 text-[11px] text-slate-500 group-hover:text-emerald-400 transition-colors shrink-0 pr-1">
-              <span className="hidden xs:inline text-[10px] font-semibold">Editar</span>
-              <ChevronRight size={15} />
-            </div>
-          </button>
-
-          {/* Atalho Rápido para Módulo de Questionários */}
-          <Link href="/admin/questionarios" className="block w-full">
-            <div className="w-full flex items-center justify-between p-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-emerald-500/40 rounded-2xl transition-all group cursor-pointer shadow-sm">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500/20 transition-colors">
-                  <Award size={15} />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors">
-                    Módulo de Questionários & Avaliações
-                  </h3>
-                  <p className="text-[10px] text-slate-400">
-                    Crie avaliações de percepção de risco para os colaboradores responderem pelo celular
-                  </p>
-                </div>
-              </div>
-              <ChevronRight size={15} className="text-slate-500 group-hover:text-emerald-400 transition-colors" />
-            </div>
-          </Link>
-        </header>
-
-        {/* Badge de Sincronização e Fila Offline */}
-        <OfflineSyncBadge meetingId={activeMeeting?.id} onSyncComplete={() => fetchAllData()} />
-
-        {/* Abas de Navegação (Novo DDS vs Histórico vs Questionários vs Ranking) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 bg-slate-900 border border-slate-800 p-1.5 rounded-2xl gap-1.5 shadow-lg">
+      {/* ===================================================================== */}
+      {/* ABAS DE NAVEGAÇÃO SEGMENTADAS                                         */}
+      {/* ===================================================================== */}
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3 flex-wrap">
+        <div className="inline-flex p-1 bg-white border border-slate-200/90 rounded-2xl shadow-sm gap-1">
           <button
             onClick={() => setActiveTab('NEW_DDS')}
-            className={`py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === 'NEW_DDS'
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                ? 'bg-[#0F1F38] text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <PlusCircle size={16} />
+            <PlusCircle size={15} />
             <span>Novo DDS</span>
           </button>
 
           <button
             onClick={() => setActiveTab('HISTORY')}
-            className={`py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === 'HISTORY'
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                ? 'bg-[#0F1F38] text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <History size={16} />
-            <span>Histórico ({meetingHistory.length})</span>
+            <History size={15} />
+            <span>Histórico ({totalMeetings})</span>
           </button>
+        </div>
 
-          <Link href="/admin/questionarios" className="w-full">
+        <div className="flex items-center gap-2">
+          <Link href="/admin/questionarios">
             <button
               type="button"
-              className="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer text-emerald-400 hover:text-white hover:bg-emerald-600/30 border border-emerald-500/30 bg-emerald-950/20 shadow-sm"
+              className="px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 text-blue-700 border border-blue-200/80 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
             >
-              <Award size={16} className="text-emerald-400 shrink-0" />
+              <Award size={15} />
               <span>Questionários</span>
             </button>
           </Link>
 
-          <Link href="/admin/questionarios?tab=RANKING" className="w-full">
+          <Link href="/admin/questionarios?tab=RANKING">
             <button
               type="button"
-              className="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer text-amber-300 hover:text-white hover:bg-amber-600/30 border border-amber-500/30 bg-amber-950/20 shadow-sm"
+              className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
             >
-              <Trophy size={16} className="text-amber-400 shrink-0" />
-              <span>🏆 Ranking & Pódio</span>
+              <Trophy size={15} />
+              <span>Ranking & Pódio</span>
             </button>
           </Link>
         </div>
+      </div>
 
-        {/* ===================================================================== */}
-        {/* ABA 1: NOVO DDS                                                       */}
-        {/* ===================================================================== */}
-        {activeTab === 'NEW_DDS' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl space-y-5 animate-in fade-in duration-200">
+      {/* ===================================================================== */}
+      {/* ABA 1: NOVO DDS                                                       */}
+      {/* ===================================================================== */}
+      {activeTab === 'NEW_DDS' && (
+        <div className="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-8 shadow-sm space-y-6 animate-in fade-in duration-200">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 block mb-0.5">
+              Cadastro de Diálogo Diário de Segurança
+            </span>
+            <h2 className="text-lg sm:text-xl font-black text-[#0F1F38] tracking-tight">
+              Criar Nova Reunião de DDS
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Preencha os dados e escolha se a reunião será presencial ou com transmissão de vídeo ao vivo.
+            </p>
+          </div>
+
+          <form onSubmit={handleStartNewMeeting} className="space-y-5">
+            {/* Seletor de Modalidade */}
             <div>
-              <h2 className="text-base sm:text-lg font-extrabold text-white">Criar Nova Reunião de DDS</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Preencha os dados e escolha se a reunião será presencial ou com transmissão de vídeo.</p>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Modalidade do DDS *
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMeetingType('PRESENTIAL')}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                    meetingType === 'PRESENTIAL'
+                      ? 'bg-blue-50/60 border-blue-600 text-blue-950 ring-2 ring-blue-500/20'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="text-xs font-black flex items-center gap-2 text-blue-700">
+                    📍 Presencial em Campo
+                  </span>
+                  <span className="text-[11px] text-slate-500 mt-1 leading-snug">
+                    Coleta de presenças com selfie e assinatura digital no celular ou tablet.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMeetingType('REMOTE')}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                    meetingType === 'REMOTE'
+                      ? 'bg-blue-50/60 border-blue-600 text-blue-950 ring-2 ring-blue-500/20'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="text-xs font-black flex items-center gap-2 text-blue-700">
+                    💻 EAD / Transmissão Ao Vivo (P2P)
+                  </span>
+                  <span className="text-[11px] text-slate-500 mt-1 leading-snug">
+                    Transmissão de vídeo, voz e slides com lista de presença em tempo real.
+                  </span>
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleStartNewMeeting} className="space-y-4">
-              {/* Seletor de Modalidade */}
+            {/* Tipo de Conteúdo */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Modalidade do DDS
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Classificação do Evento *
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMeetingType('PRESENTIAL')}
-                    className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                      meetingType === 'PRESENTIAL'
-                        ? 'bg-emerald-950/60 border-emerald-500 text-white ring-2 ring-emerald-500/30'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/60'
-                    }`}
-                  >
-                    <span className="text-xs font-black flex items-center gap-1.5 text-emerald-400">
-                      📍 Presencial
-                    </span>
-                    <span className="text-[10px] text-slate-400 mt-1 leading-tight">
-                      Coleta de assinaturas e fotos no próprio aparelho em campo.
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setMeetingType('REMOTE')}
-                    className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                      meetingType === 'REMOTE'
-                        ? 'bg-emerald-950/60 border-emerald-500 text-white ring-2 ring-emerald-500/30'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/60'
-                    }`}
-                  >
-                    <span className="text-xs font-black flex items-center gap-1.5 text-emerald-400">
-                      💻 EAD (Vídeo P2P)
-                    </span>
-                    <span className="text-[10px] text-slate-400 mt-1 leading-tight">
-                      Transmissão de áudio, vídeo e tela para colaboradores remotos.
-                    </span>
-                  </button>
-                </div>
+                <select
+                  value={classification}
+                  onChange={(e) => setClassification(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-xs sm:text-sm text-slate-900 font-bold focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                >
+                  <option value="DDS">DDS — Diálogo Diário de Segurança</option>
+                  <option value="Treinamento">Treinamento Obrigatório (NR)</option>
+                  <option value="Campanha">Campanha de Saúde & Prevenção</option>
+                </select>
               </div>
 
-              {/* Tema e Local */}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Tipo de Conteúdo *</label>
-                  <select
-                    value={classification}
-                    onChange={(e) => setClassification(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-base sm:text-xs text-white font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none min-h-[44px]"
-                  >
-                    <option value="DDS">DDS</option>
-                    <option value="Treinamento">Treinamento</option>
-                    <option value="Campanha">Campanha</option>
-                  </select>
-                </div>
-                <div></div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                    Tema *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    placeholder="Ex: Trabalho em Altura & EPIs"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-base sm:text-xs text-white font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none min-h-[44px]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                    Local *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={farm}
-                    onChange={(e) => setFarm(e.target.value)}
-                    placeholder="Ex: Canteiro de Obras / Fazenda"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-3 text-base sm:text-xs text-white font-bold focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none min-h-[44px]"
-                  />
-                </div>
-              </div>
-
-                            {/* Objetivo */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                  Objetivo / Observações da Reunião
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Local / Unidade Operacional *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={farm}
+                  onChange={(e) => setFarm(e.target.value)}
+                  placeholder="Ex: Canteiro de Obras / Fazenda / Unidade Central"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-xs sm:text-sm text-slate-900 font-bold focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Tema */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Tema do DDS *
+              </label>
+              <input
+                type="text"
+                required
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="Ex: Cuidados com Animais na Pista / Trabalho em Altura & EPIs"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-xs sm:text-sm text-slate-900 font-bold focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+              />
+            </div>
+
+            {/* Objetivo */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Objetivo Específico / Observações
+              </label>
+              <textarea
+                rows={2}
+                value={objective}
+                onChange={(e) => setObjective(e.target.value)}
+                placeholder="Ex: Orientar os operadores quanto à verificação diária e direção defensiva."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all leading-relaxed"
+              />
+            </div>
+
+            {/* Conteúdo Programático se Treinamento */}
+            {classification === 'Treinamento' && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Conteúdo Programático do Treinamento</span>
+                  <span className="text-[10px] text-emerald-600 font-bold">constará na ata em PDF</span>
                 </label>
                 <textarea
-                  rows={2}
-                  value={objective}
-                  onChange={(e) => setObjective(e.target.value)}
-                  placeholder="Ex: Orientar os operadores de trator quanto à verificação diária do cinto e freios."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-base sm:text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed"
+                  rows={3}
+                  value={programmaticContent}
+                  onChange={(e) => setProgrammaticContent(e.target.value)}
+                  placeholder="Ex: Módulo 1: Conceitos e Normas Regulamentadoras&#10;Módulo 2: Procedimentos de segurança e EPIs&#10;Módulo 3: Prática operacional."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all leading-relaxed font-sans"
                 />
-              </div>
-
-              {/* Conteúdo Programático (Exibido apenas quando for Treinamento) */}
-              <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
-                    <span>Conteúdo Programático (Treinamento)</span>
-                    <span className="text-[10px] text-emerald-400 font-normal lowercase">sai na ata em pdf</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={programmaticContent}
-                    onChange={(e) => setProgrammaticContent(e.target.value)}
-                    placeholder="Ex: Módulo 1: Legislação e NRs aplicáveis&#10;Módulo 2: Procedimentos de segurança e EPIs&#10;Módulo 3: Prática operacional e primeiros socorros."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-base sm:text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed font-sans"
-                  />
-                </div>
-
-              {/* Seção 1: Material de Apresentação do DDS (Slides, Cartazes e PDFs) */}
-              <div className="pt-2 border-t border-slate-800/80">
-                <AttachmentManager
-                  attachments={newAttachments}
-                  onChange={setNewAttachments}
-                />
-              </div>
-
-              {/* Seção 2: Fotos Coletivas da Equipe (Evidência Administrativa) */}
-              <div className="pt-2 border-t border-slate-800/80 space-y-2">
-                <GroupPhotoCapture 
-                  initialPhotos={teamPhotos}
-                  onPhotosChange={setTeamPhotos}
-                />
-              </div>
-
-              {/* Botão de Iniciar */}
-              <button
-                type="submit"
-                disabled={isCreatingMeeting}
-                className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.99] text-slate-950 font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl shadow-emerald-950/60 transition-all cursor-pointer min-h-[48px]"
-              >
-                {isCreatingMeeting ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>Iniciando Reunião...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play size={16} />
-                    <span>Abrir Sala do DDS Agora</span>
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* ===================================================================== */}
-        {/* ABA 2: HISTÓRICO DE ATAS                                              */}
-        {/* ===================================================================== */}
-        {activeTab === 'HISTORY' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl space-y-4 animate-in fade-in duration-200">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-              <div>
-                <h2 className="text-base sm:text-lg font-extrabold text-white">Histórico de DDS Realizados</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Consulte, exporte relatórios consolidados ou baixe atas individuais.</p>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                {meetingHistory.length > 0 && (
-                  <button
-                    onClick={handleDownloadConsolidatedPdf}
-                    className="px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer min-h-[40px]"
-                  >
-                    <Download size={14} />
-                    <span>Exportar Dossiê Consolidado</span>
-                  </button>
-                )}
-
-                {selectedMeetings.length > 0 && (
-                  <button
-                    onClick={() => handleDeleteMeetings(selectedMeetings, true)}
-                    className="px-3.5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer min-h-[40px]"
-                  >
-                    <Trash2 size={14} />
-                    <span>Excluir ({selectedMeetings.length})</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {meetingHistory.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-2xl">
-                Nenhum DDS registrado no histórico ainda.
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {meetingHistory.map((m) => (
-                  <div
-                    key={m.id}
-                    className="bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all"
-                  >
-                    <div className="flex items-start sm:items-center gap-3 min-w-0">
-                      <label className="p-1 cursor-pointer shrink-0 mt-0.5 sm:mt-0" title="Selecionar este DDS">
-                        <input
-                          type="checkbox"
-                          checked={selectedMeetings.includes(m.id)}
-                          onChange={() => toggleSelectMeeting(m.id)}
-                          className="w-5 h-5 rounded text-emerald-600 bg-slate-900 border-slate-700 cursor-pointer shrink-0"
-                        />
-                      </label>
-
-                      <div className="min-w-0 max-w-full">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs sm:text-sm font-extrabold text-white break-words">{m.topic}</span>
-                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
-                            {m.type === 'PRESENTIAL' ? 'Presencial' : 'Remoto'}
-                          </span>
-                          {m.attachments && m.attachments.length > 0 && (
-                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shrink-0">
-                              <FileText size={10} /> {m.attachments.length} {m.attachments.length === 1 ? 'anexo' : 'anexos'}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5 break-words">
-                          📍 {m.farm} • {new Date(m.createdAt).toLocaleDateString('pt-BR')} às {new Date(m.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • <strong className="text-emerald-400">{m.attendees?.length || 0} presenças</strong>
-                        </p>
-                        {m.objective && (
-                          <p className="text-[11px] text-emerald-400/90 mt-0.5 break-words italic font-medium">
-                            🎯 {m.objective}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto pt-2 sm:pt-0 border-t border-slate-900 sm:border-0 w-full sm:w-auto justify-end">
-                      <button
-                        onClick={() => handleOpenPreview(m)}
-                        className="px-3.5 py-2 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-emerald-200 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-700/60 cursor-pointer min-h-[38px] transition-all shadow-sm"
-                        title="Pré-visualizar Lista de Presença e Dossiê Completo"
-                      >
-                        <Eye size={13} />
-                        <span>Visualizar Lista</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleDownloadHistoryPdf(m)}
-                        className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-700 cursor-pointer min-h-[38px]"
-                      >
-                        <Download size={13} />
-                        <span>Ata PDF</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleOpenEditModal(m)}
-                        title="Editar Detalhes"
-                        className="p-2 text-slate-400 hover:text-emerald-400 rounded-xl hover:bg-slate-800 border border-slate-800 hover:border-slate-700 cursor-pointer min-h-[38px] min-w-[38px] flex items-center justify-center transition-colors"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                      </button>
-
-                      <button
-                        onClick={() => handleDeleteMeetings([m.id], false, m.topic)}
-                        className="p-2 text-slate-400 hover:text-red-400 rounded-xl hover:bg-slate-800 border border-slate-800 hover:border-slate-700 cursor-pointer min-h-[38px] min-w-[38px] flex items-center justify-center transition-colors"
-                        title="Excluir DDS"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
               </div>
             )}
-          </div>
-        )}
 
-        {/* Rodapé Administrativo & Governança */}
-        <footer className="mt-14 pt-6 border-t border-slate-800/80 text-center space-y-1.5 text-xs text-slate-500 pb-4">
-          <p>© 2026 <strong>AM TST</strong>. Todos os direitos reservados.</p>
-          <p className="text-[11px] text-slate-400 font-medium">
-            <strong>DDS ON</strong> é uma plataforma da <strong>AM TST</strong> • Integrada ao DDS Master.
-          </p>
-          <div className="flex items-center justify-center gap-3 text-[11px] pt-0.5">
-            <Link href="/termos" target="_blank" className="text-slate-400 hover:text-emerald-400 underline underline-offset-2 transition-colors">
-              Termos de Uso
-            </Link>
-            <span>•</span>
-            <Link href="/privacidade" target="_blank" className="text-slate-400 hover:text-emerald-400 underline underline-offset-2 transition-colors">
-              Aviso de Privacidade (LGPD)
-            </Link>
+            {/* Anexos & Fotos Coletivas */}
+            <div className="pt-3 border-t border-slate-100 space-y-4">
+              <AttachmentManager
+                attachments={newAttachments}
+                onChange={setNewAttachments}
+              />
+
+              <GroupPhotoCapture 
+                initialPhotos={teamPhotos}
+                onPhotosChange={setTeamPhotos}
+              />
+            </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={isCreatingMeeting}
+              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-900/20 transition-all cursor-pointer min-h-[48px]"
+            >
+              {isCreatingMeeting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Iniciando Reunião...</span>
+                </>
+              ) : (
+                <>
+                  <Play size={16} />
+                  <span>Abrir Sala do DDS Agora</span>
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* ABA 2: HISTÓRICO DE ATAS                                              */}
+      {/* ===================================================================== */}
+      {activeTab === 'HISTORY' && (
+        <div className="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-8 shadow-sm space-y-5 animate-in fade-in duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 block mb-0.5">
+                Arquivo Digital de Atas
+              </span>
+              <h2 className="text-lg sm:text-xl font-black text-[#0F1F38] tracking-tight">
+                Histórico de DDS Realizados
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Consulte presenças, exporte dossiês consolidados e emita relatórios em PDF.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {meetingHistory.length > 0 && (
+                <button
+                  onClick={handleDownloadConsolidatedPdf}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                >
+                  <Download size={14} />
+                  <span>Exportar Dossiê Consolidado</span>
+                </button>
+              )}
+
+              {selectedMeetings.length > 0 && (
+                <button
+                  onClick={() => handleDeleteMeetings(selectedMeetings, true)}
+                  className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Trash2 size={14} />
+                  <span>Excluir ({selectedMeetings.length})</span>
+                </button>
+              )}
+            </div>
           </div>
-        </footer>
-      </div>
+
+          {/* Filtros de Data */}
+          <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-wrap items-center gap-3 text-xs">
+            <span className="font-bold text-slate-700 text-xs flex items-center gap-1.5">
+              <Filter size={14} className="text-slate-400" />
+              Filtrar por Período:
+            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 outline-none font-medium"
+              />
+              <span className="text-slate-400 font-bold">até</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 outline-none font-medium"
+              />
+              {(startDate || endDate) && (
+                <button
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                  }}
+                  className="px-2.5 py-1.5 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-xl font-bold text-xs hover:bg-slate-100 transition-colors"
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Lista de Reuniões */}
+          {meetingHistory.length === 0 ? (
+            <div className="p-12 text-center text-slate-400 text-xs border border-dashed border-slate-200 rounded-2xl">
+              Nenhum DDS registrado no histórico até o momento.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {meetingHistory.map((m) => (
+                <div
+                  key={m.id}
+                  className="bg-slate-50/70 hover:bg-white border border-slate-200/90 hover:border-slate-300 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all shadow-none hover:shadow-sm"
+                >
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <label className="p-1 cursor-pointer shrink-0 mt-0.5" title="Selecionar para dossiê consolidado">
+                      <input
+                        type="checkbox"
+                        checked={selectedMeetings.includes(m.id)}
+                        onChange={() => toggleSelectMeeting(m.id)}
+                        className="w-4 h-4 rounded text-blue-600 bg-white border-slate-300 cursor-pointer"
+                      />
+                    </label>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm sm:text-base font-black text-[#0F1F38] break-words">
+                          {m.topic}
+                        </span>
+                        <StatusBadge
+                          status={m.classification || 'DDS'}
+                          size="sm"
+                        />
+                        <StatusBadge
+                          status={m.type || 'PRESENTIAL'}
+                          size="sm"
+                        />
+                        {m.attachments && m.attachments.length > 0 && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 shrink-0">
+                            <FileText size={11} /> {m.attachments.length} {m.attachments.length === 1 ? 'anexo' : 'anexos'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 flex-wrap">
+                        <span className="font-semibold text-slate-700">📍 {m.farm}</span>
+                        <span>•</span>
+                        <span>
+                          {new Date(m.createdAt).toLocaleDateString('pt-BR')} às {new Date(m.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span>•</span>
+                        <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          <Users size={12} />
+                          {m.attendees?.length || 0} presenças
+                        </span>
+                      </div>
+
+                      {m.objective && (
+                        <p className="text-xs text-slate-600 mt-1.5 italic font-medium line-clamp-2">
+                          🎯 {m.objective}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0 self-end md:self-auto pt-2 md:pt-0 border-t border-slate-200 md:border-0 w-full md:w-auto justify-end">
+                    <button
+                      onClick={() => handleOpenPreview(m)}
+                      className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-200 cursor-pointer transition-all shadow-sm"
+                      title="Pré-visualizar Lista de Presença e Dossiê Completo"
+                    >
+                      <Eye size={14} />
+                      <span>Ver Ata</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleDownloadHistoryPdf(m)}
+                      className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-200 cursor-pointer transition-all shadow-sm"
+                    >
+                      <Download size={14} />
+                      <span>PDF</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleOpenEditModal(m)}
+                      title="Editar Detalhes"
+                      className="p-2 text-slate-400 hover:text-blue-600 rounded-xl hover:bg-slate-100 border border-slate-200 cursor-pointer transition-colors"
+                    >
+                      <PenTool size={14} />
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteMeetings([m.id], false, m.topic)}
+                      className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 border border-slate-200 cursor-pointer transition-colors"
+                      title="Excluir DDS"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Rodapé Administrativo */}
+      <footer className="mt-8 pt-6 border-t border-slate-200 text-center space-y-1.5 text-xs text-slate-500">
+        <p>© 2026 <strong>AM TST</strong>. Todos os direitos reservados.</p>
+        <p className="text-[11px] text-slate-400 font-medium">
+          <strong>DDS ON</strong> • Gestão Digital de SST & Diálogos Diários de Segurança.
+        </p>
+        <div className="flex items-center justify-center gap-3 text-[11px] pt-0.5">
+          <Link href="/termos" target="_blank" className="text-slate-500 hover:text-blue-600 underline transition-colors">
+            Termos de Uso
+          </Link>
+          <span>•</span>
+          <Link href="/privacidade" target="_blank" className="text-slate-500 hover:text-blue-600 underline transition-colors">
+            Aviso de Privacidade (LGPD)
+          </Link>
+        </div>
+      </footer>
 
       {/* Modal de Pré-Visualização de Documento e Lista de Presença */}
       {previewMeeting && (
@@ -1836,19 +1940,22 @@ export default function AdminPanel() {
           onDownloadPdf={() => handleDownloadHistoryPdf(previewMeeting)}
         />
       )}
+    </AppShell>
+  );
+}
 
-      {/* Modal de Meu Perfil */}
-      {currentUser && (
-        <UserProfileModal
-          user={currentUser}
-          isOpen={isProfileOpen}
-          onClose={() => setIsProfileOpen(false)}
-          onProfileUpdated={(updated) => {
-            updateUserLocal(updated);
-            showToast('Perfil atualizado com sucesso!', 'success');
-          }}
-        />
-      )}
-    </main>
+export const dynamic = 'force-dynamic';
+
+export default function AdminPanel() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#F5F7FB] flex items-center justify-center">
+          <Loader2 className="animate-spin text-blue-600" size={32} />
+        </div>
+      }
+    >
+      <AdminPanelContent />
+    </Suspense>
   );
 }

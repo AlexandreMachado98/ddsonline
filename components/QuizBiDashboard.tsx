@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
@@ -252,16 +252,16 @@ export default function QuizBiDashboard({
       {/* ========================================================================= */}
       {/* 1. BARRA SUPERIOR: CONTROLE DE SUB-ABAS DO BI & EXPORTAÇÃO                */}
       {/* ========================================================================= */}
-      <div className="bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-2xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/80 p-3 sm:p-4 rounded-3xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         {/* Sub-abas das 5 Áreas Principais */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 p-1 bg-slate-950 border border-slate-800 rounded-xl">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 p-1 bg-slate-50 border border-slate-200 rounded-2xl">
           <button
             type="button"
             onClick={() => setSubTab('OVERVIEW')}
             className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               subTab === 'OVERVIEW'
                 ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <BarChart3 size={14} />
@@ -274,7 +274,7 @@ export default function QuizBiDashboard({
             className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               subTab === 'ANALYSIS'
                 ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <Layers size={14} />
@@ -287,7 +287,7 @@ export default function QuizBiDashboard({
             className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               subTab === 'RANKING'
                 ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <Trophy size={14} />
@@ -300,7 +300,7 @@ export default function QuizBiDashboard({
             className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               subTab === 'HISTORY'
                 ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <BookOpen size={14} />
@@ -313,7 +313,7 @@ export default function QuizBiDashboard({
             className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               subTab === 'LEARNING'
                 ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <TrendingUp size={14} />
@@ -348,7 +348,7 @@ export default function QuizBiDashboard({
       {/* ========================================================================= */}
       {/* 2. FILTROS INTELIGENTES GLOBAIS                                           */}
       {/* ========================================================================= */}
-      <section className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl space-y-3">
+      <section className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-sm space-y-3">
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
           <div className="flex items-center gap-2">
             <Filter size={15} className="text-emerald-400" />
@@ -380,7 +380,7 @@ export default function QuizBiDashboard({
             <select
               value={period}
               onChange={e => setPeriod(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 font-medium"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-emerald-500 font-medium"
             >
               <option value="all">Todo o Histórico</option>
               <option value="7d">Últimos 7 dias</option>
@@ -397,7 +397,7 @@ export default function QuizBiDashboard({
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 font-medium"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-emerald-500 font-medium"
             >
               <option value="ALL">Todos os Status</option>
               <option value="PUBLISHED">Em Andamento (Publicado)</option>
@@ -412,7 +412,7 @@ export default function QuizBiDashboard({
             <select
               value={scoreRangeFilter}
               onChange={e => setScoreRangeFilter(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 font-medium"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-emerald-500 font-medium"
             >
               <option value="ALL">Todas as Notas</option>
               <option value="CRITICAL">🚨 Crítico (&lt; 40%)</option>
@@ -428,7 +428,7 @@ export default function QuizBiDashboard({
             <select
               value={selectedQuizId}
               onChange={e => setSelectedQuizId(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 font-medium truncate"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-emerald-500 font-medium truncate"
             >
               <option value="ALL">Todos os Questionários</option>
               {quizzes.map(q => (
@@ -448,7 +448,7 @@ export default function QuizBiDashboard({
                 placeholder="Ex: Linha de fogo, NR-31..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 font-medium placeholder-slate-600 text-xs"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-slate-800 focus:outline-none focus:border-emerald-500 font-medium placeholder-slate-600 text-xs"
               />
               <Search size={13} className="absolute left-2.5 top-2.5 text-slate-500" />
             </div>
@@ -464,7 +464,7 @@ export default function QuizBiDashboard({
                 type="date"
                 value={startDate}
                 onChange={e => setStartDate(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-800 text-xs focus:outline-none focus:border-emerald-500"
               />
             </div>
             <div>
@@ -473,7 +473,7 @@ export default function QuizBiDashboard({
                 type="date"
                 value={endDate}
                 onChange={e => setEndDate(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-800 text-xs focus:outline-none focus:border-emerald-500"
               />
             </div>
           </div>
@@ -504,7 +504,7 @@ export default function QuizBiDashboard({
           {/* Grid de 8 Cards de Indicadores Consolidados */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
             {/* Aproveitamento Médio */}
-            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1 shadow-md">
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl space-y-1 shadow-sm">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Aproveitamento Médio</span>
               <div className="flex items-baseline gap-2">
                 <h3 className="text-2xl font-black text-emerald-400">{indicators.overallAverageScore}%</h3>
@@ -513,7 +513,7 @@ export default function QuizBiDashboard({
             </div>
 
             {/* Taxa de Aprovação */}
-            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1 shadow-md">
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl space-y-1 shadow-sm">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Taxa de Aprovação</span>
               <div className="flex items-baseline gap-2">
                 <h3 className={`text-2xl font-black ${indicators.approvalRate >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>
@@ -524,7 +524,7 @@ export default function QuizBiDashboard({
             </div>
 
             {/* Respostas Recebidas */}
-            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1 shadow-md">
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl space-y-1 shadow-sm">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Total de Respostas</span>
               <div className="flex items-baseline gap-2">
                 <h3 className="text-2xl font-black text-white">{indicators.totalAttempts}</h3>
@@ -533,7 +533,7 @@ export default function QuizBiDashboard({
             </div>
 
             {/* Participantes Distintos */}
-            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1 shadow-md">
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl space-y-1 shadow-sm">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Colaboradores Únicos</span>
               <div className="flex items-baseline gap-2">
                 <h3 className="text-2xl font-black text-cyan-300">{indicators.uniqueParticipantsCount}</h3>
@@ -542,7 +542,7 @@ export default function QuizBiDashboard({
             </div>
 
             {/* Desempenhos Críticos */}
-            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1 shadow-md">
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl space-y-1 shadow-sm">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Desempenhos Críticos</span>
               <div className="flex items-baseline gap-2">
                 <h3 className={`text-2xl font-black ${indicators.criticalPerformancesCount > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
@@ -553,7 +553,7 @@ export default function QuizBiDashboard({
             </div>
 
             {/* Questionários em Andamento */}
-            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1 shadow-md">
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl space-y-1 shadow-sm">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Em Andamento</span>
               <div className="flex items-baseline gap-2">
                 <h3 className="text-2xl font-black text-amber-300">{indicators.totalQuizzesInProgress}</h3>
@@ -562,7 +562,7 @@ export default function QuizBiDashboard({
             </div>
 
             {/* Questionários Concluídos */}
-            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1 shadow-md">
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl space-y-1 shadow-sm">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Concluídos</span>
               <div className="flex items-baseline gap-2">
                 <h3 className="text-2xl font-black text-emerald-300">{indicators.totalQuizzesClosed}</h3>
@@ -571,7 +571,7 @@ export default function QuizBiDashboard({
             </div>
 
             {/* Total Criados */}
-            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1 shadow-md">
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl space-y-1 shadow-sm">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Total Criados</span>
               <div className="flex items-baseline gap-2">
                 <h3 className="text-2xl font-black text-slate-200">{indicators.totalQuizzesCreated}</h3>
@@ -580,7 +580,7 @@ export default function QuizBiDashboard({
             </div>
 
             {/* Taxa de Participação */}
-            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1 shadow-md">
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl space-y-1 shadow-sm">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Taxa Participação</span>
               <div className="flex items-baseline gap-2">
                 <h3 className="text-2xl font-black text-teal-300">{indicators.participationRate}%</h3>
@@ -589,7 +589,7 @@ export default function QuizBiDashboard({
             </div>
 
             {/* Fragilidades Críticas */}
-            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1 shadow-md">
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl space-y-1 shadow-sm">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Fragilidades de Pauta</span>
               <div className="flex items-baseline gap-2">
                 <h3 className="text-2xl font-black text-rose-400">
@@ -711,7 +711,7 @@ export default function QuizBiDashboard({
       {/* SUB-ABA B: ANÁLISE DE QUESTIONÁRIOS                                       */}
       {/* ========================================================================= */}
       {subTab === 'ANALYSIS' && (
-        <section className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
+        <section className="bg-white border border-slate-200/80 p-5 sm:p-7 rounded-3xl shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
             <div>
               <div className="flex items-center gap-2">
@@ -841,7 +841,7 @@ export default function QuizBiDashboard({
               <select
                 value={selectedQuizId}
                 onChange={e => setSelectedQuizId(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-emerald-500 font-medium max-w-xs truncate"
+                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 text-xs focus:outline-none focus:border-emerald-500 font-medium max-w-xs truncate"
               >
                 <option value="ALL">Selecionar Questionário...</option>
                 {quizzes.map(q => (
@@ -878,7 +878,7 @@ export default function QuizBiDashboard({
       {/* SUB-ABA D: HISTÓRICO DE AVALIAÇÕES (PERMANENTE & PAGINADO)                 */}
       {/* ========================================================================= */}
       {subTab === 'HISTORY' && (
-        <section className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
+        <section className="bg-white border border-slate-200/80 p-5 sm:p-7 rounded-3xl shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
             <div>
               <div className="flex items-center gap-2">
@@ -916,7 +916,7 @@ export default function QuizBiDashboard({
                   setHistorySearch(e.target.value);
                   setHistoryPage(1);
                 }}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-emerald-500 font-medium placeholder-slate-600"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-slate-800 text-xs focus:outline-none focus:border-emerald-500 font-medium placeholder-slate-600"
               />
               <Search size={13} className="absolute left-2.5 top-2.5 text-slate-500" />
             </div>
@@ -1090,7 +1090,7 @@ export default function QuizBiDashboard({
           </div>
 
           {/* Diagnóstico de Fragilidades Operacionais com Planos de Ação */}
-          <section className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
+          <section className="bg-white border border-slate-200/80 p-5 sm:p-7 rounded-3xl shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
               <div>
                 <div className="flex items-center gap-2">

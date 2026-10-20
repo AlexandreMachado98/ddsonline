@@ -128,23 +128,23 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-3 sm:p-6 font-sans relative overflow-x-hidden max-w-full">
+    <main className="min-h-screen bg-[#F5F7FB] text-[#0F172A] flex flex-col items-center justify-center p-3 sm:p-6 font-sans relative overflow-x-hidden max-w-full">
       
-      {/* Luz de fundo decorativa */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-96 h-80 sm:h-96 bg-emerald-600/15 blur-[130px] rounded-full pointer-events-none"></div>
+      {/* Luz de fundo decorativa suave */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-96 h-80 sm:h-96 bg-blue-500/10 blur-[130px] rounded-full pointer-events-none"></div>
 
-      <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-8 shadow-2xl relative z-10 space-y-5 backdrop-blur-md overflow-hidden">
+      <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-8 shadow-xl relative z-10 space-y-5 overflow-hidden">
         
         {/* LOGO OFICIAL: DDS ON */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-[11px] font-bold tracking-wide mb-1 flex-wrap justify-center text-center">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-blue-700 text-[11px] font-bold tracking-wide mb-1 flex-wrap justify-center text-center">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
             <span className="break-words">Plataforma Digital de SST & NR</span>
           </div>
           <div className="flex justify-center">
             <DdsLogo size="xl" showSubtitle={false} />
           </div>
-          <p className="text-xs text-slate-300 font-medium max-w-xs mx-auto leading-relaxed break-words">
+          <p className="text-xs text-slate-500 font-medium max-w-xs mx-auto leading-relaxed break-words">
             {isRegisterMode 
               ? 'Insira a Palavra-Chave da sua empresa para acesso instantâneo.' 
               : 'Diálogo Diário de Segurança com Registro Fotográfico e Videoconferência.'}
@@ -229,27 +229,27 @@ export default function HomePage() {
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)} 
                 placeholder="Digite seu e-mail" 
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-10 py-3 text-base sm:text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all min-h-[44px]" 
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-10 py-3 text-base sm:text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all min-h-[44px]" 
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-300 mb-1">Senha de Acesso</label>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">Senha de Acesso</label>
             <div className="relative flex items-center">
-              <Lock className="absolute left-3.5 text-slate-500" size={16} />
+              <Lock className="absolute left-3.5 text-slate-400" size={16} />
               <input 
                 type={showPassword ? 'text' : 'password'} 
                 required 
                 value={password} 
                 onChange={(e) => setPassword(e.target.value)} 
                 placeholder="Digite sua senha" 
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-11 py-3 text-base sm:text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none transition-all min-h-[44px]" 
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-11 py-3 text-base sm:text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all min-h-[44px]" 
               />
               <button 
                 type="button" 
                 onClick={() => setShowPassword(!showPassword)} 
-                className="absolute right-3.5 text-slate-500 hover:text-slate-300 p-2 min-h-[40px] min-w-[40px] flex items-center justify-center" 
+                className="absolute right-3.5 text-slate-400 hover:text-slate-600 p-2 min-h-[40px] min-w-[40px] flex items-center justify-center" 
                 title={showPassword ? "Ocultar senha" : "Ver senha"}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -260,7 +260,7 @@ export default function HomePage() {
           <button 
             type="submit" 
             disabled={loading} 
-            className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-slate-950 font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-950/60 active:scale-[0.98] mt-1 min-h-[48px]"
+            className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-900/20 active:scale-[0.98] mt-1 min-h-[48px]"
           >
             {loading ? (
               <>
@@ -278,36 +278,36 @@ export default function HomePage() {
           <button 
             type="button" 
             onClick={() => { setIsRegisterMode(!isRegisterMode); setError(''); }} 
-            className="text-xs text-emerald-400 hover:text-emerald-300 font-bold transition-colors min-h-[36px]"
+            className="text-xs text-blue-600 hover:text-blue-800 font-bold transition-colors min-h-[36px]"
           >
             {isRegisterMode ? 'Já possui conta? Fazer login' : 'Primeiro acesso? Cadastre-se como organizador'}
           </button>
         </div>
 
         {/* Rodapé Oficial com Direitos Autorais e Link AM TST */}
-        <footer className="pt-4 border-t border-slate-800/80 text-center space-y-1.5">
-          <p className="text-[10px] text-slate-400">
+        <footer className="pt-4 border-t border-slate-100 text-center space-y-1.5">
+          <p className="text-[10px] text-slate-500">
             © 2026 <strong>AM TST</strong>. Todos os direitos reservados.
           </p>
-          <p className="text-[10px] text-slate-400 font-medium">
+          <p className="text-[10px] text-slate-500 font-medium">
             <strong>DDS ON</strong> é uma plataforma da <strong>AM TST</strong>.
           </p>
-          <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500 pt-0.5">
-            <Link href="/termos" className="text-slate-400 hover:text-emerald-400 underline underline-offset-2 transition-colors">
+          <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400 pt-0.5">
+            <Link href="/termos" className="text-slate-500 hover:text-blue-600 underline underline-offset-2 transition-colors">
               Termos de Uso
             </Link>
             <span>•</span>
-            <Link href="/privacidade" className="text-slate-400 hover:text-emerald-400 underline underline-offset-2 transition-colors">
+            <Link href="/privacidade" className="text-slate-500 hover:text-blue-600 underline underline-offset-2 transition-colors">
               Privacidade (LGPD)
             </Link>
           </div>
-          <div className="flex items-center justify-center gap-1 text-[10px] text-slate-500">
+          <div className="flex items-center justify-center gap-1 text-[10px] text-slate-400">
             <span>Desenvolvido por</span>
             <a 
               href="https://amtst.vercel.app" 
               target="_blank" 
               rel="noopener noreferrer" 
-              className="text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2"
+              className="text-blue-600 hover:text-blue-800 font-bold inline-flex items-center gap-0.5 transition-colors underline underline-offset-2"
             >
               AM TST <ExternalLink size={9} />
             </a>
