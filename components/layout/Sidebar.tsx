@@ -21,7 +21,13 @@ export default function Sidebar({ isOpen, onClose, onOpenProfile }: SidebarProps
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentTab = searchParams.get('tab');
+  const action = searchParams.get('action');
+  const view = searchParams.get('view');
   const { user, logout } = useAuth();
+
+  const isPainelGeral = pathname === '/admin' && !action && !view && !currentTab;
+  const isNovoDds = pathname === '/admin' && action === 'new';
+  const isHistorico = pathname === '/admin' && view === 'history';
 
   const navGroups = [
     {
@@ -31,19 +37,19 @@ export default function Sidebar({ isOpen, onClose, onOpenProfile }: SidebarProps
           label: 'Painel Geral',
           href: '/admin',
           icon: LayoutDashboard,
-          active: pathname === '/admin' && !currentTab
+          active: isPainelGeral
         },
         {
           label: 'Novo DDS',
           href: '/admin?action=new',
           icon: PlusCircle,
-          active: pathname === '/admin' && searchParams.get('action') === 'new'
+          active: isNovoDds
         },
         {
           label: 'Histórico & Atas',
           href: '/admin?view=history',
           icon: FileText,
-          active: pathname === '/admin' && searchParams.get('view') === 'history'
+          active: isHistorico
         }
       ]
     },
@@ -100,22 +106,11 @@ export default function Sidebar({ isOpen, onClose, onOpenProfile }: SidebarProps
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Top Branding */}
-        <div className="h-16 px-5 border-b border-white/10 flex items-center justify-between">
-          <Link href="/admin" onClick={onClose} className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400">
-              <Shield size={18} />
-            </div>
-            <div>
-              <span className="text-base font-black tracking-tight text-white flex items-center gap-1.5">
-                DDS ON
-                <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-400/30">
-                  SaaS
-                </span>
-              </span>
-              <p className="text-[10px] text-slate-400 font-medium">Gestão Inteligente de SST</p>
-            </div>
-          </Link>
+        {/* Top Branding Oficial DDS ON */}
+        <div className="h-16 px-4 border-b border-white/10 flex items-center justify-between">
+          <div onClick={onClose}>
+            <DdsLogo size="sm" showSubtitle={false} clickable href="/admin" />
+          </div>
 
           <button
             onClick={onClose}

@@ -356,18 +356,18 @@ export default function GroupPhotoCapture({ initialPhotos, initialPhoto, onPhoto
         </div>
       ) : !isCameraOpen && (
         /* ESTADO VAZIO */
-        <div className="border-2 border-dashed border-slate-800 hover:border-slate-700 rounded-3xl p-5 text-center bg-slate-950/40 space-y-3 transition-colors">
-          <div className="p-3 bg-blue-500/10 text-blue-400 rounded-2xl inline-flex border border-blue-500/20">
+        <div className="border-2 border-dashed border-slate-700/80 hover:border-slate-600 rounded-3xl p-5 text-center bg-slate-900/90 space-y-3 transition-colors shadow-inner">
+          <div className="p-3 bg-blue-500/20 text-blue-400 rounded-2xl inline-flex border border-blue-400/30">
             <Users size={24} />
           </div>
           <div>
             <div className="flex items-center justify-center gap-2">
-              <h4 className="text-xs font-bold text-slate-200">Foto Coletiva da Equipe (Evidência)</h4>
-              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30">
+              <h4 className="text-xs sm:text-sm font-bold text-white">Foto Coletiva da Equipe (Evidência)</h4>
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/40">
                 🔒 Apenas Organizador
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+            <p className="text-xs text-slate-300 mt-1.5 max-w-sm mx-auto font-medium leading-relaxed">
               Fotografia dos colaboradores reunidos para auditoria na Ata PDF (não é exibida na tela pública de assinatura).
             </p>
           </div>
@@ -384,7 +384,7 @@ export default function GroupPhotoCapture({ initialPhotos, initialPhoto, onPhoto
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl transition-all border border-slate-700 flex items-center gap-1.5 min-h-[40px]"
+              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-xs rounded-xl transition-all border border-slate-600 flex items-center gap-1.5 min-h-[40px]"
             >
               <Upload size={14} className="text-blue-400" /> Adicionar Fotos (Múltiplas)
             </button>

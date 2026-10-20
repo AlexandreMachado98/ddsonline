@@ -404,12 +404,12 @@ export default function AttachmentManager({
 
       {/* Lista de Anexos */}
       {attachments.length === 0 ? (
-        <div className="p-5 border border-dashed border-slate-800 rounded-2xl bg-slate-950/40 text-center space-y-1.5">
-          <div className="w-10 h-10 mx-auto rounded-full bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-400">
-            <FileCheck2 size={20} className="text-slate-400" />
+        <div className="p-5 border-2 border-dashed border-slate-700/80 rounded-2xl bg-slate-900/90 text-center space-y-2 shadow-inner">
+          <div className="w-10 h-10 mx-auto rounded-full bg-slate-800 border border-slate-600/80 flex items-center justify-center text-emerald-400">
+            <FileCheck2 size={20} className="text-emerald-400" />
           </div>
-          <p className="text-xs font-bold text-slate-300">Nenhum material de apresentação anexado a este DDS</p>
-          <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+          <p className="text-xs sm:text-sm font-bold text-white">Nenhum material de apresentação anexado a este DDS</p>
+          <p className="text-xs text-slate-300 max-w-sm mx-auto font-medium leading-relaxed">
             {readOnly 
               ? 'Nenhum slide, cartaz ou documento complementar foi registrado para leitura neste DDS.' 
               : 'Clique em "+ Anexar Slide / PDF" ou "Fotografar Cartaz" para adicionar o conteúdo visual e instrucional do DDS.'}

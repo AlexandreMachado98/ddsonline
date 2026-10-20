@@ -620,6 +620,17 @@ function AdminPanelContent() {
 
 
   // =========================================================================
+  // MÉTRICAS E INDICADORES (Hooks no topo do componente para cumprir Rules of Hooks)
+  // =========================================================================
+  const totalMeetings = meetingHistory.length;
+  const totalAttendees = useMemo(() => {
+    return meetingHistory.reduce((acc, m) => acc + (m.attendees?.length || 0), 0) + (activeMeeting?.attendees?.length || 0);
+  }, [meetingHistory, activeMeeting]);
+  const totalAttachments = useMemo(() => {
+    return meetingHistory.reduce((acc, m) => acc + (m.attachments?.length || 0), 0);
+  }, [meetingHistory]);
+
+  // =========================================================================
   // SALA DO DDS EM ANDAMENTO (MODO TRANSMISSÃO)
   // =========================================================================
   if (isLiveMode && activeMeeting) {
@@ -846,75 +857,6 @@ function AdminPanelContent() {
         )}
 
         <div className="max-w-7xl w-full mx-auto space-y-4 sm:space-y-6">
-          {/* Badge de Sincronização e Fila Offline */}
-          <OfflineSyncBadge meetingId={activeMeeting?.id} onSyncComplete={() => fetchAllData()} />
-
-          {/* Header Superior */}
-          <header className="flex items-center justify-between gap-2 bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-2xl sm:rounded-3xl shadow-xl">
-            <div className="flex items-center gap-2 min-w-0">
-              <DdsLogo size="sm" showSubtitle={false} clickable href="/admin" />
-              <span className="text-[10px] sm:text-xs bg-slate-800 text-emerald-400 font-bold px-2 py-0.5 rounded-lg border border-slate-700 shrink-0">
-                {isPresential ? '📍 Presencial' : '💻 EAD'}
-              </span>
-            </div>
-            
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              <label 
-                className="px-2.5 sm:px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-[11px] sm:text-xs font-bold transition-colors border border-slate-700 flex items-center gap-1.5 cursor-pointer shadow-sm" 
-                title="Adicionar Logo da Empresa ao PDF"
-              >
-                <Plus size={13} className="text-emerald-400 shrink-0" />
-                <span className="hidden sm:inline">Logo Empresa</span>
-                <span className="sm:hidden">Logo</span>
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      localStorage.setItem('dds_company_logo', reader.result as string);
-                      showToast('Logo salva! Ela aparecerá no topo das próximas Atas em PDF.', 'success');
-                    };
-                    reader.readAsDataURL(file);
-                  }
-                }} />
-              </label>
-
-              <button
-                type="button"
-                onClick={() => setIsProfileOpen(true)}
-                className="p-1 rounded-xl hover:bg-slate-800 transition-colors flex items-center gap-1.5 cursor-pointer"
-                title="Abrir Meu Perfil"
-              >
-                <div className="w-8 h-8 rounded-full bg-slate-800 ring-2 ring-emerald-500/40 p-0.5 shrink-0 flex items-center justify-center overflow-hidden shadow-sm">
-                  {currentUser?.photoURL ? (
-                    <img
-                      src={currentUser.photoURL}
-                      alt={currentUser.name}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full rounded-full bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white text-[11px] font-black select-none">
-                      {currentUser?.name ? (
-                        currentUser.name.split(' ').length > 1
-                          ? (currentUser.name.split(' ')[0][0] + currentUser.name.split(' ')[currentUser.name.split(' ').length - 1][0]).toUpperCase()
-                          : currentUser.name.slice(0, 2).toUpperCase()
-                      ) : 'TST'}
-                    </div>
-                  )}
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setIsLiveMode(false)} 
-                className="px-2.5 sm:px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[11px] sm:text-xs font-bold transition-colors border border-slate-700 flex items-center gap-1 cursor-pointer shrink-0 shadow-sm"
-              >
-                <ArrowLeft size={13} className="shrink-0" />
-                <span className="hidden sm:inline">Voltar ao Painel</span>
-                <span className="sm:hidden">Painel</span>
-              </button>
-            </div>
-          </header>
-
           {/* Banner de Status do DDS */}
           <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 rounded-3xl p-4 sm:p-6 text-white shadow-xl space-y-4 border border-emerald-500/40 overflow-hidden max-w-full">
             <div className="min-w-0 max-w-full overflow-hidden space-y-1.5">
@@ -1107,6 +1049,8 @@ function AdminPanelContent() {
                   <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
                     {activeMeeting.attendees.map((attendee: any, idx: number) => {
                       const hasLeft = Boolean(attendee.leftAt || attendee.exitReason);
+                      const attName = attendee.name || 'Colaborador';
+                      const initials = attName.trim().length > 0 ? attName.trim().slice(0, 2).toUpperCase() : 'CO';
 
                       return (
                         <div key={idx} className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
@@ -1116,15 +1060,15 @@ function AdminPanelContent() {
                         }`}>
                           <div className="flex items-center gap-2 min-w-0">
                             {attendee.selfie ? (
-                              <img src={attendee.selfie} alt={attendee.name} className="w-8 h-8 rounded-full object-cover border border-slate-700 shrink-0" />
+                              <img src={attendee.selfie} alt={attName} className="w-8 h-8 rounded-full object-cover border border-slate-700 shrink-0" />
                             ) : (
                               <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 font-black text-xs flex items-center justify-center shrink-0">
-                                {attendee.name.slice(0, 2).toUpperCase()}
+                                {initials}
                               </div>
                             )}
                             <div className="min-w-0">
-                              <p className="text-xs font-bold text-white truncate">{attendee.name}</p>
-                              <p className="text-[10px] text-slate-400 font-mono truncate">{attendee.cpf}</p>
+                              <p className="text-xs font-bold text-white truncate">{attName}</p>
+                              <p className="text-[10px] text-slate-300 font-mono truncate">{attendee.cpf || 'Sem CPF / Função'}</p>
                             </div>
                           </div>
 
@@ -1172,19 +1116,6 @@ function AdminPanelContent() {
             onDownloadPdf={() => handleDownloadActivePdf()}
           />
         )}
-
-        {/* Modal de Meu Perfil (na Sala Ativa) */}
-        {currentUser && (
-          <UserProfileModal
-            user={currentUser}
-            isOpen={isProfileOpen}
-            onClose={() => setIsProfileOpen(false)}
-            onProfileUpdated={(updated) => {
-              updateUserLocal(updated);
-              showToast('Perfil atualizado com sucesso!', 'success');
-            }}
-          />
-        )}
       </AppShell>
     );
   }
@@ -1192,14 +1123,6 @@ function AdminPanelContent() {
   // =========================================================================
   // DASHBOARD PRINCIPAL (NOVO DDS / HISTÓRICO)
   // =========================================================================
-  const totalMeetings = meetingHistory.length;
-  const totalAttendees = useMemo(() => {
-    return meetingHistory.reduce((acc, m) => acc + (m.attendees?.length || 0), 0) + (activeMeeting?.attendees?.length || 0);
-  }, [meetingHistory, activeMeeting]);
-  const totalAttachments = useMemo(() => {
-    return meetingHistory.reduce((acc, m) => acc + (m.attachments?.length || 0), 0);
-  }, [meetingHistory]);
-
   return (
     <AppShell
       breadcrumbs={[{ label: 'Painel Geral' }]}
