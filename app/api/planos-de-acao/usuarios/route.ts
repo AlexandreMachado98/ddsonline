@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth';
+import { resolveUserCompanyId } from '@/lib/actionPlanServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +20,8 @@ export async function GET(req: Request) {
     };
 
     if (authUser.role !== 'SUPER_ADMIN') {
-      where.companyId = authUser.companyId || 'unassigned';
+      const effectiveCompanyId = await resolveUserCompanyId(authUser);
+      where.companyId = effectiveCompanyId;
     }
 
     const users = await prisma.user.findMany({

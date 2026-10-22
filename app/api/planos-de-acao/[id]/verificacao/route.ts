@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth';
+import { resolveUserCompanyId } from '@/lib/actionPlanServer';
 import { VerificationResult } from '@/lib/actionPlanUtils';
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +36,8 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Plano não encontrado' }, { status: 404 });
     }
 
-    if (authUser.role !== 'SUPER_ADMIN' && plan.companyId !== authUser.companyId) {
+    const effectiveCompanyId = await resolveUserCompanyId(authUser);
+    if (authUser.role !== 'SUPER_ADMIN' && plan.companyId !== effectiveCompanyId) {
       return NextResponse.json({ success: false, error: 'Acesso negado' }, { status: 403 });
     }
 

@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth';
+import { resolveUserCompanyId } from '@/lib/actionPlanServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,7 +76,8 @@ export async function GET(
     }
 
     // Validação Multi-tenant
-    if (authUser.role !== 'SUPER_ADMIN' && plan.companyId !== authUser.companyId) {
+    const effectiveCompanyId = await resolveUserCompanyId(authUser);
+    if (authUser.role !== 'SUPER_ADMIN' && plan.companyId !== effectiveCompanyId) {
       return NextResponse.json({ success: false, error: 'Acesso negado a este plano de ação' }, { status: 403 });
     }
 

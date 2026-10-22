@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser, logSecurityEvent } from '@/lib/auth';
+import { resolveUserCompanyId } from '@/lib/actionPlanServer';
 import { 
   canTransitionStatus, 
   calculateDeadlineState, 
@@ -70,9 +71,10 @@ export async function GET(req: Request) {
     const sortOrder = searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
 
     // Cláusula Multi-tenant obrigatória
+    const effectiveCompanyId = await resolveUserCompanyId(authUser);
     const companyFilter = authUser.role === 'SUPER_ADMIN' 
       ? {} 
-      : { companyId: authUser.companyId || 'unassigned' };
+      : { companyId: effectiveCompanyId };
 
     // Filtros dinâmicos
     const where: any = {
@@ -309,16 +311,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
     }
 
-    // Se o usuário não tiver companyId atribuído, bloqueia criação
-    const companyId = authUser.companyId;
-    if (!companyId) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Usuário não vinculado a uma empresa ativa. Não é possível cadastrar plano de ação.' 
-      }, { status: 400 });
-    }
-
     const body = await req.json();
+
+    // Obtém ou resolve automaticamente o companyId da empresa do usuário
+    let companyId = await resolveUserCompanyId(authUser);
+    if (authUser.role === 'SUPER_ADMIN' && body.companyId) {
+      companyId = body.companyId;
+    }
     const {
       title,
       description,
@@ -490,7 +489,8 @@ export async function PUT(req: Request) {
       return NextResponse.json({ success: false, error: 'Plano de ação não encontrado.' }, { status: 404 });
     }
 
-    if (authUser.role !== 'SUPER_ADMIN' && currentPlan.companyId !== authUser.companyId) {
+    const effectiveCompanyId = await resolveUserCompanyId(authUser);
+    if (authUser.role !== 'SUPER_ADMIN' && currentPlan.companyId !== effectiveCompanyId) {
       return NextResponse.json({ success: false, error: 'Acesso negado a este plano de ação.' }, { status: 403 });
     }
 
@@ -670,7 +670,8 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ success: false, error: 'Plano não encontrado.' }, { status: 404 });
     }
 
-    if (authUser.role !== 'SUPER_ADMIN' && plan.companyId !== authUser.companyId) {
+    const effectiveCompanyId = await resolveUserCompanyId(authUser);
+    if (authUser.role !== 'SUPER_ADMIN' && plan.companyId !== effectiveCompanyId) {
       return NextResponse.json({ success: false, error: 'Permissão negada.' }, { status: 403 });
     }
 
