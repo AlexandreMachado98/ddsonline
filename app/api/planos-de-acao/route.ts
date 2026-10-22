@@ -330,6 +330,8 @@ export async function POST(req: Request) {
       category,
       criticality,
       priority,
+      status,
+      completedAt,
       problemDescription,
       identifiedRisk,
       potentialConsequences,
@@ -348,11 +350,28 @@ export async function POST(req: Request) {
       startDate,
       dueDate,
       alertDaysBefore,
-      tasks
+      tasks,
+      attachments
     } = body;
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return NextResponse.json({ success: false, error: 'O título do plano de ação é obrigatório.' }, { status: 400 });
+    }
+
+    // Suporte a cadastro de planos já concluídos no passado (histórico/retroativo)
+    const finalStatus: ActionPlanStatus = (['OPEN', 'IN_PROGRESS', 'AWAITING_VALIDATION', 'COMPLETED', 'SUSPENDED', 'CANCELLED'].includes(status))
+      ? (status as ActionPlanStatus)
+      : 'OPEN';
+
+    let finalCompletedAt: Date | null = null;
+    if (finalStatus === 'COMPLETED') {
+      if (completedAt) {
+        finalCompletedAt = new Date(completedAt);
+      } else if (dueDate) {
+        finalCompletedAt = new Date(dueDate);
+      } else {
+        finalCompletedAt = new Date();
+      }
     }
 
     // Gera código sequencial automático oficial
@@ -374,7 +393,8 @@ export async function POST(req: Request) {
         category: category?.trim() || 'SST',
         criticality: (criticality as ActionPlanCriticality) || 'MEDIUM',
         priority: (priority as ActionPlanPriority) || 'MEDIUM',
-        status: 'OPEN',
+        status: finalStatus,
+        completedAt: finalCompletedAt,
 
         // Problema / Investigação
         problemDescription: problemDescription?.trim() || null,
@@ -412,14 +432,30 @@ export async function POST(req: Request) {
             dueDate: t.dueDate ? new Date(t.dueDate) : null,
             weight: t.weight ? parseInt(t.weight, 10) : 1,
             position: idx,
-            status: 'OPEN',
+            status: finalStatus === 'COMPLETED' ? 'COMPLETED' : 'OPEN',
+            completedAt: finalStatus === 'COMPLETED' ? finalCompletedAt : null,
             notes: t.notes || null
+          }))
+        } : undefined,
+
+        // Evidências anexadas diretamente no cadastro inicial (Fotos Antes/Durante/Depois)
+        attachments: Array.isArray(attachments) && attachments.length > 0 ? {
+          create: attachments.filter((att: any) => att && att.fileData).map((att: any) => ({
+            fileName: String(att.fileName || 'evidencia.jpg').slice(0, 150),
+            displayName: String(att.displayName || att.fileName || 'Evidência').slice(0, 150),
+            mimeType: String(att.mimeType || 'image/jpeg').slice(0, 100),
+            fileSize: Number(att.fileSize) || 0,
+            fileData: att.fileData,
+            evidenceType: ['BEFORE', 'DURING', 'AFTER', 'COMPLEMENTARY'].includes(att.evidenceType) ? att.evidenceType : 'COMPLEMENTARY',
+            caption: att.caption ? String(att.caption).slice(0, 500) : null,
+            authorId: authUser.id
           }))
         } : undefined
       },
       include: {
         responsible: { select: { id: true, name: true, email: true } },
-        tasks: true
+        tasks: true,
+        attachments: true
       }
     });
 
@@ -516,9 +552,11 @@ export async function PUT(req: Request) {
         }
       }
 
-      // REGRA: Conclusão exige data e medida executada
+      // REGRA: Conclusão permite data efetiva retroativa (ex: planos executados anteriormente)
       if (newStatus === 'COMPLETED') {
-        dataToUpdate.completedAt = new Date();
+        dataToUpdate.completedAt = updateFields.completedAt 
+          ? new Date(updateFields.completedAt) 
+          : (currentPlan.dueDate ? new Date(currentPlan.dueDate) : new Date());
       }
 
       dataToUpdate.status = newStatus;
@@ -617,6 +655,32 @@ export async function PUT(req: Request) {
           newValue: newDue ? newDue.toISOString().slice(0, 10) : 'Sem prazo',
           details: `Prazo de conclusão atualizado por ${authUser.name}.`
         });
+      }
+    }
+
+    // Atualização explícita de data de conclusão (permite retificar histórico de planos anteriores)
+    if (updateFields.completedAt !== undefined) {
+      dataToUpdate.completedAt = updateFields.completedAt ? new Date(updateFields.completedAt) : null;
+    }
+
+    // Se foram enviadas novas evidências no update
+    if (Array.isArray(body.attachments) && body.attachments.length > 0) {
+      for (const att of body.attachments) {
+        if (att && att.fileData && !att.id) {
+          await prisma.actionPlanAttachment.create({
+            data: {
+              actionPlanId: id,
+              fileName: String(att.fileName || 'evidencia.jpg').slice(0, 150),
+              displayName: String(att.displayName || att.fileName || 'Evidência').slice(0, 150),
+              mimeType: String(att.mimeType || 'image/jpeg').slice(0, 100),
+              fileSize: Number(att.fileSize) || 0,
+              fileData: att.fileData,
+              evidenceType: ['BEFORE', 'DURING', 'AFTER', 'COMPLEMENTARY'].includes(att.evidenceType) ? att.evidenceType : 'COMPLEMENTARY',
+              caption: att.caption ? String(att.caption).slice(0, 500) : null,
+              authorId: authUser.id
+            }
+          });
+        }
       }
     }
 

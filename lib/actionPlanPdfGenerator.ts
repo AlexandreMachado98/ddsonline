@@ -306,7 +306,15 @@ export async function generateActionPlanIndividualPdf(plan: ActionPlanFullData):
       new Date(plan.identificationDate).toLocaleDateString('pt-BR'),
       { content: 'Prazo Final de Conclusão:', styles: { fontStyle: 'bold' } },
       plan.dueDate ? new Date(plan.dueDate).toLocaleDateString('pt-BR') : 'A definir'
-    ]
+    ],
+    ...(plan.completedAt ? [
+      [
+        { content: 'Data Efetiva de Conclusão:', styles: { fontStyle: 'bold' } },
+        new Date(plan.completedAt).toLocaleDateString('pt-BR'),
+        { content: 'Conformidade de Prazo:', styles: { fontStyle: 'bold' } },
+        deadline.label
+      ]
+    ] : [])
   ];
 
   autoTable(doc, {
@@ -476,9 +484,16 @@ export async function generateActionPlanIndividualPdf(plan: ActionPlanFullData):
   currentY = (doc as any).lastAutoTable.finalY + 8;
 
   // --- SEÇÃO 5: REGISTRO DE EVIDÊNCIAS FOTOGRÁFICAS (ANTES, DURANTE, DEPOIS) ---
-  const validPhotos = (plan.attachments || []).filter(a => 
-    a.fileData && (a.mimeType.startsWith('image/') || a.fileData.startsWith('data:image/'))
+  const allAttachments = plan.attachments || [];
+  const validPhotos = allAttachments.filter(a => 
+    a && a.fileData && (
+      (a.mimeType && (a.mimeType.startsWith('image/') || a.mimeType.includes('jpeg') || a.mimeType.includes('png') || a.mimeType.includes('webp'))) ||
+      a.fileData.startsWith('data:image/') ||
+      ['BEFORE', 'DURING', 'AFTER', 'COMPLEMENTARY'].includes(a.evidenceType || '')
+    )
   );
+
+  const nonPhotoAttachments = allAttachments.filter(a => !validPhotos.includes(a));
 
   if (validPhotos.length > 0) {
     if (currentY > pageHeight - 85) {
@@ -497,7 +512,6 @@ export async function generateActionPlanIndividualPdf(plan: ActionPlanFullData):
     // Agrupa fotos: Antes, Durante, Depois, Complementar
     const beforePhotos = validPhotos.filter(p => p.evidenceType === 'BEFORE');
     const afterPhotos = validPhotos.filter(p => p.evidenceType === 'AFTER');
-    const otherPhotos = validPhotos.filter(p => p.evidenceType !== 'BEFORE' && p.evidenceType !== 'AFTER');
 
     // Se houver fotos Antes e Depois, renderiza comparativo lado a lado
     if (beforePhotos.length > 0 && afterPhotos.length > 0) {
@@ -515,7 +529,7 @@ export async function generateActionPlanIndividualPdf(plan: ActionPlanFullData):
       doc.setFontSize(7.5);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(225, 29, 72);
-      doc.text('EVIDÊNCIA: ANTES DA INTERVENÇÃO', 16, currentY + 4.5);
+      doc.text('EVIDÊNCIA: ANTES DA INTERVENÇÃO (DESVIO IDENTIFICADO)', 16, currentY + 4.5);
 
       try {
         const normBefore = normalizeImageDataUrl(pBefore.fileData);
@@ -581,9 +595,13 @@ export async function generateActionPlanIndividualPdf(plan: ActionPlanFullData):
           doc.addImage(norm1, 'JPEG', 16, currentY + 2, gridW - 4, gridH - 10);
         } catch (e) {}
 
+        const p1TypeLabel = p1.evidenceType === 'BEFORE' ? 'ANTES' :
+                            p1.evidenceType === 'AFTER' ? 'DEPOIS' :
+                            p1.evidenceType === 'DURING' ? 'DURANTE' : 'COMPLEMENTAR';
+
         doc.setFontSize(6.5);
         doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-        doc.text(cleanTextForPdf(`${p1.evidenceType || 'REGISTRO'}: ${p1.caption || p1.fileName}`), 16, currentY + gridH - 2);
+        doc.text(cleanTextForPdf(`[${p1TypeLabel}] ${p1.caption || p1.displayName || p1.fileName}`), 16, currentY + gridH - 2);
 
         // Foto 2
         if (p2) {
@@ -598,13 +616,52 @@ export async function generateActionPlanIndividualPdf(plan: ActionPlanFullData):
             doc.addImage(norm2, 'JPEG', x2 + 2, currentY + 2, gridW - 4, gridH - 10);
           } catch (e) {}
 
+          const p2TypeLabel = p2.evidenceType === 'BEFORE' ? 'ANTES' :
+                              p2.evidenceType === 'AFTER' ? 'DEPOIS' :
+                              p2.evidenceType === 'DURING' ? 'DURANTE' : 'COMPLEMENTAR';
+
           doc.setFontSize(6.5);
-          doc.text(cleanTextForPdf(`${p2.evidenceType || 'REGISTRO'}: ${p2.caption || p2.fileName}`), x2 + 2, currentY + gridH - 2);
+          doc.text(cleanTextForPdf(`[${p2TypeLabel}] ${p2.caption || p2.displayName || p2.fileName}`), x2 + 2, currentY + gridH - 2);
         }
 
         currentY += gridH + 4;
       }
     }
+  }
+
+  // Se houver laudos / documentos anexos que não são imagens
+  if (nonPhotoAttachments.length > 0) {
+    if (currentY > pageHeight - 50) {
+      doc.addPage();
+      renderHeader();
+      currentY = 32;
+    }
+
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(navyDark[0], navyDark[1], navyDark[2]);
+    doc.text('DOCUMENTOS, LAUDOS E ARQUIVOS COMPLEMENTARES ANEXADOS:', 14, currentY + 4);
+    currentY += 6;
+
+    const docRows = nonPhotoAttachments.map((att, idx) => [
+      String(idx + 1),
+      cleanTextForPdf(att.displayName || att.fileName),
+      att.mimeType || 'Documento',
+      att.fileSize ? `${Math.round(att.fileSize / 1024)} KB` : 'Anexo',
+      cleanTextForPdf(att.caption || 'Documento comprobatório')
+    ]);
+
+    autoTable(doc, {
+      startY: currentY,
+      margin: { left: 14, right: 14 },
+      head: [['#', 'Arquivo', 'Tipo MIME', 'Tamanho', 'Descrição']],
+      body: docRows,
+      theme: 'grid',
+      styles: { fontSize: 7, cellPadding: 1.5, textColor: textDark },
+      headStyles: { fillColor: [241, 245, 249], textColor: textMuted, fontStyle: 'bold' }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 8;
   }
 
   // --- SEÇÃO 6: VERIFICAÇÃO DE EFICÁCIA (VALIDAÇÃO SST) ---

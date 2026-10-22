@@ -1,17 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Check, AlertTriangle, Calendar, User, Building, 
   MapPin, Shield, Target, Plus, Trash2, Loader2, Sparkles,
-  HelpCircle, Link as LinkIcon
+  HelpCircle, Link as LinkIcon, Camera, Image as ImageIcon,
+  CheckCircle2, History, FileText, Upload, Eye
 } from 'lucide-react';
 import { 
+  ActionPlanStatus,
   ActionPlanPriority, 
   ActionPlanCriticality, 
   ORIGIN_LABELS, 
   PRIORITY_LABELS, 
-  CRITICALITY_LABELS 
+  CRITICALITY_LABELS,
+  STATUS_LABELS
 } from '@/lib/actionPlanUtils';
 
 interface UserOption {
@@ -19,6 +22,17 @@ interface UserOption {
   name: string;
   email: string;
   position?: string | null;
+}
+
+export interface DraftAttachment {
+  id?: string;
+  fileName: string;
+  displayName: string;
+  mimeType: string;
+  fileSize: number;
+  fileData: string;
+  evidenceType: 'BEFORE' | 'DURING' | 'AFTER' | 'COMPLEMENTARY';
+  caption: string;
 }
 
 interface ActionPlanModalProps {
@@ -34,7 +48,7 @@ export default function ActionPlanModal({
   onSuccess,
   planToEdit
 }: ActionPlanModalProps) {
-  const [activeTab, setActiveTab] = useState<'IDENT' | 'PROBLEM' | 'ACTION' | 'TASKS'>('IDENT');
+  const [activeTab, setActiveTab] = useState<'IDENT' | 'PROBLEM' | 'ACTION' | 'TASKS' | 'EVIDENCES'>('IDENT');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [meetings, setMeetings] = useState<any[]>([]);
@@ -51,7 +65,16 @@ export default function ActionPlanModal({
   const [category, setCategory] = useState('SST');
   const [criticality, setCriticality] = useState<ActionPlanCriticality>('MEDIUM');
   const [priority, setPriority] = useState<ActionPlanPriority>('MEDIUM');
+  const [status, setStatus] = useState<ActionPlanStatus>('OPEN');
+  const [completedAt, setCompletedAt] = useState('');
   const [alertDaysBefore, setAlertDaysBefore] = useState(7);
+
+  // Evidências Anexadas (Fotos Antes, Durante, Depois)
+  const [attachments, setAttachments] = useState<DraftAttachment[]>([]);
+  const [evidenceType, setEvidenceType] = useState<'BEFORE' | 'DURING' | 'AFTER' | 'COMPLEMENTARY'>('BEFORE');
+  const [evidenceCaption, setEvidenceCaption] = useState('');
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Problema
   const [problemDescription, setProblemDescription] = useState('');
@@ -133,6 +156,21 @@ export default function ActionPlanModal({
       setVerifierId(planToEdit.verifierId || '');
       setStartDate(planToEdit.startDate ? new Date(planToEdit.startDate).toISOString().slice(0, 10) : '');
       setDueDate(planToEdit.dueDate ? new Date(planToEdit.dueDate).toISOString().slice(0, 10) : '');
+      setStatus(planToEdit.status || 'OPEN');
+      setCompletedAt(planToEdit.completedAt ? new Date(planToEdit.completedAt).toISOString().slice(0, 10) : '');
+
+      if (Array.isArray(planToEdit.attachments) && planToEdit.attachments.length > 0) {
+        setAttachments(planToEdit.attachments.map((a: any) => ({
+          id: a.id,
+          fileName: a.fileName,
+          displayName: a.displayName || a.fileName,
+          mimeType: a.mimeType || 'image/jpeg',
+          fileSize: a.fileSize || 0,
+          fileData: a.fileData,
+          evidenceType: a.evidenceType || 'COMPLEMENTARY',
+          caption: a.caption || ''
+        })));
+      }
 
       if (Array.isArray(planToEdit.tasks) && planToEdit.tasks.length > 0) {
         setTasks(planToEdit.tasks.map((t: any) => ({
@@ -158,6 +196,10 @@ export default function ActionPlanModal({
     setCategory('SST');
     setCriticality('MEDIUM');
     setPriority('MEDIUM');
+    setStatus('OPEN');
+    setCompletedAt('');
+    setAttachments([]);
+    setEvidenceCaption('');
     setAlertDaysBefore(7);
     setProblemDescription('');
     setIdentifiedRisk('');
@@ -197,6 +239,51 @@ export default function ActionPlanModal({
     });
   };
 
+  // Gerenciamento de Anexos e Evidências
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsProcessingFile(true);
+    const file = files[0];
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('O arquivo selecionado excede o limite de 10 MB.');
+      setIsProcessingFile(false);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const newAtt: DraftAttachment = {
+        fileName: file.name,
+        displayName: evidenceCaption.trim() || file.name,
+        mimeType: file.type || 'image/jpeg',
+        fileSize: file.size,
+        fileData: result,
+        evidenceType: evidenceType,
+        caption: evidenceCaption.trim()
+      };
+
+      setAttachments(prev => [...prev, newAtt]);
+      setEvidenceCaption('');
+      setIsProcessingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    reader.onerror = () => {
+      alert('Falha ao processar arquivo.');
+      setIsProcessingFile(false);
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -227,6 +314,8 @@ export default function ActionPlanModal({
         category,
         criticality,
         priority,
+        status,
+        completedAt: status === 'COMPLETED' ? (completedAt || dueDate || new Date().toISOString().slice(0, 10)) : null,
         alertDaysBefore: Number(alertDaysBefore),
         problemDescription: problemDescription.trim() || null,
         identifiedRisk: identifiedRisk.trim() || null,
@@ -245,7 +334,16 @@ export default function ActionPlanModal({
         verifierId: verifierId || null,
         startDate: startDate || null,
         dueDate: dueDate || null,
-        tasks: tasks.filter(t => t.description.trim().length > 0)
+        tasks: tasks.filter(t => t.description.trim().length > 0),
+        attachments: attachments.map(a => ({
+          fileName: a.fileName,
+          displayName: a.displayName,
+          mimeType: a.mimeType,
+          fileSize: a.fileSize,
+          fileData: a.fileData,
+          evidenceType: a.evidenceType,
+          caption: a.caption
+        }))
       };
 
       const url = '/api/planos-de-acao';
@@ -354,6 +452,19 @@ export default function ActionPlanModal({
           >
             <Check size={15} />
             <span>4. Subações / Etapas ({tasks.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('EVIDENCES')}
+            className={`px-4 py-3 border-b-2 flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'EVIDENCES'
+                ? 'border-blue-600 text-blue-600 bg-white'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Camera size={15} />
+            <span>5. Evidências & Fotos ({attachments.length})</span>
           </button>
         </div>
 
@@ -504,6 +615,92 @@ export default function ActionPlanModal({
                       <option key={k} value={k}>{v}</option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Situação do Plano & Registro Retroativo */}
+              <div className="pt-3 border-t border-slate-200">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <History size={15} className="text-blue-600" />
+                      <span>Status do Registro & Histórico de Execução</span>
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      Permite cadastrar ações novas ou registrar planos já executados anteriormente
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Situação / Estado Inicial da Ação
+                      </label>
+                      <select
+                        value={status}
+                        onChange={e => {
+                          const newSt = e.target.value as ActionPlanStatus;
+                          setStatus(newSt);
+                          if (newSt === 'COMPLETED' && !completedAt) {
+                            setCompletedAt(dueDate || identificationDate || new Date().toISOString().slice(0, 10));
+                          }
+                        }}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      >
+                        <option value="OPEN">Em Aberto (Ação Nova em Planejamento)</option>
+                        <option value="IN_PROGRESS">Em Andamento (Em Execução)</option>
+                        <option value="AWAITING_VALIDATION">Aguardando Validação de Eficácia</option>
+                        <option value="COMPLETED">✓ Concluído Anteriormente (Histórico Retroativo)</option>
+                      </select>
+                    </div>
+
+                    {status === 'COMPLETED' ? (
+                      <div className="animate-in fade-in duration-200">
+                        <label className="block text-[11px] font-bold text-emerald-800 mb-1 flex items-center justify-between">
+                          <span>Data Efetiva da Conclusão</span>
+                          <span className="text-[10px] text-emerald-600 font-bold">Histórico Oficial</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={completedAt}
+                          onChange={e => setCompletedAt(e.target.value)}
+                          className="w-full px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50/50 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center text-slate-400 text-xs pt-5">
+                        <span>O prazo limite será definido na aba "3. Ação Proposta & Prazos".</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {status === 'COMPLETED' && (
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 animate-in fade-in">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                        <div>
+                          <p className="font-bold text-xs text-emerald-950">Registro Retroativo Ativo</p>
+                          <p className="text-[11px] text-emerald-800">
+                            {completedAt && dueDate && completedAt.slice(0, 10) <= dueDate.slice(0, 10)
+                              ? 'A data de conclusão é igual ou anterior ao prazo: constará como "Concluído no Prazo" no sistema e nos relatórios em PDF.'
+                              : completedAt && dueDate
+                              ? 'Atenção: A data de conclusão informada é posterior ao prazo limite estipulado.'
+                              : 'Defina o prazo final na aba 3 para calcular a conformidade temporal.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {completedAt && dueDate && (
+                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full shrink-0 ${
+                          completedAt.slice(0, 10) <= dueDate.slice(0, 10)
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-amber-500 text-white'
+                        }`}>
+                          {completedAt.slice(0, 10) <= dueDate.slice(0, 10) ? 'No Prazo' : 'Com Atraso'}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -896,6 +1093,197 @@ export default function ActionPlanModal({
             </div>
           )}
 
+          {/* ========================================================================= */}
+          {/* ABA 5: EVIDÊNCIAS & COMPROVAÇÕES (FOTOS ANTES / DURANTE / DEPOIS) */}
+          {/* ========================================================================= */}
+          {activeTab === 'EVIDENCES' && (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Camera size={15} className="text-blue-600" />
+                    <span>Registro de Evidências Fotográficas & Comprovações</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Anexe fotos do Antes (desvio), Durante (execução) e Depois (solução implementada) para constarem no relatório oficial em PDF.
+                  </p>
+                </div>
+              </div>
+
+              {/* Box de Upload de Evidência */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <span className="text-xs font-bold text-slate-700 block">
+                  Adicionar Nova Evidência
+                </span>
+
+                {/* Seletor do Tipo de Evidência */}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEvidenceType('BEFORE')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                      evidenceType === 'BEFORE'
+                        ? 'bg-rose-50 border-rose-300 text-rose-700 shadow-sm'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    🔴 Antes (Risco / Desvio)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEvidenceType('DURING')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                      evidenceType === 'DURING'
+                        ? 'bg-amber-50 border-amber-300 text-amber-700 shadow-sm'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    🟡 Durante (Execução)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEvidenceType('AFTER')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                      evidenceType === 'AFTER'
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    🟢 Depois (Solução / Concluído)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEvidenceType('COMPLEMENTARY')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                      evidenceType === 'COMPLEMENTARY'
+                        ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    🔵 Complementar (Laudo / Doc)
+                  </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <input
+                    type="text"
+                    placeholder="Legenda da foto / evidência (ex: Proteção física instalada e aterrada)..."
+                    value={evidenceCaption}
+                    onChange={e => setEvidenceCaption(e.target.value)}
+                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isProcessingFile}
+                    className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer shrink-0 disabled:opacity-50"
+                  >
+                    {isProcessingFile ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" />
+                        <span>Carregando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={15} />
+                        <span>Selecionar Foto ou Arquivo</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Galeria de Evidências Anexadas */}
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-slate-700 block">
+                  Evidências Vinculadas a este Plano ({attachments.length})
+                </span>
+
+                {attachments.length === 0 ? (
+                  <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                    <ImageIcon size={32} className="mx-auto text-slate-300 mb-2" />
+                    <p className="text-xs font-bold text-slate-600">Nenhuma evidência anexada até o momento</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Você pode anexar fotos comprovando a execução antes de salvar ou incluir posteriormente no painel de acompanhamento.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {attachments.map((att, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between gap-1.5">
+                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                            att.evidenceType === 'BEFORE'
+                              ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                              : att.evidenceType === 'AFTER'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : att.evidenceType === 'DURING'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : 'bg-blue-100 text-blue-800 border border-blue-200'
+                          }`}>
+                            {att.evidenceType === 'BEFORE' ? 'Antes' :
+                             att.evidenceType === 'AFTER' ? 'Depois' :
+                             att.evidenceType === 'DURING' ? 'Durante' : 'Complementar'}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAttachment(idx)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                            title="Remover anexo"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+
+                        {att.fileData && (att.mimeType?.startsWith('image/') || att.fileData.startsWith('data:image/')) ? (
+                          <div className="h-28 rounded-xl overflow-hidden bg-slate-100 border border-slate-100 flex items-center justify-center">
+                            <img
+                              src={att.fileData}
+                              alt={att.displayName}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-28 rounded-xl bg-slate-100 border border-slate-200 flex flex-col items-center justify-center text-slate-500 gap-1.5">
+                            <FileText size={28} className="text-blue-600" />
+                            <span className="text-[10px] font-bold truncate max-w-[90%]">
+                              {att.fileName}
+                            </span>
+                          </div>
+                        )}
+
+                        <div>
+                          <p className="text-xs font-bold text-slate-800 line-clamp-2">
+                            {att.caption || att.displayName || att.fileName}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            {att.fileSize ? `${Math.round(att.fileSize / 1024)} KB` : 'Evidência anexada'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Rodapé de Ações */}
           <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
             <button
@@ -911,7 +1299,8 @@ export default function ActionPlanModal({
                 <button
                   type="button"
                   onClick={() => {
-                    if (activeTab === 'TASKS') setActiveTab('ACTION');
+                    if (activeTab === 'EVIDENCES') setActiveTab('TASKS');
+                    else if (activeTab === 'TASKS') setActiveTab('ACTION');
                     else if (activeTab === 'ACTION') setActiveTab('PROBLEM');
                     else if (activeTab === 'PROBLEM') setActiveTab('IDENT');
                   }}
@@ -921,37 +1310,38 @@ export default function ActionPlanModal({
                 </button>
               )}
 
-              {activeTab !== 'TASKS' ? (
+              {activeTab !== 'EVIDENCES' ? (
                 <button
                   type="button"
                   onClick={() => {
                     if (activeTab === 'IDENT') setActiveTab('PROBLEM');
                     else if (activeTab === 'PROBLEM') setActiveTab('ACTION');
                     else if (activeTab === 'ACTION') setActiveTab('TASKS');
+                    else if (activeTab === 'TASKS') setActiveTab('EVIDENCES');
                   }}
                   className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all shadow-sm"
                 >
                   Avançar
                 </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-all shadow-sm hover:shadow flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Salvando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check size={16} />
-                      <span>{planToEdit ? 'Salvar Alterações' : 'Concluir & Criar Plano'}</span>
-                    </>
-                  )}
-                </button>
-              )}
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-all shadow-sm hover:shadow flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Salvando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={16} />
+                    <span>{planToEdit ? 'Salvar Alterações' : status === 'COMPLETED' ? 'Registrar Plano Concluído' : 'Criar Plano de Ação'}</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </form>

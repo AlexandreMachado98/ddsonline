@@ -500,6 +500,25 @@ function PlanosDeAcaoContent() {
                           <td className="py-3 px-4 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1">
                               <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/planos-de-acao/${plan.id}`);
+                                    const data = await res.json();
+                                    if (data.success && data.plan) {
+                                      generateActionPlanIndividualPdf(data.plan);
+                                    } else {
+                                      generateActionPlanIndividualPdf(plan);
+                                    }
+                                  } catch {
+                                    generateActionPlanIndividualPdf(plan);
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                title="Baixar Relatório Completo em PDF (com Evidências)"
+                              >
+                                <FileText size={15} />
+                              </button>
+                              <button
                                 onClick={() => handleOpenDetails(plan)}
                                 className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                                 title="Visualizar detalhes"

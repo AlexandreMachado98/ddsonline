@@ -69,47 +69,54 @@ export function calculateDeadlineState(
   colorClass: { bg: string; text: string; border: string; dot?: string };
 } {
   // Se concluído, avalia se concluiu dentro do prazo original/prorrogado
-  if (status === 'COMPLETED' && completedAt && dueDate) {
-    const compDate = new Date(completedAt).getTime();
-    const dDate = new Date(dueDate).getTime();
-    const isLate = compDate > dDate;
-
-    return isLate
-      ? {
-          state: 'COMPLETED_LATE',
-          label: 'Concluído com Atraso',
-          daysRemaining: 0,
-          isOverdue: false,
-          colorClass: {
-            bg: 'bg-amber-50',
-            text: 'text-amber-800',
-            border: 'border-amber-300'
-          }
-        }
-      : {
-          state: 'COMPLETED_ON_TIME',
-          label: 'Concluído no Prazo',
-          daysRemaining: 0,
-          isOverdue: false,
-          colorClass: {
-            bg: 'bg-emerald-50',
-            text: 'text-emerald-800',
-            border: 'border-emerald-300',
-            dot: 'bg-emerald-500'
-          }
-        };
-  }
-
   if (status === 'COMPLETED') {
+    if (completedAt && dueDate) {
+      // Normaliza para comparação por data de calendário (YYYY-MM-DD), evitando desvios de fuso/horário
+      const compStr = typeof completedAt === 'string' 
+        ? completedAt.slice(0, 10) 
+        : new Date(completedAt).toISOString().slice(0, 10);
+      const dueStr = typeof dueDate === 'string' 
+        ? dueDate.slice(0, 10) 
+        : new Date(dueDate).toISOString().slice(0, 10);
+      
+      const isLate = compStr > dueStr;
+
+      return isLate
+        ? {
+            state: 'COMPLETED_LATE',
+            label: 'Concluído com Atraso',
+            daysRemaining: 0,
+            isOverdue: false,
+            colorClass: {
+              bg: 'bg-amber-50',
+              text: 'text-amber-800',
+              border: 'border-amber-300'
+            }
+          }
+        : {
+            state: 'COMPLETED_ON_TIME',
+            label: 'Concluído no Prazo',
+            daysRemaining: 0,
+            isOverdue: false,
+            colorClass: {
+              bg: 'bg-emerald-50',
+              text: 'text-emerald-800',
+              border: 'border-emerald-300',
+              dot: 'bg-emerald-500'
+            }
+          };
+    }
+
     return {
       state: 'COMPLETED_ON_TIME',
-      label: 'Concluído',
+      label: 'Concluído no Prazo',
       daysRemaining: 0,
       isOverdue: false,
       colorClass: {
         bg: 'bg-emerald-50',
         text: 'text-emerald-800',
-        border: 'border-emerald-300'
+        border: 'border-emerald-300',
+        dot: 'bg-emerald-500'
       }
     };
   }
