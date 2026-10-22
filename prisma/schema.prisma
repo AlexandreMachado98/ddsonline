@@ -32,6 +32,7 @@ model Company {
   
   users              User[]
   meetings           Meeting[]
+  actionPlans        ActionPlan[]
 }
 
 model User {
@@ -50,31 +51,46 @@ model User {
   companyRel Company?  @relation(fields: [companyId], references: [id])
   meetings   Meeting[]
   quizzes    Quiz[]
+
+  // Relações do Módulo de Planos de Ação
+  createdActionPlans          ActionPlan[]                  @relation("ActionPlanCreator")
+  responsibleActionPlans      ActionPlan[]                  @relation("ActionPlanResponsible")
+  supervisedActionPlans       ActionPlan[]                  @relation("ActionPlanSupervisor")
+  verifierActionPlans         ActionPlan[]                  @relation("ActionPlanVerifier")
+  taskResponsibilities        ActionPlanTask[]              @relation("TaskResponsible")
+  actionPlanAttachments       ActionPlanAttachment[]        @relation("AttachmentAuthor")
+  actionPlanComments          ActionPlanComment[]           @relation("CommentAuthor")
+  actionPlanHistoryEntries    ActionPlanHistory[]           @relation("HistoryUser")
+  extensionRequests           ActionPlanDeadlineExtension[] @relation("ExtensionRequester")
+  extensionApprovals          ActionPlanDeadlineExtension[] @relation("ExtensionApprover")
+  actionPlanVerifications     ActionPlanVerification[]      @relation("VerificationVerifier")
+  actionPlanNotifications     ActionPlanNotification[]      @relation("NotificationUser")
 }
 
 model Meeting {
-  id              String       @id @default(uuid())
-  topic           String
-  farm            String
-  status          String       @default("LIVE")
-  createdAt       DateTime     @default(now())
-  inviteExpiresAt DateTime?
-  inviteToken     String?
-  organizerId     String?
-  organizer       User?        @relation(fields: [organizerId], references: [id])
-  companyId       String?
-  company         Company?     @relation(fields: [companyId], references: [id])
-  type            String?      @default("REMOTE")
+  id                  String              @id @default(uuid())
+  topic               String
+  farm                String
+  status              String              @default("LIVE")
+  createdAt           DateTime            @default(now())
+  inviteExpiresAt     DateTime?
+  inviteToken         String?
+  organizerId         String?
+  organizer           User?               @relation(fields: [organizerId], references: [id])
+  companyId           String?
+  company             Company?            @relation(fields: [companyId], references: [id])
+  type                String?             @default("REMOTE")
   groupPhoto          String?
   objective           String?
   programmaticContent String?
   endedAt             DateTime?
   instructorName      String?
-  classification      String?      @default("DDS")
+  classification      String?             @default("DDS")
   documentHash        String?
   attendees           Attendance[]
   attachments         MeetingAttachment[]
-  quizzes              Quiz[]
+  quizzes             Quiz[]
+  actionPlans         ActionPlan[]
 
   @@index([organizerId, status, createdAt(sort: Desc)])
   @@index([companyId])
@@ -92,7 +108,7 @@ model Attendance {
   createdAt     DateTime  @default(now())
   meetingId     String
   meeting       Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
-  quizAttempts QuizAttempt[]
+  quizAttempts  QuizAttempt[]
   quizProofHash String?
 
   @@index([meetingId, createdAt])
@@ -114,6 +130,7 @@ model MeetingAttachment {
 
   @@index([meetingId, order])
 }
+
 model Quiz {
   id            String         @id @default(uuid())
   meetingId     String?
@@ -168,21 +185,21 @@ model QuizOption {
 }
 
 model QuizAttempt {
-  id              String       @id @default(uuid())
-  quizId          String
-  quiz            Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  attendanceId    String?
-  attendance      Attendance?  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
-  participantName String?
-  participantDoc  String?
-  score           Float
-  earnedPoints    Int
-  possiblePoints  Int
-  passed          Boolean
-  level           String
-  submittedAt     DateTime     @default(now())
+  id               String       @id @default(uuid())
+  quizId           String
+  quiz             Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  attendanceId     String?
+  attendance       Attendance?  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  participantName  String?
+  participantDoc   String?
+  score            Float
+  earnedPoints     Int
+  possiblePoints   Int
+  passed           Boolean
+  level            String
+  submittedAt      DateTime     @default(now())
   timeSpentSeconds Int?
-  answers         QuizAnswer[]
+  answers          QuizAnswer[]
 
   @@index([quizId, submittedAt])
   @@index([attendanceId])
@@ -200,4 +217,254 @@ model QuizAnswer {
 
   @@unique([attemptId, questionId])
   @@index([attemptId])
+}
+
+// =========================================================================
+// MÓDULO DE PLANOS DE AÇÃO (SST / QUALIDADE / NÃO CONFORMIDADES)
+// =========================================================================
+
+enum ActionPlanStatus {
+  OPEN
+  IN_PROGRESS
+  AWAITING_VALIDATION
+  COMPLETED
+  SUSPENDED
+  CANCELLED
+  REOPENED
+}
+
+enum ActionPlanPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ActionPlanOrigin {
+  DDS
+  INSPECTION
+  AUDIT
+  NON_CONFORMITY
+  INCIDENT
+  ACCIDENT
+  PREVENTIVE_OBSERVATION
+  QUESTIONNAIRE
+  OTHER
+}
+
+enum ActionPlanCriticality {
+  LOW
+  MEDIUM
+  HIGH
+  VERY_HIGH
+}
+
+enum VerificationResult {
+  EFFECTIVE
+  PARTIALLY_EFFECTIVE
+  INEFFECTIVE
+  PENDING
+}
+
+model ActionPlan {
+  id                    String                 @id @default(uuid())
+  code                  String                 @unique
+  title                 String
+  description           String?
+  companyId             String
+  company               Company                @relation(fields: [companyId], references: [id])
+  sector                String?
+  location              String?
+  identificationDate    DateTime               @default(now())
+  origin                ActionPlanOrigin       @default(OTHER)
+  originReferenceId     String?
+  meetingId             String?
+  meeting               Meeting?               @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  category              String?
+  criticality           ActionPlanCriticality  @default(MEDIUM)
+  status                ActionPlanStatus       @default(OPEN)
+  priority              ActionPlanPriority     @default(MEDIUM)
+
+  // Descrição do problema / Investigação
+  problemDescription    String?
+  identifiedRisk        String?
+  potentialConsequences String?
+  identifiedCause       String?
+  rootCause             String?
+  immediateMeasures     String?
+  additionalNotes       String?
+
+  // Ação proposta (5W2H)
+  actionDescription     String?
+  actionObjective       String?
+  expectedResult        String?
+  requiredResources     String?
+  completionCriteria    String?
+
+  // Atribuições e Responsáveis
+  creatorId             String
+  creator               User                   @relation("ActionPlanCreator", fields: [creatorId], references: [id])
+  responsibleId         String?
+  responsible           User?                  @relation("ActionPlanResponsible", fields: [responsibleId], references: [id])
+  supervisorId          String?
+  supervisor            User?                  @relation("ActionPlanSupervisor", fields: [supervisorId], references: [id])
+  verifierId            String?
+  verifier              User?                  @relation("ActionPlanVerifier", fields: [verifierId], references: [id])
+
+  // Prazos e Datas
+  startDate             DateTime?
+  dueDate               DateTime?
+  completedAt           DateTime?
+  originalDueDate       DateTime?
+
+  // Controle inteligente de alertas (dias antes)
+  alertDaysBefore       Int                    @default(7)
+
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  // Relações do plano
+  tasks                 ActionPlanTask[]
+  attachments           ActionPlanAttachment[]
+  comments              ActionPlanComment[]
+  history               ActionPlanHistory[]
+  extensions            ActionPlanDeadlineExtension[]
+  verification          ActionPlanVerification?
+  notifications         ActionPlanNotification[]
+
+  @@index([companyId])
+  @@index([creatorId])
+  @@index([responsibleId])
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+  @@index([createdAt])
+  @@index([companyId, status])
+  @@index([companyId, responsibleId])
+  @@index([companyId, dueDate])
+}
+
+model ActionPlanTask {
+  id            String           @id @default(uuid())
+  actionPlanId  String
+  actionPlan    ActionPlan       @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  description   String
+  responsibleId String?
+  responsible   User?            @relation("TaskResponsible", fields: [responsibleId], references: [id])
+  dueDate       DateTime?
+  status        ActionPlanStatus @default(OPEN)
+  weight        Int              @default(1)
+  notes         String?
+  position      Int              @default(0)
+  completedAt   DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  attachments   ActionPlanAttachment[]
+
+  @@index([actionPlanId, position])
+  @@index([responsibleId])
+}
+
+model ActionPlanAttachment {
+  id           String          @id @default(uuid())
+  actionPlanId String?
+  actionPlan   ActionPlan?     @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  taskId       String?
+  task         ActionPlanTask? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fileName     String
+  displayName  String?
+  mimeType     String
+  fileSize     Int
+  fileData     String
+  caption      String?
+  evidenceType String?         // BEFORE, DURING, AFTER, COMPLEMENTARY
+  authorId     String?
+  author       User?           @relation("AttachmentAuthor", fields: [authorId], references: [id])
+  notes        String?
+  createdAt    DateTime        @default(now())
+
+  @@index([actionPlanId])
+  @@index([taskId])
+}
+
+model ActionPlanComment {
+  id           String     @id @default(uuid())
+  actionPlanId String
+  actionPlan   ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User       @relation("CommentAuthor", fields: [authorId], references: [id])
+  content      String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([actionPlanId, createdAt])
+}
+
+model ActionPlanHistory {
+  id            String     @id @default(uuid())
+  actionPlanId  String
+  actionPlan    ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User       @relation("HistoryUser", fields: [userId], references: [id])
+  action        String     // CREATED, EDITED, STATUS_CHANGED, DEADLINE_CHANGED, RESPONSIBLE_CHANGED, PHOTO_ADDED, PHOTO_REMOVED, COMMENT_ADDED, EXTENSION_REQUESTED, EXTENSION_APPROVED, EXTENSION_REJECTED, REOPENED, COMPLETED, VERIFIED
+  previousValue String?
+  newValue      String?
+  details       String?
+  createdAt     DateTime   @default(now())
+
+  @@index([actionPlanId, createdAt])
+}
+
+model ActionPlanDeadlineExtension {
+  id               String     @id @default(uuid())
+  actionPlanId     String
+  actionPlan       ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  requesterId      String
+  requester        User       @relation("ExtensionRequester", fields: [requesterId], references: [id])
+  currentDueDate   DateTime
+  requestedDueDate DateTime
+  justification    String
+  evidenceData     String?
+  status           String     @default("PENDING") // PENDING, APPROVED, REJECTED
+  approverId       String?
+  approver         User?      @relation("ExtensionApprover", fields: [approverId], references: [id])
+  approvalNotes    String?
+  approvedAt       DateTime?
+  createdAt        DateTime   @default(now())
+
+  @@index([actionPlanId])
+  @@index([status])
+}
+
+model ActionPlanVerification {
+  id           String             @id @default(uuid())
+  actionPlanId String             @unique
+  actionPlan   ActionPlan         @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  verifierId   String
+  verifier     User               @relation("VerificationVerifier", fields: [verifierId], references: [id])
+  result       VerificationResult @default(PENDING)
+  evidenceData String?
+  notes        String?
+  verifiedAt   DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+model ActionPlanNotification {
+  id           String     @id @default(uuid())
+  actionPlanId String
+  actionPlan   ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation("NotificationUser", fields: [userId], references: [id])
+  type         String     // NEW_ASSIGNMENT, DUE_APPROACHING, OVERDUE, RESPONSIBLE_CHANGED, EXTENSION_REQUESTED, SENT_FOR_VALIDATION, APPROVED, RETURNED
+  title        String
+  message      String
+  read         Boolean    @default(false)
+  readAt       DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@index([userId, read])
+  @@index([actionPlanId])
+  @@index([createdAt])
 }

@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { 
   LayoutDashboard, FileText, PlusCircle, Award, 
   Trophy, BookOpen, BarChart3, User, LogOut, 
-  ChevronRight, Shield, X
+  ChevronRight, Shield, X, CheckSquare
 } from 'lucide-react';
 import DdsLogo from '@/components/DdsLogo';
 import { useAuth } from '@/context/AuthContext';
@@ -23,11 +23,20 @@ export default function Sidebar({ isOpen, onClose, onOpenProfile }: SidebarProps
   const currentTab = searchParams.get('tab');
   const action = searchParams.get('action');
   const view = searchParams.get('view');
+  const mode = searchParams.get('mode');
+  const isLive = mode === 'live';
   const { user, logout } = useAuth();
 
-  const isPainelGeral = pathname === '/admin' && !action && !view && !currentTab;
-  const isNovoDds = pathname === '/admin' && action === 'new';
-  const isHistorico = pathname === '/admin' && view === 'history';
+  const handleNavClick = (href: string) => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('dds:exit-live-room', { detail: { target: href } }));
+    }
+    onClose();
+  };
+
+  const isPainelGeral = pathname === '/admin' && !action && !view && !currentTab && !isLive;
+  const isNovoDds = pathname === '/admin' && action === 'new' && !isLive;
+  const isHistorico = pathname === '/admin' && view === 'history' && !isLive;
 
   const navGroups = [
     {
@@ -81,6 +90,13 @@ export default function Sidebar({ isOpen, onClose, onOpenProfile }: SidebarProps
       label: 'GESTÃO & INDICADORES',
       items: [
         {
+          label: 'Planos de Ação',
+          href: '/admin/planos-de-acao',
+          icon: CheckSquare,
+          badge: 'SST',
+          active: pathname?.startsWith('/admin/planos-de-acao')
+        },
+        {
           label: 'BI & Analytics SST',
           href: '/admin/questionarios?tab=BI',
           icon: BarChart3,
@@ -108,7 +124,7 @@ export default function Sidebar({ isOpen, onClose, onOpenProfile }: SidebarProps
       >
         {/* Top Branding Oficial DDS ON */}
         <div className="h-16 px-4 border-b border-white/10 flex items-center justify-between">
-          <div onClick={onClose}>
+          <div onClick={() => handleNavClick('/admin')}>
             <DdsLogo size="sm" showSubtitle={false} clickable href="/admin" />
           </div>
 
@@ -135,7 +151,7 @@ export default function Sidebar({ isOpen, onClose, onOpenProfile }: SidebarProps
                     <Link
                       key={itemIdx}
                       href={item.href}
-                      onClick={onClose}
+                      onClick={() => handleNavClick(item.href)}
                       className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all group ${
                         item.active
                           ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'

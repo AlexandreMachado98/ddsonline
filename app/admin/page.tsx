@@ -9,7 +9,7 @@ import {
   ArrowLeft, Plus, PenTool, Award, Trophy, BookmarkCheck, Shield
 } from 'lucide-react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { generateDdsPdf, generateConsolidatedDdsPdf } from '@/lib/pdfGenerator';
 import GroupPhotoCapture, { parseGroupPhotos, serializeGroupPhotos } from '@/components/GroupPhotoCapture';
 import DdsConferenceRoom from '@/components/DdsConferenceRoom';
@@ -27,6 +27,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 function AdminPanelContent() {
   const { user: currentUser, logout: handleLogout, updateUserLocal } = useAuth();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'NEW_DDS' | 'HISTORY'>('NEW_DDS');
@@ -34,16 +35,33 @@ function AdminPanelContent() {
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
 
-  // Sincroniza abas via URL querystrings
+  // Sincroniza abas e modo de transmissão via URL querystrings
   useEffect(() => {
     const view = searchParams?.get('view');
     const action = searchParams?.get('action');
+    const mode = searchParams?.get('mode');
+
+    if (mode === 'live') {
+      setIsLiveMode(true);
+    } else {
+      setIsLiveMode(false);
+    }
+
     if (view === 'history') {
       setActiveTab('HISTORY');
     } else if (action === 'new') {
       setActiveTab('NEW_DDS');
     }
   }, [searchParams]);
+
+  // Event listener para saída imediata da sala ao vivo disparado pela navegação
+  useEffect(() => {
+    const handleExitLive = () => {
+      setIsLiveMode(false);
+    };
+    window.addEventListener('dds:exit-live-room', handleExitLive);
+    return () => window.removeEventListener('dds:exit-live-room', handleExitLive);
+  }, []);
 
   // Formulário do Novo DDS
   const [meetingType, setMeetingType] = useState<'PRESENTIAL' | 'REMOTE'>('PRESENTIAL');
@@ -70,6 +88,14 @@ function AdminPanelContent() {
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+
+  // Se a rota solicitou mode=live mas nenhuma reunião ativa existe após carga inicial, normaliza URL
+  useEffect(() => {
+    if (!isLoadingInitial && !activeMeeting && searchParams?.get('mode') === 'live') {
+      setIsLiveMode(false);
+      router.replace('/admin');
+    }
+  }, [isLoadingInitial, activeMeeting, searchParams, router]);
 
   // Recupera rascunho de novo DDS em elaboração salvo no dispositivo
   useEffect(() => {
@@ -301,6 +327,7 @@ function AdminPanelContent() {
         setActiveMeeting(data.meeting);
         cacheMeetingData(data.meeting);
         setIsLiveMode(true);
+        router.push('/admin?mode=live');
         setTopic('');
         setObjective('');
         setProgrammaticContent('');
@@ -611,6 +638,7 @@ function AdminPanelContent() {
       setIsReviewingClose(false);
       setActiveMeeting(null);
       setTeamPhotos([]);
+      router.push('/admin');
       fetchAllData();
       showToast('DDS Encerrado! Ata arquivada com sucesso.', 'success');
     } catch (e) {
@@ -645,7 +673,10 @@ function AdminPanelContent() {
         actions={
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsLiveMode(false)}
+              onClick={() => {
+                setIsLiveMode(false);
+                router.push('/admin');
+              }}
               className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <ArrowLeft size={14} />
@@ -1354,8 +1385,13 @@ function AdminPanelContent() {
           icon={Radio}
           variant={activeMeeting ? 'emerald' : 'blue'}
           onClick={() => {
-            if (activeMeeting) setIsLiveMode(true);
-            else setActiveTab('NEW_DDS');
+            if (activeMeeting) {
+              setIsLiveMode(true);
+              router.push('/admin?mode=live');
+            } else {
+              setActiveTab('NEW_DDS');
+              router.push('/admin?action=new');
+            }
           }}
         />
         <MetricCard
@@ -1395,7 +1431,10 @@ function AdminPanelContent() {
 
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
             <button
-              onClick={() => setIsLiveMode(true)}
+              onClick={() => {
+                setIsLiveMode(true);
+                router.push('/admin?mode=live');
+              }}
               className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer"
             >
               <Play size={14} />

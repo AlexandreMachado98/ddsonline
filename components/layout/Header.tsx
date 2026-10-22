@@ -20,6 +20,12 @@ export default function Header({
 }: HeaderProps) {
   const { user } = useAuth();
 
+  const handleCrumbClick = (href: string) => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('dds:exit-live-room', { detail: { target: href } }));
+    }
+  };
+
   return (
     <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between gap-4 transition-all shadow-sm">
       {/* Left: Mobile trigger & Breadcrumbs */}
@@ -36,6 +42,7 @@ export default function Header({
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
           <Link
             href="/admin"
+            onClick={() => handleCrumbClick('/admin')}
             className="hover:text-blue-600 transition-colors hidden sm:inline"
           >
             DDS ON
@@ -46,6 +53,7 @@ export default function Header({
               {crumb.href ? (
                 <Link
                   href={crumb.href}
+                  onClick={() => handleCrumbClick(crumb.href!)}
                   className="hover:text-blue-600 transition-colors truncate max-w-[150px] sm:max-w-xs"
                 >
                   {crumb.label}

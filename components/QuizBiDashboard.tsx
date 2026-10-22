@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
@@ -1188,23 +1188,34 @@ export default function QuizBiDashboard({
                           </p>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleCopyPlan(item.actionPlan, item.questionId)}
-                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 shrink-0 cursor-pointer"
-                        >
-                          {copiedActionId === item.questionId ? (
-                            <>
-                              <Check size={13} className="text-emerald-400" />
-                              <span className="text-emerald-400 font-bold">Copiado!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={13} />
-                              <span>Copiar Pauta</span>
-                            </>
-                          )}
-                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyPlan(item.actionPlan, item.questionId)}
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 cursor-pointer"
+                          >
+                            {copiedActionId === item.questionId ? (
+                              <>
+                                <Check size={13} className="text-emerald-400" />
+                                <span className="text-emerald-400 font-bold">Copiado!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={13} />
+                                <span>Copiar</span>
+                              </>
+                            )}
+                          </button>
+
+                          <a
+                            href="/admin/planos-de-acao"
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                            title="Oficializar no Módulo de Planos de Ação"
+                          >
+                            <Target size={13} />
+                            <span>Criar Plano de Ação</span>
+                          </a>
+                        </div>
                       </div>
 
                     </div>
