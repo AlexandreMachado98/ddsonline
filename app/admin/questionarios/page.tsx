@@ -170,6 +170,10 @@ export default function QuestionariosAdminPage() {
   const handleImportFile = async (file?: File) => {
     if (!file) return;
     setStatusMessage(null);
+    if (file.size === 0) {
+      setStatusMessage({ type: 'error', text: 'O arquivo está vazio.' });
+      return;
+    }
     if (file.size > 5 * 1024 * 1024) {
       setStatusMessage({ type: 'error', text: 'Arquivo acima do limite de 5 MB.' });
       return;
@@ -193,12 +197,13 @@ export default function QuestionariosAdminPage() {
         if (!response.ok || !data.success) throw new Error(data.error || 'Falha ao extrair arquivo.');
         parsed = data.questions;
       }
-      if (parsed.length > 100) throw new Error('Limite de 100 perguntas por questionário.');
+      if (!parsed.length || parsed.length > 100) throw new Error('O arquivo deve conter de 1 a 100 perguntas.');
       const converted: QuizQuestionInput[] = parsed.map(q => ({
         id: crypto.randomUUID(), text: q.text, type: 'SINGLE_CHOICE', weight: 1,
         explanation: q.explanation,
         options: q.options.map(o => ({ id: crypto.randomUUID(), text: o.text, correct: o.correct }))
       }));
+      if (!window.confirm('Substituir as perguntas atualmente no editor pelas ' + converted.length + ' perguntas importadas? Alterações não salvas serão perdidas.')) return;
       setQuestions(converted);
       if (!title.trim()) setTitle(file.name.replace(/\.[^.]+$/, '').slice(0, 150));
       setStatusMessage({ type: 'success', text: parsed.length + ' perguntas extraídas. Revise todas as questões e gabaritos antes de salvar. O arquivo original não foi armazenado no banco.' });
