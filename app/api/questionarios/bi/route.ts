@@ -226,6 +226,8 @@ export async function GET(req: Request) {
     // Fragilidades por questão
     const questionFragilityMap = new Map<string, {
       questionId: string;
+      quizId: string;
+      meetingId: string | null;
       quizTitle: string;
       questionText: string;
       totalAnswered: number;
@@ -397,6 +399,8 @@ export async function GET(req: Request) {
           if (!questionFragilityMap.has(q.id)) {
             questionFragilityMap.set(q.id, {
               questionId: q.id,
+              quizId: quiz.id,
+              meetingId: quiz.meetingId,
               quizTitle: quiz.title,
               questionText: q.text,
               totalAnswered: 0,
@@ -519,6 +523,8 @@ export async function GET(req: Request) {
 
         return {
           questionId: item.questionId,
+          quizId: item.quizId,
+          meetingId: item.meetingId,
           quizTitle: item.quizTitle,
           questionText: item.questionText,
           totalAnswered: item.totalAnswered,
