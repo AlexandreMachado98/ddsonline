@@ -739,6 +739,11 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ success: false, error: 'Permissão negada.' }, { status: 403 });
     }
 
+    // Uma solicitação de exclusão definitiva nunca deve cair silenciosamente em cancelamento.
+    if (permanent && authUser.role !== 'SUPER_ADMIN' && authUser.role !== 'COMPANY_ADMIN') {
+      return NextResponse.json({ success: false, error: 'Somente administradores podem excluir definitivamente.' }, { status: 403 });
+    }
+
     // Apenas Administradores podem excluir permanentemente
     if (permanent && (authUser.role === 'SUPER_ADMIN' || authUser.role === 'COMPANY_ADMIN')) {
       await prisma.actionPlan.delete({ where: { id } });
