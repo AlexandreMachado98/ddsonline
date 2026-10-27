@@ -7,7 +7,7 @@ import {
   Copy, Check, Clock, Award, RefreshCw, Bookmark, BookmarkCheck,
   TrendingUp, Users, Target, BarChart2, Star, RotateCcw,
   Sparkles, Layers, BookOpen, ChevronRight, FileText, Eye, X, ShieldAlert,
-  ShieldCheck, Trophy, Loader2
+  ShieldCheck, Trophy, Loader2, ChevronDown, MoreHorizontal
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useSearchParams } from 'next/navigation';
@@ -237,6 +237,15 @@ function QuestionariosContent() {
   // Questionários
   const [quizzes, setQuizzes] = useState<ExistingQuiz[]>([]);
   const [isLoadingQuizzes, setIsLoadingQuizzes] = useState<boolean>(false);
+  // UI-only controls. All evaluation mutations continue to use the original handlers.
+  const [quizSearch, setQuizSearch] = useState('');
+  const [quizStatusFilter, setQuizStatusFilter] = useState<'ALL' | ExistingQuiz['status']>('ALL');
+  const [quizOrder, setQuizOrder] = useState<'newest' | 'oldest' | 'title'>('newest');
+  const [quizPage, setQuizPage] = useState(1);
+  const [expandedQuizId, setExpandedQuizId] = useState<string | null>(null);
+  const [quizMenuId, setQuizMenuId] = useState<string | null>(null);
+  const QUIZZES_PER_PAGE = 10;
+
 
   // Vínculo para a criação do NOVO questionário
   const [creationMeetingId, setCreationMeetingId] = useState<string>('');
@@ -350,6 +359,24 @@ function QuestionariosContent() {
     quizzes.filter(q => q.isTemplate).forEach(q => map.set(q.id, q));
     return Array.from(map.values());
   }, [allTemplates, quizzes]);
+
+
+  const visibleQuizzes = React.useMemo(() => {
+    const term = quizSearch.trim().toLocaleLowerCase('pt-BR');
+    return quizzes
+      .filter(q => (quizStatusFilter === 'ALL' || q.status === quizStatusFilter) &&
+        (!term || q.title.toLocaleLowerCase('pt-BR').includes(term)))
+      .sort((a, b) => quizOrder === 'title'
+        ? a.title.localeCompare(b.title, 'pt-BR')
+        : quizOrder === 'oldest'
+          ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [quizzes, quizSearch, quizStatusFilter, quizOrder]);
+  const quizPageCount = Math.max(1, Math.ceil(visibleQuizzes.length / QUIZZES_PER_PAGE));
+  const currentQuizPage = Math.min(quizPage, quizPageCount);
+  const paginatedQuizzes = visibleQuizzes.slice(
+    (currentQuizPage - 1) * QUIZZES_PER_PAGE, currentQuizPage * QUIZZES_PER_PAGE
+  );
 
   // Estado para Modal de Detalhes do Colaborador (Gabarito, Acertos e Erros)
   const [selectedCollaborator, setSelectedCollaborator] = useState<ParticipantDetail | null>(null);
@@ -1200,206 +1227,163 @@ function QuestionariosContent() {
               </div>
             </section>
 
-            {/* Listagem de Questionários com Ações de Reavaliação e Salvar Formulário */}
-            <section className="bg-white border border-slate-200/90 p-4 sm:p-5 rounded-2xl space-y-4 shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+
+            {/* Avaliações compactas: detalhes e ações apenas sob demanda */}
+            <section className="bg-white border border-slate-200/90 p-3 sm:p-5 rounded-2xl space-y-3 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Award size={18} className="text-blue-600" />
                   <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">
                     Avaliações Cadastradas ({quizzes.length})
                   </h2>
                 </div>
+                <span className="text-[11px] text-slate-500">
+                  {visibleQuizzes.length} encontrada(s) · {quizzes.filter(q => q.status === 'DRAFT').length} rascunho(s) · {quizzes.filter(q => q.status === 'PUBLISHED').length} publicada(s)
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_160px_160px] gap-2">
+                <input
+                  aria-label="Buscar avaliações pelo nome"
+                  placeholder="Buscar avaliação pelo nome..."
+                  value={quizSearch}
+                  onChange={e => { setQuizSearch(e.target.value); setQuizPage(1); }}
+                  className="min-w-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <select
+                  aria-label="Filtrar avaliações por situação"
+                  value={quizStatusFilter}
+                  onChange={e => { setQuizStatusFilter(e.target.value as typeof quizStatusFilter); setQuizPage(1); }}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
+                >
+                  <option value="ALL">Todos os status</option>
+                  <option value="DRAFT">Rascunho</option>
+                  <option value="PUBLISHED">Publicada</option>
+                  <option value="CLOSED">Encerrada</option>
+                </select>
+                <select
+                  aria-label="Ordenar avaliações"
+                  value={quizOrder}
+                  onChange={e => { setQuizOrder(e.target.value as typeof quizOrder); setQuizPage(1); }}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
+                >
+                  <option value="newest">Mais recentes</option>
+                  <option value="oldest">Mais antigas</option>
+                  <option value="title">Nome (A–Z)</option>
+                </select>
               </div>
 
               {isLoadingQuizzes ? (
-                <p className="text-xs text-slate-400 py-3">Buscando avaliações...</p>
+                <p className="text-xs text-slate-500 py-4">Buscando avaliações...</p>
               ) : quizzes.length === 0 ? (
-                <p className="text-xs text-slate-400 py-3">Nenhum questionário encontrado. Crie uma nova avaliação abaixo.</p>
+                <p className="text-xs text-slate-500 py-4">Nenhuma avaliação cadastrada.</p>
+              ) : visibleQuizzes.length === 0 ? (
+                <p className="text-xs text-slate-500 py-4">Nenhuma avaliação corresponde à pesquisa ou ao filtro.</p>
               ) : (
-                <div className="space-y-3">
-                  {quizzes.map(q => (
-                    <div key={q.id} className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${
-                              q.status === 'PUBLISHED' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' :
-                              q.status === 'CLOSED' ? 'bg-slate-800 border-slate-700 text-slate-400' :
-                              'bg-amber-500/15 border-amber-500/30 text-amber-300'
-                            }`}>
-                              {q.status === 'PUBLISHED' ? 'Ativo / Publicado' : q.status === 'CLOSED' ? 'Encerrado' : 'Rascunho'}
+                <div className="space-y-2">
+                  {paginatedQuizzes.map(q => {
+                    const expanded = expandedQuizId === q.id;
+                    const attempts = q.attempts || [];
+                    const average = attempts.length ? attempts.reduce((sum, a) => sum + a.score, 0) / attempts.length : 0;
+                    const approvalRate = attempts.length ? attempts.filter(a => a.passed).length / attempts.length * 100 : 0;
+                    const distinctPeople = new Set(attempts.map(a => a.participantDoc || a.attendance?.id || a.participantName || a.id)).size;
+                    return (
+                      <div key={q.id} className="relative bg-slate-950 border border-slate-800 rounded-xl">
+                        <div className="flex items-center gap-2 p-3">
+                          <button
+                            type="button"
+                            aria-expanded={expanded}
+                            aria-controls={'quiz-details-' + q.id}
+                            onClick={() => { setExpandedQuizId(expanded ? null : q.id); setQuizMenuId(null); }}
+                            className="flex-1 min-w-0 text-left flex items-center gap-3 cursor-pointer"
+                          >
+                            <span className="shrink-0 text-slate-400">
+                              {expanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
                             </span>
-                            
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-slate-300">
-                              {q.meeting?.topic ? `Vinculado: ${q.meeting.topic}` : '✨ Autônomo'}
-                            </span>
-
-                            {q.isTemplate && (
-                              <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 flex items-center gap-1">
-                                <BookmarkCheck size={11} /> Formulário Base
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-bold text-white truncate">{q.title}</span>
+                              <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[11px] text-slate-400">
+                                <span className={q.status === 'DRAFT' ? 'text-amber-300' : q.status === 'PUBLISHED' ? 'text-emerald-400' : 'text-slate-300'}>
+                                  {q.status === 'DRAFT' ? 'Rascunho' : q.status === 'PUBLISHED' ? 'Publicada' : 'Encerrada'}
+                                </span>
+                                <span>· {q.questions?.length || 0} questões</span>
+                                <span>· {attempts.length} respostas</span>
                               </span>
-                            )}
-
-                            <h3 className="text-sm font-bold text-white">{q.title}</h3>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-1">
-                            Nota Mínima: {q.passingScore}% • Total de Questões: {q.questions?.length || 0} • Respostas: {q.attempts?.length || 0}
-                          </p>
-                        </div>
-
-                        {/* Ações Rápidas */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {/* Se for vinculado a um DDS, permite desvincular a qualquer momento */}
-                          {q.meetingId ? (
+                            </span>
+                          </button>
+                          <div className="relative shrink-0">
                             <button
-                              onClick={() => handleDetachMeeting(q)}
-                              disabled={isSaving}
-                              className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/30 hover:border-amber-500/60 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-                              title="Desvincular este questionário do DDS para transformá-lo em uma Avaliação Autônoma permanente"
+                              type="button"
+                              aria-label={'Ações da avaliação ' + q.title}
+                              aria-expanded={quizMenuId === q.id}
+                              aria-haspopup="menu"
+                              onClick={() => setQuizMenuId(quizMenuId === q.id ? null : q.id)}
+                              className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg cursor-pointer"
                             >
-                              <Sparkles size={12} className="text-amber-400" />
-                              <span>Desvincular do DDS</span>
+                              <MoreHorizontal size={20} />
                             </button>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              {attachingQuizId === q.id ? (
-                                <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-lg border border-slate-700">
-                                  <select
-                                    value={targetMeetingToAttach}
-                                    onChange={e => setTargetMeetingToAttach(e.target.value)}
-                                    className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none"
-                                  >
-                                    <option value="">Selecione o DDS...</option>
-                                    {meetings.map(m => (
-                                      <option key={m.id} value={m.id}>
-                                        {m.topic}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <button
-                                    onClick={() => handleAttachMeeting(q.id, targetMeetingToAttach)}
-                                    disabled={!targetMeetingToAttach || isSaving}
-                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-xs font-bold rounded cursor-pointer"
-                                  >
-                                    Confirmar
-                                  </button>
-                                  <button
-                                    onClick={() => { setAttachingQuizId(null); setTargetMeetingToAttach(''); }}
-                                    className="px-1.5 py-1 text-slate-400 hover:text-white text-xs cursor-pointer"
-                                  >
-                                    Cancelar
-                                  </button>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => setAttachingQuizId(q.id)}
-                                  disabled={isSaving}
-                                  className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 hover:border-slate-500 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-                                  title="Vincular esta avaliação autônoma a um DDS específico"
-                                >
-                                  <Layers size={12} className="text-slate-400" />
-                                  <span>Vincular a um DDS</span>
+                            {quizMenuId === q.id && (
+                              <div role="menu" aria-label={'Ações da avaliação ' + q.title} className="absolute right-0 top-full mt-1 z-30 w-56 max-w-[calc(100vw-3rem)] rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-1.5 space-y-0.5">
+                                <button role="menuitem" type="button" onClick={() => { setSelectedRankingQuizId(q.id); setActiveTab('RANKING'); setQuizMenuId(null); }} className="block w-full text-left px-3 py-2 text-xs text-amber-200 hover:bg-slate-800 rounded-lg">Ranking & Pódio / resultados</button>
+                                <button role="menuitem" type="button" disabled={isSaving} onClick={() => { handleSaveToFormBank(q); setQuizMenuId(null); }} className="block w-full text-left px-3 py-2 text-xs text-cyan-200 hover:bg-slate-800 rounded-lg disabled:opacity-50">Jogar no Banco de Formulários</button>
+                                {q.status === 'DRAFT' && (
+                                  <button role="menuitem" type="button" onClick={() => { handleUpdateStatus(q.id, 'PUBLISHED'); setQuizMenuId(null); }} className="block w-full text-left px-3 py-2 text-xs text-emerald-300 hover:bg-slate-800 rounded-lg">Publicar Avaliação</button>
+                                )}
+                                {q.status === 'PUBLISHED' && (
+                                  <>
+                                    <button role="menuitem" type="button" onClick={() => { handleCopyLink(q.shareToken); setQuizMenuId(null); }} className="block w-full text-left px-3 py-2 text-xs text-white hover:bg-slate-800 rounded-lg">Copiar link da avaliação</button>
+                                    <button role="menuitem" type="button" onClick={() => { handleUpdateStatus(q.id, 'CLOSED'); setQuizMenuId(null); }} className="block w-full text-left px-3 py-2 text-xs text-rose-300 hover:bg-slate-800 rounded-lg">Encerrar avaliação</button>
+                                  </>
+                                )}
+                                {q.status === 'CLOSED' && (
+                                  <button role="menuitem" type="button" disabled={isSaving} onClick={() => { handleReevaluate(q); setQuizMenuId(null); }} className="block w-full text-left px-3 py-2 text-xs text-emerald-300 hover:bg-slate-800 rounded-lg disabled:opacity-50">Aplicar Reavaliação</button>
+                                )}
+                                <button role="menuitem" type="button" disabled={isSaving} onClick={() => { setExpandedQuizId(q.id); setQuizMenuId(null); setAttachingQuizId(q.meetingId ? null : q.id); }} className="block w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-slate-800 rounded-lg disabled:opacity-50">
+                                  {q.meetingId ? 'Gerenciar vínculo com DDS' : 'Vincular a um DDS'}
                                 </button>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Ver Ranking Oficial e Pódio */}
-                          <button
-                            onClick={() => {
-                              setSelectedRankingQuizId(q.id);
-                              setActiveTab('RANKING');
-                            }}
-                            className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-500/60 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-                            title="Ver Ranking Oficial e Pódio desta Avaliação"
-                          >
-                            <Trophy size={12} className="text-amber-400" />
-                            <span>Ranking & Pódio</span>
-                          </button>
-
-                          {/* Copiar para o Banco de Formulários */}
-                          <button
-                            onClick={() => handleSaveToFormBank(q)}
-                            disabled={isSaving}
-                            className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 hover:border-cyan-500/60 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-                            title="Copiar e guardar este modelo diretamente no Banco de Formulários para reutilizar quando quiser"
-                          >
-                            <Bookmark size={12} className="text-cyan-400" />
-                            <span>Jogar no Banco de Formulários</span>
-                          </button>
-
-                          {q.status === 'DRAFT' && (
-                            <button
-                              onClick={() => handleUpdateStatus(q.id, 'PUBLISHED')}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-xs rounded-lg transition-all cursor-pointer"
-                            >
-                              Publicar Avaliação
-                            </button>
-                          )}
-
-                          {q.status === 'PUBLISHED' && (
-                            <>
-                              <button
-                                onClick={() => handleCopyLink(q.shareToken)}
-                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer"
-                              >
-                                {copiedToken === q.shareToken ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                                <span>{copiedToken === q.shareToken ? 'Link Copiado!' : 'Copiar Link'}</span>
-                              </button>
-                              <button
-                                onClick={() => handleUpdateStatus(q.id, 'CLOSED')}
-                                className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-500 text-white font-bold text-xs rounded-lg transition-all cursor-pointer"
-                              >
-                                Encerrar
-                              </button>
-                            </>
-                          )}
-
-                          {/* REAVALIAÇÃO: Se o questionário foi finalizado, permite reabrir/gerar nova rodada */}
-                          {q.status === 'CLOSED' && (
-                            <button
-                              onClick={() => handleReevaluate(q)}
-                              disabled={isSaving}
-                              className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 text-slate-950 font-black text-xs rounded-lg transition-all flex items-center gap-1 shadow-md cursor-pointer"
-                              title="Reabrir este questionário para aplicar uma nova rodada de avaliação à equipe"
-                            >
-                              <RotateCcw size={13} />
-                              <span>Aplicar Reavaliação</span>
-                            </button>
-                          )}
-
-                          {/* Excluir Avaliação */}
-                          <button
-                            onClick={() => handleDeleteQuiz(q.id)}
-                            disabled={isSaving}
-                            className="p-1.5 text-slate-500 hover:text-rose-400 border border-transparent hover:border-rose-500/20 rounded-lg transition-colors cursor-pointer"
-                            title="Excluir esta avaliação"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Resumo de Respostas dos Participantes */}
-                      {q.attempts && q.attempts.length > 0 && (
-                        <div className="pt-2 border-t border-slate-800/80">
-                          <p className="text-[11px] font-bold text-slate-300 mb-2">Desempenho dos Participantes:</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                            {q.attempts.map(att => (
-                              <div key={att.id} className="p-2 bg-slate-900 border border-slate-800 rounded-lg text-[11px] flex items-center justify-between">
-                                <span className="font-semibold text-slate-200 truncate pr-2">
-                                  {att.participantName || att.attendance?.name || 'Participante'}
-                                </span>
-                                <span className={`font-black shrink-0 ${att.passed ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                  {att.score}% ({att.passed ? 'Aprovado' : 'Abaixo'})
-                                </span>
+                                <div className="border-t border-slate-700 my-1" />
+                                <button role="menuitem" type="button" disabled={isSaving} onClick={() => { handleDeleteQuiz(q.id); setQuizMenuId(null); }} className="block w-full text-left px-3 py-2 text-xs text-rose-300 hover:bg-slate-800 rounded-lg disabled:opacity-50">Excluir avaliação</button>
                               </div>
-                            ))}
+                            )}
                           </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        {expanded && (
+                          <div id={'quiz-details-' + q.id} className="border-t border-slate-800 px-3 pb-3 pt-3 space-y-3">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                              <div className="rounded-lg bg-slate-900 p-2"><p className="text-slate-400">Nota mínima</p><strong className="text-white">{q.passingScore}%</strong></div>
+                              <div className="rounded-lg bg-slate-900 p-2"><p className="text-slate-400">Participantes únicos</p><strong className="text-white">{distinctPeople}</strong></div>
+                              <div className="rounded-lg bg-slate-900 p-2"><p className="text-slate-400">Aproveitamento médio</p><strong className="text-white">{attempts.length ? average.toLocaleString('pt-BR', {maximumFractionDigits: 1}) + '%' : '—'}</strong></div>
+                              <div className="rounded-lg bg-slate-900 p-2"><p className="text-slate-400">Taxa de aprovação</p><strong className="text-white">{attempts.length ? approvalRate.toLocaleString('pt-BR', {maximumFractionDigits: 1}) + '%' : '—'}</strong></div>
+                            </div>
+                            <p className="text-xs text-slate-300">{q.meeting?.topic ? 'Vinculada ao DDS: ' + q.meeting.topic : 'Avaliação autônoma'}{q.isTemplate ? ' · Formulário base' : ''}</p>
+                            {q.meetingId ? (
+                              <button type="button" disabled={isSaving} onClick={() => handleDetachMeeting(q)} className="px-3 py-2 bg-slate-800 text-amber-200 text-xs rounded-lg disabled:opacity-50">Desvincular do DDS</button>
+                            ) : attachingQuizId === q.id ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <select aria-label="Selecionar DDS de destino" value={targetMeetingToAttach} onChange={e => setTargetMeetingToAttach(e.target.value)} className="max-w-full bg-slate-900 text-white text-xs rounded-lg px-2 py-2 border border-slate-700">
+                                  <option value="">Selecione o DDS...</option>
+                                  {meetings.map(m => <option key={m.id} value={m.id}>{m.topic}</option>)}
+                                </select>
+                                <button type="button" disabled={!targetMeetingToAttach || isSaving} onClick={() => handleAttachMeeting(q.id, targetMeetingToAttach)} className="px-3 py-2 bg-emerald-600 text-slate-950 font-bold text-xs rounded-lg disabled:opacity-50">Confirmar vínculo</button>
+                                <button type="button" onClick={() => { setAttachingQuizId(null); setTargetMeetingToAttach(''); }} className="px-3 py-2 text-slate-300 text-xs rounded-lg">Cancelar</button>
+                              </div>
+                            ) : (
+                              <button type="button" disabled={isSaving} onClick={() => setAttachingQuizId(q.id)} className="px-3 py-2 bg-slate-800 text-slate-200 text-xs rounded-lg disabled:opacity-50">Vincular a um DDS</button>
+                            )}
+                            <button type="button" onClick={() => { setSelectedRankingQuizId(q.id); setActiveTab('RANKING'); }} className="ml-2 px-3 py-2 bg-slate-800 text-amber-200 text-xs rounded-lg">Ver resultados individuais e ranking</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {visibleQuizzes.length > QUIZZES_PER_PAGE && (
+                <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                  <span className="text-xs text-slate-500">Página {currentQuizPage} de {quizPageCount}</span>
+                  <div className="flex gap-2">
+                    <button type="button" disabled={currentQuizPage <= 1} onClick={() => { setQuizPage(p => Math.max(1, p - 1)); setExpandedQuizId(null); setQuizMenuId(null); }} className="border border-slate-200 rounded-lg px-3 py-2 text-xs disabled:opacity-40">Anterior</button>
+                    <button type="button" disabled={currentQuizPage >= quizPageCount} onClick={() => { setQuizPage(p => Math.min(quizPageCount, p + 1)); setExpandedQuizId(null); setQuizMenuId(null); }} className="border border-slate-200 rounded-lg px-3 py-2 text-xs disabled:opacity-40">Próxima</button>
+                  </div>
                 </div>
               )}
             </section>
