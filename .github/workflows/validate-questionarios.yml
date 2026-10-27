@@ -6,6 +6,10 @@ on:
     paths:
       - 'app/api/questionarios/**'
       - 'app/admin/questionarios/**'
+      - 'app/admin/bi/**'
+      - 'app/api/bi/**'
+      - 'components/layout/Sidebar.tsx'
+      - 'components/QuizBiDashboard.tsx'
       - 'lib/quizGrading.ts'
       - 'prisma/**'
       - '.github/workflows/validate-questionarios.yml'
@@ -32,3 +36,9 @@ jobs:
 
       - name: Testes unitários de correção
         run: node tests/quizGrading.test.cjs
+
+      - name: Verificar build Next.js de produção
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/dds_test
+          SESSION_SECRET: temporary-ci-validation-secret-with-more-than-32-characters

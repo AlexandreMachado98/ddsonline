@@ -13,7 +13,6 @@ import { useAuth } from '@/context/AuthContext';
 import { useSearchParams } from 'next/navigation';
 import DdsLogo from '@/components/DdsLogo';
 import QuizRankingView from '@/components/QuizRankingView';
-import QuizBiDashboard from '@/components/QuizBiDashboard';
 import AppShell from '@/components/layout/AppShell';
 
 interface QuizOptionInput {
@@ -214,13 +213,17 @@ function QuestionariosContent() {
   const searchParams = useSearchParams();
 
   // Abas da tela: Avaliações Ativas, Ranking de Desempenho, Banco de Formulários, e Inteligência BI
-  const [activeTab, setActiveTab] = useState<'QUIZZES' | 'TEMPLATES' | 'RANKING' | 'BI'>('QUIZZES');
+  const [activeTab, setActiveTab] = useState<'QUIZZES' | 'TEMPLATES' | 'RANKING'>('QUIZZES');
   const [selectedRankingQuizId, setSelectedRankingQuizId] = useState<string>('');
 
   // Sincroniza aba e quiz da URL
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['QUIZZES', 'TEMPLATES', 'RANKING', 'BI'].includes(tab)) {
+    if (tab === 'BI' && typeof window !== 'undefined') {
+      window.location.replace('/admin/bi');
+      return;
+    }
+    if (tab && ['QUIZZES', 'TEMPLATES', 'RANKING'].includes(tab)) {
       setActiveTab(tab as any);
     }
     const qId = searchParams.get('quizId');
@@ -1118,17 +1121,7 @@ function QuestionariosContent() {
               <span>Modelos NR ({templateQuizzes.length})</span>
             </button>
 
-            <button
-              onClick={() => setActiveTab('BI')}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
-                activeTab === 'BI'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-blue-700 hover:text-blue-900 hover:bg-blue-50'
-              }`}
-            >
-              <BarChart2 size={15} />
-              <span>Inteligência BI</span>
-            </button>
+
           </div>
 
           <div className="flex items-center gap-2">
@@ -1803,17 +1796,6 @@ function QuestionariosContent() {
         {/* ========================================================================= */}
         {/* ABA 3: RELATÓRIO BI & DESEMPENHO (BUSINESS INTELLIGENCE)                  */}
         {/* ========================================================================= */}
-        {activeTab === 'BI' && (
-          <QuizBiDashboard
-            organizerName={currentUser?.name || 'Técnico de Segurança'}
-            companyName={currentUser?.company || 'DDS Online'}
-            onOpenCollaboratorModal={handleOpenCollaboratorByName}
-            onSelectQuizForRanking={(quizId) => {
-              setSelectedRankingQuizId(quizId);
-              setActiveTab('RANKING');
-            }}
-          />
-        )}
 
         {/* ========================================================================= */}
         {/* MODAL DE DETALHES DO COLABORADOR: GABARITO, ACERTOS E ERROS              */}
