@@ -1,0 +1,40 @@
+name: Sincronizar dependências do importador
+on:
+  push:
+    branches:
+      - feature/importacao-questionarios-arquivos
+    paths:
+      - package.json
+      - .github/workflows/sync-questionario-lock.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout da branch de desenvolvimento
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Gerar lockfile a partir das dependências declaradas
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Validar instalação reprodutível
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Registrar lockfile sincronizado
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "Lockfile já sincronizado."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "build: sincronizar package-lock do importador"
+          git push origin HEAD:feature/importacao-questionarios-arquivos
