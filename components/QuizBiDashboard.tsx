@@ -53,6 +53,8 @@ interface BiQuizItem {
 
 interface FragilityItem {
   questionId: string;
+  quizId: string;
+  meetingId?: string | null;
   quizTitle: string;
   questionText: string;
   totalAnswered: number;
@@ -250,7 +252,8 @@ export default function QuizBiDashboard({
   const openAutomaticPlan = (item: FragilityItem) => {
     if (item.errorCount <= 0) return;
     setPlanQuestion(item);
-    setPlanStartDate(new Date().toLocaleDateString('en-CA'));
+    const now = new Date();
+    setPlanStartDate([now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-'));
     setPlanDueDate('');
     setPlanError('');
     setPlanSuccess(null);
@@ -267,7 +270,6 @@ export default function QuizBiDashboard({
       setPlanError('O prazo final não pode ser anterior ao início.');
       return;
     }
-    const originQuiz = quizzes.find(q => q.title === item.quizTitle);
     const risk = item.mostCommonWrongText
       ? `Resposta incorreta identificada: "${item.mostCommonWrongText}".`
       : 'Respostas incorretas identificadas nesta questão.';
@@ -282,7 +284,7 @@ export default function QuizBiDashboard({
           description: `Avaliação: ${item.quizTitle}. Questão: ${item.questionText}.`,
           origin: 'QUESTIONNAIRE',
           originReferenceId: item.questionId,
-          meetingId: originQuiz?.meetingId || null,
+          meetingId: item.meetingId || null,
           category: 'Segurança do Trabalho / Aprendizagem',
           criticality: item.fragilityLevel === 'CRITICAL' ? 'HIGH' : 'MEDIUM',
           priority: item.fragilityLevel === 'CRITICAL' ? 'HIGH' : 'MEDIUM',
