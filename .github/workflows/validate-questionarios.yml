@@ -10,6 +10,8 @@ on:
       - 'app/api/bi/**'
       - 'components/layout/Sidebar.tsx'
       - 'components/QuizBiDashboard.tsx'
+      - 'app/admin/planos-de-acao/**'
+      - 'app/api/planos-de-acao/**'
       - 'lib/quizGrading.ts'
       - 'prisma/**'
       - '.github/workflows/validate-questionarios.yml'

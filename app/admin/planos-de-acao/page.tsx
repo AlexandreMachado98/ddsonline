@@ -5,7 +5,7 @@ import {
   Plus, Search, Filter, Download, RefreshCw, LayoutDashboard, 
   List, Calendar as CalendarIcon, CheckSquare, Clock, 
   AlertTriangle, Shield, CheckCircle2, User, ChevronLeft, ChevronRight,
-  FileText, ExternalLink, Eye, Edit3, Loader2, Sparkles, SlidersHorizontal
+  FileText, ExternalLink, Eye, Edit3, Trash2, Loader2, Sparkles, SlidersHorizontal
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import AppShell from '@/components/layout/AppShell';
@@ -140,6 +140,32 @@ function PlanosDeAcaoContent() {
         loadMetrics();
       }
     } catch (e) {}
+  };
+
+  const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const canPermanentlyDelete = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'COMPANY_ADMIN';
+
+  const handleDeletePlan = async (plan: any) => {
+    const permanent = canPermanentlyDelete;
+    const message = permanent
+      ? `Excluir permanentemente o plano ${plan.code} — ${plan.title}? Esta ação remove o plano, tarefas, evidências e histórico associado e não pode ser desfeita.`
+      : `Cancelar o plano ${plan.code} — ${plan.title}? O registro será mantido no histórico.`;
+    if (!window.confirm(message)) return;
+    setDeleteError(null);
+    setDeletingPlanId(plan.id);
+    try {
+      const query = new URLSearchParams({ id: plan.id });
+      if (permanent) query.set('permanent', 'true');
+      const response = await fetch('/api/planos-de-acao?' + query.toString(), { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Não foi possível alterar o plano.');
+      await Promise.all([loadPlans(), loadMetrics()]);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Falha ao excluir o plano.');
+    } finally {
+      setDeletingPlanId(null);
+    }
   };
 
   // Abrir detalhes do plano
@@ -392,7 +418,9 @@ function PlanosDeAcaoContent() {
           />
         )}
 
-        {/* 2. VISUALIZAÇÃO: LISTA (TABELA PROFISSIONAL) */}
+        {deleteError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{deleteError}</div>}
+
+        {/* 2. VISUALIZAÇÃO: LISTA EM CARTÕES RESPONSIVOS */}
         {activeMode === 'LIST' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
             {isLoading ? (
@@ -412,136 +440,61 @@ function PlanosDeAcaoContent() {
                 className="my-8 border-none"
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                      <th className="py-3 px-4">Código</th>
-                      <th className="py-3 px-4">Título do Plano</th>
-                      <th className="py-3 px-4">Origem / Setor</th>
-                      <th className="py-3 px-4">Responsável</th>
-                      <th className="py-3 px-4 text-center">Prioridade</th>
-                      <th className="py-3 px-4 text-center">Status</th>
-                      <th className="py-3 px-4">Prazo Final</th>
-                      <th className="py-3 px-4">Situação</th>
-                      <th className="py-3 px-4 text-center">Progresso</th>
-                      <th className="py-3 px-4 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {plans.map(plan => {
-                      const deadline = calculateDeadlineState(plan.dueDate, plan.completedAt, plan.status, plan.alertDaysBefore || 7);
-                      const progress = calculatePlanProgress(plan.tasks || [], plan.status);
-
-                      return (
-                        <tr
-                          key={plan.id}
-                          className="hover:bg-blue-50/20 transition-colors cursor-pointer group"
-                          onClick={() => handleOpenDetails(plan)}
-                        >
-                          <td className="py-3 px-4 font-black text-blue-700 whitespace-nowrap">
-                            {plan.code}
-                          </td>
-
-                          <td className="py-3 px-4 max-w-xs">
-                            <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">
-                              {plan.title}
-                            </p>
-                            <span className="text-[10px] text-slate-400 block truncate">
-                              {plan.problemDescription || 'Sem descrição adicional'}
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-4 whitespace-nowrap">
-                            <span className="font-bold text-slate-800 block">{ORIGIN_LABELS[plan.origin] || plan.origin}</span>
-                            <span className="text-[10px] text-slate-500">{plan.sector || 'Geral'}</span>
-                          </td>
-
-                          <td className="py-3 px-4 whitespace-nowrap">
-                            <span className="font-bold text-slate-800 block">{plan.responsible?.name || 'Não atribuído'}</span>
-                            <span className="text-[10px] text-slate-400">{plan.responsible?.position || 'Executante'}</span>
-                          </td>
-
-                          <td className="py-3 px-4 text-center whitespace-nowrap">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                              plan.priority === 'CRITICAL' ? 'bg-rose-100 text-rose-800' :
-                              plan.priority === 'HIGH' ? 'bg-amber-100 text-amber-800' :
-                              'bg-slate-100 text-slate-700'
-                            }`}>
-                              {PRIORITY_LABELS[plan.priority as keyof typeof PRIORITY_LABELS] || plan.priority}
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-4 text-center whitespace-nowrap">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-blue-50 text-blue-800 border border-blue-200">
-                              {STATUS_LABELS[plan.status as ActionPlanStatus] || plan.status}
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-4 whitespace-nowrap font-medium text-slate-600">
-                            {plan.dueDate ? new Date(plan.dueDate).toLocaleDateString('pt-BR') : '-'}
-                          </td>
-
-                          <td className="py-3 px-4 whitespace-nowrap">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${deadline.colorClass.bg} ${deadline.colorClass.text} ${deadline.colorClass.border}`}>
-                              {deadline.label}
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-4 text-center whitespace-nowrap">
-                            <div className="flex items-center gap-1.5 justify-center">
-                              <div className="w-16 bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                                <div className="bg-emerald-500 h-full transition-all" style={{ width: `${progress}%` }} />
-                              </div>
-                              <span className="text-[10px] font-bold text-slate-600">{progress}%</span>
-                            </div>
-                          </td>
-
-                          <td className="py-3 px-4 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    const res = await fetch(`/api/planos-de-acao/${plan.id}`);
-                                    const data = await res.json();
-                                    if (data.success && data.plan) {
-                                      generateActionPlanIndividualPdf(data.plan);
-                                    } else {
-                                      generateActionPlanIndividualPdf(plan);
-                                    }
-                                  } catch {
-                                    generateActionPlanIndividualPdf(plan);
-                                  }
-                                }}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                                title="Baixar Relatório Completo em PDF (com Evidências)"
-                              >
-                                <FileText size={15} />
-                              </button>
-                              <button
-                                onClick={() => handleOpenDetails(plan)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                title="Visualizar detalhes"
-                              >
-                                <Eye size={15} />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditingPlan(plan);
-                                  setIsCreateModalOpen(true);
-                                }}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                title="Editar plano"
-                              >
-                                <Edit3 size={15} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="grid grid-cols-1 2xl:grid-cols-2 gap-3 p-3 sm:p-4">
+                {plans.map(plan => {
+                  const deadline = calculateDeadlineState(plan.dueDate, plan.completedAt, plan.status, plan.alertDaysBefore || 7);
+                  const progress = calculatePlanProgress(plan.tasks || [], plan.status);
+                  return (
+                    <article key={plan.id} className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm hover:border-blue-200 transition-colors min-w-0">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[11px] font-extrabold text-blue-700">{plan.code}</span>
+                          <button type="button" onClick={() => handleOpenDetails(plan)} className="block text-left text-sm font-extrabold text-slate-900 hover:text-blue-700 break-words mt-1" title="Ver detalhes do plano">
+                            {plan.title}
+                          </button>
+                          {plan.problemDescription && <p className="text-xs text-slate-500 mt-1 line-clamp-2 break-words">{plan.problemDescription}</p>}
+                        </div>
+                        <div className="flex flex-wrap gap-1 shrink-0 max-w-full">
+                          <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${plan.priority === 'CRITICAL' ? 'bg-rose-100 text-rose-800' : plan.priority === 'HIGH' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
+                            {PRIORITY_LABELS[plan.priority as keyof typeof PRIORITY_LABELS] || plan.priority}
+                          </span>
+                          <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-bold uppercase">
+                            {STATUS_LABELS[plan.status as ActionPlanStatus] || plan.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                        <div className="min-w-0"><span className="block text-[10px] font-bold uppercase text-slate-500">Origem / setor</span><p className="font-semibold text-slate-800 break-words">{ORIGIN_LABELS[plan.origin] || plan.origin} · {plan.sector || 'Geral'}</p></div>
+                        <div className="min-w-0"><span className="block text-[10px] font-bold uppercase text-slate-500">Responsável</span><p className="font-semibold text-slate-800 break-words">{plan.responsible?.name || 'Não atribuído'}</p></div>
+                        <div><span className="block text-[10px] font-bold uppercase text-slate-500">Prazo final</span><p className="font-semibold text-slate-800">{plan.dueDate ? new Date(plan.dueDate).toLocaleDateString('pt-BR') : 'Não definido'}</p></div>
+                        <div><span className="block text-[10px] font-bold uppercase text-slate-500">Situação</span>
+                          <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold border ${deadline.colorClass.bg} ${deadline.colorClass.text} ${deadline.colorClass.border}`}>{deadline.label}</span>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                        <div className="flex items-center gap-2 text-xs text-slate-600" aria-label={`Progresso: ${progress}%`}>
+                          <span className="text-[10px] font-bold text-slate-500">Progresso</span>
+                          <div className="w-20 h-2 rounded-full bg-slate-200 overflow-hidden"><div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} /></div>
+                          <strong>{progress}%</strong>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <button type="button" onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/planos-de-acao/${plan.id}`);
+                              const data = await res.json();
+                              generateActionPlanIndividualPdf(data.success && data.plan ? data.plan : plan);
+                            } catch { generateActionPlanIndividualPdf(plan); }
+                          }} className="p-2 rounded-lg text-slate-600 hover:text-emerald-700 hover:bg-emerald-50" title="Baixar PDF" aria-label={`Baixar PDF do plano ${plan.code}`}><FileText size={16}/></button>
+                          <button type="button" onClick={() => handleOpenDetails(plan)} className="p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50" title="Visualizar" aria-label={`Visualizar plano ${plan.code}`}><Eye size={16}/></button>
+                          <button type="button" onClick={() => { setEditingPlan(plan); setIsCreateModalOpen(true); }} className="p-2 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50" title="Editar" aria-label={`Editar plano ${plan.code}`}><Edit3 size={16}/></button>
+                          {(canPermanentlyDelete || plan.status !== 'CANCELLED') && <button type="button" disabled={deletingPlanId !== null} onClick={() => handleDeletePlan(plan)} className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 disabled:opacity-40" title={canPermanentlyDelete ? 'Excluir plano permanentemente' : 'Cancelar plano (mantém histórico)'} aria-label={`${canPermanentlyDelete ? 'Excluir' : 'Cancelar'} plano ${plan.code}`}>
+                            {deletingPlanId === plan.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16}/>}
+                          </button>}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             )}
 
