@@ -60,6 +60,81 @@ interface ExistingQuiz {
   attempts: AttemptSummary[];
 }
 
+
+type ImportedQuestion = { text: string; options: { text: string; correct: boolean }[]; explanation?: string };
+
+function parseCsvRows(source: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [], field = '', quoted = false;
+  const input = source.replace(/^\uFEFF/, '');
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+    if (c === '"') {
+      if (quoted && input[i + 1] === '"') { field += '"'; i++; }
+      else quoted = !quoted;
+    } else if (c === ',' && !quoted) { row.push(field.trim()); field = ''; }
+    else if ((c === '\n' || c === '\r') && !quoted) {
+      if (c === '\r' && input[i + 1] === '\n') i++;
+      row.push(field.trim()); field = '';
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  if (quoted) throw new Error('CSV com aspas não fechadas.');
+  row.push(field.trim());
+  if (row.some(Boolean)) rows.push(row);
+  return rows;
+}
+
+function extractCsvQuestions(source: string): ImportedQuestion[] {
+  const rows = parseCsvRows(source);
+  if (rows.length < 2) throw new Error('O CSV precisa conter cabeçalho e perguntas.');
+  const headers = rows[0].map(h => h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, ''));
+  const col = (...names: string[]) => headers.findIndex(h => names.includes(h));
+  const questionCol = col('pergunta', 'questao', 'enunciado');
+  const answerCol = col('gabarito', 'resposta', 'respostacorreta');
+  const explanationCol = col('explicacao', 'justificativa');
+  const optionCols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map(letter => col(letter, 'alternativa' + letter, 'opcao' + letter));
+  if (questionCol < 0 || answerCol < 0 || optionCols.slice(0, 2).some(n => n < 0)) {
+    throw new Error('Cabeçalhos necessários: Pergunta, Alternativa A, Alternativa B e Gabarito.');
+  }
+  return rows.slice(1).map((row, i) => {
+    const text = (row[questionCol] || '').trim();
+    const options = optionCols.flatMap((index, pos) => index < 0 || !row[index]?.trim() ? [] : [{ letter: 'ABCDEFGH'[pos], text: row[index].trim() }]);
+    const answer = (row[answerCol] || '').trim().toUpperCase();
+    if (!text || options.length < 2 || !options.some(o => o.letter === answer)) {
+      throw new Error('Linha ' + (i + 2) + ': pergunta, alternativas ou gabarito inválido.');
+    }
+    return { text, options: options.map(o => ({ text: o.text, correct: o.letter === answer })), explanation: explanationCol < 0 ? '' : row[explanationCol] };
+  });
+}
+
+function extractTxtQuestions(source: string): ImportedQuestion[] {
+  const lines = source.replace(/\r/g, '').split('\n').map(line => line.trim()).filter(Boolean);
+  const results: ImportedQuestion[] = [];
+  let current: { text: string; options: { letter: string; text: string }[]; answer: string; explanation: string } | null = null;
+  const finish = () => {
+    if (!current) return;
+    if (!current.text || current.options.length < 2 || !current.options.some(o => o.letter === current!.answer)) {
+      throw new Error('Pergunta ' + (results.length + 1) + ' incompleta ou sem gabarito válido.');
+    }
+    results.push({ text: current.text, options: current.options.map(o => ({ text: o.text, correct: o.letter === current!.answer })), explanation: current.explanation });
+  };
+  for (const line of lines) {
+    const question = line.match(/^(?:pergunta\s*)?\d+[.)\-:]\s*(.+)$/i);
+    const option = line.match(/^([A-H])[.)\-:]\s*(.+)$/i);
+    const answer = line.match(/^(?:gabarito|resposta(?:\s+correta)?)\s*[:\-]\s*([A-H])\s*$/i);
+    const explanation = line.match(/^(?:explica[cç][aã]o|justificativa)\s*[:\-]\s*(.+)$/i);
+    if (question) { finish(); current = { text: question[1], options: [], answer: '', explanation: '' }; }
+    else if (option && current) current.options.push({ letter: option[1].toUpperCase(), text: option[2] });
+    else if (answer && current) current.answer = answer[1].toUpperCase();
+    else if (explanation && current) current.explanation = explanation[1];
+  }
+  finish();
+  if (!results.length) throw new Error('Nenhuma pergunta encontrada. Use questões numeradas, alternativas A) e gabarito.');
+  return results;
+}
+
 export default function QuestionariosAdminPage() {
   const { user: currentUser } = useAuth();
 
@@ -89,6 +164,38 @@ export default function QuestionariosAdminPage() {
       ]
     }
   ]);
+
+
+  const [isImporting, setIsImporting] = useState(false);
+  const handleImportFile = async (file?: File) => {
+    if (!file) return;
+    setStatusMessage(null);
+    if (file.size > 2 * 1024 * 1024) {
+      setStatusMessage({ type: 'error', text: 'Arquivo acima do limite de 2 MB.' });
+      return;
+    }
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (extension !== 'csv' && extension !== 'txt') {
+      setStatusMessage({ type: 'error', text: 'Nesta primeira versão, utilize CSV ou TXT. PDF, Word e Excel exigem extratores adicionais.' });
+      return;
+    }
+    setIsImporting(true);
+    try {
+      const content = await file.text();
+      const parsed = extension === 'csv' ? extractCsvQuestions(content) : extractTxtQuestions(content);
+      if (parsed.length > 100) throw new Error('Limite de 100 perguntas por questionário.');
+      const converted: QuizQuestionInput[] = parsed.map(q => ({
+        id: crypto.randomUUID(), text: q.text, type: 'SINGLE_CHOICE', weight: 1,
+        explanation: q.explanation,
+        options: q.options.map(o => ({ id: crypto.randomUUID(), text: o.text, correct: o.correct }))
+      }));
+      setQuestions(converted);
+      if (!title.trim()) setTitle(file.name.replace(/\.[^.]+$/, '').slice(0, 150));
+      setStatusMessage({ type: 'success', text: parsed.length + ' perguntas extraídas. Revise todas as questões e gabaritos antes de salvar. O arquivo não foi enviado nem armazenado.' });
+    } catch (error) {
+      setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Não foi possível interpretar o arquivo.' });
+    } finally { setIsImporting(false); }
+  };
 
   // Mensagens e feedbacks
   const [isSaving, setIsSaving] = useState(false);
@@ -357,6 +464,18 @@ export default function QuestionariosAdminPage() {
             </div>
           </div>
         </header>
+
+
+        <section className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
+          <h2 className="text-base font-bold text-white">Importar perguntas de arquivo</h2>
+          <p className="text-xs text-slate-400">Importe CSV ou TXT com perguntas, alternativas e gabaritos. A extração ocorre no navegador: o arquivo original não é enviado ao servidor nem salvo no banco. Confira os dados antes de salvar.</p>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-semibold text-white">
+            <FileText size={16} /> {isImporting ? 'Lendo arquivo...' : 'Selecionar CSV ou TXT'}
+            <input type="file" accept=".csv,.txt,text/csv,text/plain" className="sr-only" disabled={isImporting}
+              onChange={async e => { await handleImportFile(e.target.files?.[0]); e.target.value = ''; }} />
+          </label>
+          <p className="text-xs text-slate-500">CSV: Pergunta, Alternativa A, Alternativa B, Alternativa C, Alternativa D, Gabarito (A/B/C/D). TXT: 1. Pergunta / A) opção / B) opção / Gabarito: B. Limite: 2 MB e 100 questões.</p>
+        </section>
 
         {/* Seletor de DDS */}
         <section className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2">
