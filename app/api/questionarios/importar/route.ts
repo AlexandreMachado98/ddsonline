@@ -9,12 +9,15 @@ type Parsed = { text: string; options: { text: string; correct: boolean }[]; exp
 function parseText(text: string): Parsed[] {
   const lines = text.replace(/\r/g, '').split('\n').map(s => s.trim()).filter(Boolean);
   const answers = new Map<number, string>();
-  let inKey = false;
+  let answerSection = false;
   for (const line of lines) {
-    if (/^(?:gabarito|respostas corretas)\s*:?$/i.test(line)) { inKey = true; continue; }
-    if (inKey) {
-      const matches = [...line.matchAll(/(?:^|\s|[,;])(?:quest[aã]o\s*)?(\d{1,3})\s*[-.:)]\s*([A-H])\b/gi)];
-      for (const m of matches) answers.set(Number(m[1]), m[2].toUpperCase());
+    if (/^(?:gabarito|respostas corretas)\s*:?$/i.test(line)) {
+      answerSection = true;
+      continue;
+    }
+    if (!answerSection) continue;
+    for (const match of line.matchAll(/(?:^|[\s,;])(?:quest[aã]o\s*)?(\d{1,3})\s*[-.:)]\s*([A-H])\b/gi)) {
+      answers.set(Number(match[1]), match[2].toUpperCase());
     }
   }
   const result: Parsed[] = [];
@@ -25,7 +28,14 @@ function parseText(text: string): Parsed[] {
     if (!current.text || current.options.length < 2 || !current.options.some(o => o.letter === answer)) {
       throw new Error('Questão ' + current.number + ' sem alternativas ou gabarito válido. Revise o documento.');
     }
-    result.push({ text: current.text, options: current.options.map(o => ({ text: o.text, correct: o.letter === answer })), explanation: current.explanation });
+    if (new Set(current.options.map(o => o.letter)).size !== current.options.length) {
+      throw new Error('Questão ' + current.number + ' contém letras de alternativas repetidas.');
+    }
+    result.push({
+      text: current.text,
+      options: current.options.map(o => ({ text: o.text, correct: o.letter === answer })),
+      explanation: current.explanation
+    });
   };
   for (const line of lines) {
     if (/^(?:gabarito|respostas corretas)\s*:?$/i.test(line)) break;
@@ -33,11 +43,18 @@ function parseText(text: string): Parsed[] {
     const option = line.match(/^([A-H])[.)\-:]\s*(.+)$/i);
     const answer = line.match(/^(?:gabarito|resposta(?:\s+correta)?)\s*[:\-]\s*([A-H])\s*$/i);
     const explanation = line.match(/^(?:explica[cç][aã]o|justificativa)\s*[:\-]\s*(.+)$/i);
-    if (question) { finish(); current = { number: Number(question[1]), text: question[2], options: [], answer: '', explanation: '' }; }
-    else if (option && current) current.options.push({ letter: option[1].toUpperCase(), text: option[2] });
-    else if (answer && current) current.answer = answer[1].toUpperCase();
-    else if (explanation && current) current.explanation = explanation[1];
-    else if (current && !current.options.length && !/^(?:p[aá]gina|page)\s+\d+/i.test(line)) current.text += ' ' + line;
+    if (question) {
+      finish();
+      current = { number: Number(question[1]), text: question[2], options: [], answer: '', explanation: '' };
+    } else if (option && current) {
+      current.options.push({ letter: option[1].toUpperCase(), text: option[2] });
+    } else if (answer && current) {
+      current.answer = answer[1].toUpperCase();
+    } else if (explanation && current) {
+      current.explanation = explanation[1];
+    } else if (current && !current.options.length && !/^(?:p[aá]gina|page)\s+\d+/i.test(line)) {
+      current.text += ' ' + line;
+    }
   }
   finish();
   if (!result.length) throw new Error('Nenhuma questão identificada. Use numeração, alternativas A) e gabarito.');
@@ -48,6 +65,7 @@ function parseText(text: string): Parsed[] {
 export async function POST(req: Request) {
   const user = await getAuthenticatedUser(req);
   if (!user) return NextResponse.json({ success: false, error: 'Sessão inválida.' }, { status: 401 });
+  if (!['SUPER_ADMIN', 'COMPANY_ADMIN', 'ORGANIZER'].includes(user.role)) return NextResponse.json({ success: false, error: 'Acesso negado.' }, { status: 403 });
   try {
     const form = await req.formData();
     const file = form.get('file');
@@ -94,6 +112,7 @@ export async function POST(req: Request) {
       if (!questions.length || questions.length > 100) throw new Error('A planilha deve conter de 1 a 100 questões.');
       return NextResponse.json({ success: true, questions }, { headers: { 'Cache-Control': 'no-store' } });
     }
+    if (!text.trim()) throw new Error('Nenhum texto extraível. PDFs digitalizados precisam de OCR.');
     if (text.length > 250000) throw new Error('Documento muito extenso para importação.');
     const questions = parseText(text);
     return NextResponse.json({ success: true, questions }, { headers: { 'Cache-Control': 'no-store' } });
