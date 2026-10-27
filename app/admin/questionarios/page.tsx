@@ -170,19 +170,29 @@ export default function QuestionariosAdminPage() {
   const handleImportFile = async (file?: File) => {
     if (!file) return;
     setStatusMessage(null);
-    if (file.size > 2 * 1024 * 1024) {
-      setStatusMessage({ type: 'error', text: 'Arquivo acima do limite de 2 MB.' });
+    if (file.size > 5 * 1024 * 1024) {
+      setStatusMessage({ type: 'error', text: 'Arquivo acima do limite de 5 MB.' });
       return;
     }
     const extension = file.name.split('.').pop()?.toLowerCase();
-    if (extension !== 'csv' && extension !== 'txt') {
-      setStatusMessage({ type: 'error', text: 'Nesta primeira versão, utilize CSV ou TXT. PDF, Word e Excel exigem extratores adicionais.' });
+    if (!['csv', 'txt', 'pdf', 'docx', 'xlsx'].includes(extension || '')) {
+      setStatusMessage({ type: 'error', text: 'Formato não suportado. Utilize CSV, TXT, PDF, DOCX ou XLSX.' });
       return;
     }
     setIsImporting(true);
     try {
-      const content = await file.text();
-      const parsed = extension === 'csv' ? extractCsvQuestions(content) : extractTxtQuestions(content);
+      let parsed: ImportedQuestion[];
+      if (extension === 'csv' || extension === 'txt') {
+        const content = await file.text();
+        parsed = extension === 'csv' ? extractCsvQuestions(content) : extractTxtQuestions(content);
+      } else {
+        const form = new FormData();
+        form.append('file', file);
+        const response = await fetch('/api/questionarios/importar', { method: 'POST', body: form });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || 'Falha ao extrair arquivo.');
+        parsed = data.questions;
+      }
       if (parsed.length > 100) throw new Error('Limite de 100 perguntas por questionário.');
       const converted: QuizQuestionInput[] = parsed.map(q => ({
         id: crypto.randomUUID(), text: q.text, type: 'SINGLE_CHOICE', weight: 1,
@@ -191,7 +201,7 @@ export default function QuestionariosAdminPage() {
       }));
       setQuestions(converted);
       if (!title.trim()) setTitle(file.name.replace(/\.[^.]+$/, '').slice(0, 150));
-      setStatusMessage({ type: 'success', text: parsed.length + ' perguntas extraídas. Revise todas as questões e gabaritos antes de salvar. O arquivo não foi enviado nem armazenado.' });
+      setStatusMessage({ type: 'success', text: parsed.length + ' perguntas extraídas. Revise todas as questões e gabaritos antes de salvar. O arquivo original não foi armazenado no banco.' });
     } catch (error) {
       setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Não foi possível interpretar o arquivo.' });
     } finally { setIsImporting(false); }
@@ -468,13 +478,13 @@ export default function QuestionariosAdminPage() {
 
         <section className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
           <h2 className="text-base font-bold text-white">Importar perguntas de arquivo</h2>
-          <p className="text-xs text-slate-400">Importe CSV ou TXT com perguntas, alternativas e gabaritos. A extração ocorre no navegador: o arquivo original não é enviado ao servidor nem salvo no banco. Confira os dados antes de salvar.</p>
+          <p className="text-xs text-slate-400">Importe CSV, TXT, PDF, DOCX ou XLSX. CSV e TXT são lidos no navegador; PDF, Word e Excel são processados temporariamente no servidor, sem armazenamento do original. Revise o gabarito antes de salvar.</p>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-semibold text-white">
-            <FileText size={16} /> {isImporting ? 'Lendo arquivo...' : 'Selecionar CSV ou TXT'}
-            <input type="file" accept=".csv,.txt,text/csv,text/plain" className="sr-only" disabled={isImporting}
+            <FileText size={16} /> {isImporting ? 'Lendo arquivo...' : 'Selecionar arquivo'}
+            <input type="file" accept=".csv,.txt,.pdf,.docx,.xlsx,text/csv,text/plain,application/pdf" className="sr-only" disabled={isImporting}
               onChange={async e => { await handleImportFile(e.target.files?.[0]); e.target.value = ''; }} />
           </label>
-          <p className="text-xs text-slate-500">CSV: Pergunta, Alternativa A, Alternativa B, Alternativa C, Alternativa D, Gabarito (A/B/C/D). TXT: 1. Pergunta / A) opção / B) opção / Gabarito: B. Limite: 2 MB e 100 questões.</p>
+          <p className="text-xs text-slate-500">CSV: Pergunta, Alternativa A, Alternativa B, Alternativa C, Alternativa D, Gabarito (A/B/C/D). TXT: 1. Pergunta / A) opção / B) opção / Gabarito: B. Limite: 5 MB e 100 questões.</p>
         </section>
 
         {/* Seletor de DDS */}
