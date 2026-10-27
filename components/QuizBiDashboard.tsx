@@ -127,6 +127,14 @@ export default function QuizBiDashboard({
   const [historySearch, setHistorySearch] = useState<string>('');
   const [historySortBy, setHistorySortBy] = useState<string>('createdAt');
   const [copiedActionId, setCopiedActionId] = useState<string | null>(null);
+  // Fluxo rápido exclusivo para fragilidades com respostas incorretas.
+  const [planQuestion, setPlanQuestion] = useState<FragilityItem | null>(null);
+  const [planStartDate, setPlanStartDate] = useState('');
+  const [planDueDate, setPlanDueDate] = useState('');
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [planError, setPlanError] = useState('');
+  const [planSuccess, setPlanSuccess] = useState<{ code: string; id: string } | null>(null);
+
 
   // Consulta à API de BI
   const fetchBiData = useCallback(async () => {
@@ -236,6 +244,71 @@ export default function QuizBiDashboard({
     navigator.clipboard.writeText(text);
     setCopiedActionId(id);
     setTimeout(() => setCopiedActionId(null), 3000);
+  };
+
+
+  const openAutomaticPlan = (item: FragilityItem) => {
+    if (item.errorCount <= 0) return;
+    setPlanQuestion(item);
+    setPlanStartDate(new Date().toLocaleDateString('en-CA'));
+    setPlanDueDate('');
+    setPlanError('');
+    setPlanSuccess(null);
+  };
+
+  const submitAutomaticPlan = async () => {
+    const item = planQuestion;
+    if (!item || savingPlan) return;
+    if (!planStartDate || !planDueDate) {
+      setPlanError('Informe a data de início e o prazo final do plano.');
+      return;
+    }
+    if (planDueDate < planStartDate) {
+      setPlanError('O prazo final não pode ser anterior ao início.');
+      return;
+    }
+    const originQuiz = quizzes.find(q => q.title === item.quizTitle);
+    const risk = item.mostCommonWrongText
+      ? `Resposta incorreta identificada: "${item.mostCommonWrongText}".`
+      : 'Respostas incorretas identificadas nesta questão.';
+    try {
+      setSavingPlan(true);
+      setPlanError('');
+      const response = await fetch('/api/planos-de-acao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Reforço preventivo — ${item.questionText}`.slice(0, 220),
+          description: `Avaliação: ${item.quizTitle}. Questão: ${item.questionText}.`,
+          origin: 'QUESTIONNAIRE',
+          originReferenceId: item.questionId,
+          meetingId: originQuiz?.meetingId || null,
+          category: 'Segurança do Trabalho / Aprendizagem',
+          criticality: item.fragilityLevel === 'CRITICAL' ? 'HIGH' : 'MEDIUM',
+          priority: item.fragilityLevel === 'CRITICAL' ? 'HIGH' : 'MEDIUM',
+          status: 'OPEN',
+          identificationDate: new Date().toISOString(),
+          problemDescription: `Questão: ${item.questionText}\nAvaliação: ${item.quizTitle}\nOcorrências: ${item.errorCount} erros em ${item.totalAnswered} respostas (${item.errorRate}%).`,
+          identifiedRisk: risk,
+          identifiedCause: 'Dificuldade de compreensão apontada pelas respostas ao questionário; investigar a causa com a equipe.',
+          immediateMeasures: 'Orientar a equipe sobre a resposta correta e avaliar a necessidade de reforço no próximo DDS.',
+          actionDescription: item.actionPlan || `Reforçar a orientação sobre: ${item.questionText}`,
+          actionObjective: 'Esclarecer a dúvida e reforçar a conduta preventiva correta.',
+          expectedResult: `A equipe deverá compreender e aplicar a orientação correta: ${item.correctOptionText}`,
+          completionCriteria: 'Realizar o reforço, registrar evidências e avaliar a compreensão da equipe.',
+          additionalNotes: `Gabarito: ${item.correctOptionText}. Desvio mais frequente: ${item.mostCommonWrongText || 'Não identificado'}.`,
+          startDate: planStartDate + 'T12:00:00.000Z',
+          dueDate: planDueDate + 'T12:00:00.000Z'
+        })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Não foi possível criar o plano de ação.');
+      setPlanSuccess({ code: result.data?.code || result.plan?.code || 'Criado', id: result.data?.id || result.plan?.id || '' });
+    } catch (error) {
+      setPlanError(error instanceof Error ? error.message : 'Erro ao registrar o plano de ação.');
+    } finally {
+      setSavingPlan(false);
+    }
   };
 
   // Seletor de Quiz para visualização do Ranking Integrado
@@ -1207,14 +1280,17 @@ export default function QuizBiDashboard({
                             )}
                           </button>
 
-                          <a
-                            href="/admin/planos-de-acao"
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-                            title="Oficializar no Módulo de Planos de Ação"
-                          >
-                            <Target size={13} />
-                            <span>Criar Plano de Ação</span>
-                          </a>
+                          {item.errorCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => openAutomaticPlan(item)}
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                              title="Gerar plano automaticamente a partir dos erros e definir o prazo"
+                            >
+                              <Target size={13} />
+                              <span>Criar Plano de Ação</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -1224,6 +1300,49 @@ export default function QuizBiDashboard({
               </div>
             )}
           </section>
+        </div>
+      )}
+
+      {planQuestion && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-3 sm:p-6" role="presentation">
+          <div role="dialog" aria-modal="true" aria-labelledby="auto-plan-title" className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950 p-5 text-white shadow-2xl space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 id="auto-plan-title" className="text-lg font-black">Plano de ação a partir do questionário</h2>
+                <p className="text-xs text-slate-400 mt-1">Os dados da questão e do gabarito serão preenchidos automaticamente.</p>
+              </div>
+              <button type="button" aria-label="Fechar" disabled={savingPlan} onClick={() => setPlanQuestion(null)} className="rounded-lg bg-slate-800 px-3 py-2 text-xs">Fechar</button>
+            </div>
+            {planSuccess ? (
+              <div className="space-y-3 rounded-xl border border-emerald-700 bg-emerald-950/40 p-4">
+                <p role="status" className="text-sm font-bold text-emerald-300">Plano de ação criado com sucesso: {planSuccess.code}</p>
+                <a href="/admin/planos-de-acao" className="inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-slate-950">Abrir Planos de Ação</a>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2 rounded-xl bg-slate-900 p-3 text-xs">
+                  <p className="text-slate-400">Avaliação: <strong className="text-white">{planQuestion.quizTitle}</strong></p>
+                  <p className="font-bold text-white">{planQuestion.questionText}</p>
+                  <p className="text-rose-300">{planQuestion.errorCount} erros de {planQuestion.totalAnswered} respostas ({planQuestion.errorRate}%)</p>
+                  <p className="text-emerald-300">Orientação correta: {planQuestion.correctOptionText}</p>
+                  <p className="text-slate-400">Origem: Questionário · Situação inicial: Aberto · Prioridade: {planQuestion.fragilityLevel === 'CRITICAL' ? 'Alta' : 'Média'}</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="text-xs font-semibold text-slate-200">Data de início
+                    <input type="date" required value={planStartDate} onChange={e => setPlanStartDate(e.target.value)} className="mt-1 block w-full rounded-lg border border-slate-600 bg-slate-900 p-3 text-white" />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-200">Prazo final
+                    <input type="date" required min={planStartDate || undefined} value={planDueDate} onChange={e => setPlanDueDate(e.target.value)} className="mt-1 block w-full rounded-lg border border-slate-600 bg-slate-900 p-3 text-white" />
+                  </label>
+                </div>
+                <p className="text-xs text-slate-400">O responsável poderá ser atribuído posteriormente no módulo de Planos de Ação. A criação manual permanece disponível.</p>
+                {planError && <p role="alert" className="rounded-lg bg-rose-950 p-3 text-sm text-rose-300">{planError}</p>}
+                <button type="button" disabled={savingPlan || !planDueDate || !planStartDate} onClick={submitAutomaticPlan} className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-500 disabled:opacity-50">
+                  {savingPlan ? 'Criando plano...' : 'Confirmar e criar plano automaticamente'}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
 
