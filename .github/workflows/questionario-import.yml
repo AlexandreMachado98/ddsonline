@@ -1,0 +1,19 @@
+name: Validar importação de questionários
+on:
+  pull_request:
+    paths:
+      - 'lib/questionarioImportParser.ts'
+      - 'tests/questionarioImportParser.test.mjs'
+      - '.github/workflows/questionario-import.yml'
+  workflow_dispatch:
+
+jobs:
+  parser-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Testar extração de perguntas e gabaritos
+        run: node --experimental-strip-types --test tests/questionarioImportParser.test.mjs
