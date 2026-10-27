@@ -98,9 +98,9 @@ export default function Sidebar({ isOpen, onClose, onOpenProfile }: SidebarProps
         },
         {
           label: 'BI & Analytics SST',
-          href: '/admin/questionarios?tab=BI',
+          href: '/admin/bi',
           icon: BarChart3,
-          active: pathname === '/admin/questionarios' && currentTab === 'BI'
+          active: pathname === '/admin/bi'
         }
       ]
     }
