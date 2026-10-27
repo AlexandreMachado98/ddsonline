@@ -57,6 +57,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Formato inválido ou arquivo acima de 5 MB.' }, { status: 400 });
     }
     const buffer = Buffer.from(await file.arrayBuffer());
+    const signatures: Record<string, boolean> = {
+      pdf: buffer.subarray(0, 5).toString('ascii') === '%PDF-',
+      docx: buffer[0] === 0x50 && buffer[1] === 0x4b,
+      xlsx: buffer[0] === 0x50 && buffer[1] === 0x4b
+    };
+    if (!signatures[extension!]) return NextResponse.json({ success: false, error: 'Conteúdo do arquivo não corresponde ao formato informado.' }, { status: 400 });
     let text = '';
     if (extension === 'docx') {
       const mammoth = await import('mammoth');
@@ -88,6 +94,7 @@ export async function POST(req: Request) {
       if (!questions.length || questions.length > 100) throw new Error('A planilha deve conter de 1 a 100 questões.');
       return NextResponse.json({ success: true, questions }, { headers: { 'Cache-Control': 'no-store' } });
     }
+    if (text.length > 250000) throw new Error('Documento muito extenso para importação.');
     const questions = parseText(text);
     return NextResponse.json({ success: true, questions }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
