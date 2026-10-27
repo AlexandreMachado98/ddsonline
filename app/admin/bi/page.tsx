@@ -48,7 +48,7 @@ function Bars({ title, data }: { title: string; data: { label: string; value: nu
   </section>;
 }
 
-export default function GeneralBIPage() {
+function GeneralBIPageContent() {
   const { user } = useAuth();
   const [section, setSection] = useState<'GERAL' | 'AVALIACOES'>('GERAL');
   const [period, setPeriod] = useState('30d');
@@ -171,4 +171,19 @@ export default function GeneralBIPage() {
       </>}
     </div>
   </AppShell>;
+}
+
+
+// Next.js 14 requires Suspense around clients that can reach useSearchParams
+// through nested layout components (AppShell / Sidebar).
+export default function GeneralBIPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="min-h-screen bg-[#F5F7FB] p-8 text-sm text-slate-600" role="status">
+        Carregando painel de BI...
+      </div>
+    }>
+      <GeneralBIPageContent />
+    </React.Suspense>
+  );
 }
