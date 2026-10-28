@@ -433,10 +433,12 @@ function QuestionariosContent() {
 
         // Nome e Função do Colaborador
         const pName = (att.participantName || att.attendance?.name || 'Anônimo').trim();
+        const pKey = att.participantRegistration && /^\d{4}$/.test(att.participantRegistration)
+          ? `matricula:${att.participantRegistration}` : `legado:${pName.toLocaleLowerCase('pt-BR')}`;
         const pRole = (att.participantDoc || 'Função não informada').trim();
 
-        if (!participantStats[pName]) {
-          participantStats[pName] = {
+        if (!participantStats[pKey]) {
+          participantStats[pKey] = {
             name: pName,
             role: pRole,
             count: 0,
@@ -446,13 +448,13 @@ function QuestionariosContent() {
             attempts: []
           };
         }
-        if (participantStats[pName].role === 'Função não informada' && pRole !== 'Função não informada') {
-          participantStats[pName].role = pRole;
+        if (participantStats[pKey].role === 'Função não informada' && pRole !== 'Função não informada') {
+          participantStats[pKey].role = pRole;
         }
 
-        participantStats[pName].count++;
-        participantStats[pName].totalScore += att.score;
-        if (att.passed) participantStats[pName].passedCount++;
+        participantStats[pKey].count++;
+        participantStats[pKey].totalScore += att.score;
+        if (att.passed) participantStats[pKey].passedCount++;
 
         // Breakdown detalhado de cada pergunta respondida por este colaborador
         const answersList = att.answers || [];
@@ -511,7 +513,7 @@ function QuestionariosContent() {
           });
         });
 
-        participantStats[pName].attempts.push({
+        participantStats[pKey].attempts.push({
           attemptId: att.id,
           quizId: quiz.id,
           quizTitle: quiz.title,
@@ -624,7 +626,11 @@ function QuestionariosContent() {
   // as respostas de uma primeira avaliação com as de uma reavaliação clonada.
   const handleOpenCollaboratorByName = (collabName: string) => {
     if (!collabName || !biMetrics?.participantStats || !selectedRankingQuiz) return;
-    const detail = biMetrics.participantStats[collabName.trim()];
+    const normalized = collabName.trim().toLocaleLowerCase('pt-BR');
+    const detail = Object.values(biMetrics.participantStats).find(p =>
+      p.name.toLocaleLowerCase('pt-BR') === normalized &&
+      p.attempts.some(att => att.quizId === selectedRankingQuiz.id)
+    );
     if (!detail) return;
 
     const attemptsFromSelectedQuiz = detail.attempts
