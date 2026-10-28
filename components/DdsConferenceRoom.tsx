@@ -356,7 +356,20 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
       });
 
       screenStreamRef.current = displayStream;
-      currentStreamRef.current = displayStream;
+      const screenVideo = displayStream.getVideoTracks()[0];
+      const microphone = cameraStreamRef.current?.getAudioTracks()[0];
+      const presentationAudio = displayStream.getAudioTracks()[0];
+      let audio = microphone || presentationAudio;
+      if (microphone && presentationAudio) {
+        const context = new AudioContext();
+        audioContextRef.current = context;
+        const mixed = context.createMediaStreamDestination();
+        context.createMediaStreamSource(new MediaStream([microphone])).connect(mixed);
+        context.createMediaStreamSource(new MediaStream([presentationAudio])).connect(mixed);
+        mixedAudioRef.current = mixed.stream;
+        audio = mixed.stream.getAudioTracks()[0];
+      }
+      currentStreamRef.current = new MediaStream([...(screenVideo ? [screenVideo] : []), ...(audio ? [audio] : [])]);
       setIsSharingScreen(true);
 
       if (screenPreviewRef.current) {
@@ -370,9 +383,10 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
         activeCallsRef.current.forEach((call) => {
           try {
             const sender = call.peerConnection?.getSenders()?.find((s: any) => s.track?.kind === 'video');
-            if (sender) {
-              sender.replaceTrack(newVideoTrack);
-            }
+            if (sender) sender.replaceTrack(newVideoTrack).catch(console.warn);
+            const audioSender = call.peerConnection?.getSenders()?.find((s: any) => s.track?.kind === 'audio');
+            const nextAudio = currentStreamRef.current?.getAudioTracks()[0];
+            if (audioSender && nextAudio) audioSender.replaceTrack(nextAudio).catch(console.warn);
           } catch (e) {}
         });
 
