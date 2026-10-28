@@ -21,7 +21,7 @@ interface QuizRankingViewProps {
   companyName?: string;
   isPublicMode?: boolean; // Se for visualizado pelo colaborador na tela pública
   shareToken?: string;
-  onOpenCollaboratorModal?: (collaboratorName: string) => void;
+  onOpenCollaboratorModal?: (attemptId: string) => void;
 }
 
 export default function QuizRankingView({
@@ -727,7 +727,7 @@ export default function QuizRankingView({
                         {!isPublicMode && onOpenCollaboratorModal && (
                           <td className="py-3 px-3 text-center whitespace-nowrap">
                             <button
-                              onClick={() => onOpenCollaboratorModal(item.participantName)}
+                              onClick={() => onOpenCollaboratorModal(item.attemptId)}
                               className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                               title="Ver Gabarito e Questões Respondidas"
                             >
