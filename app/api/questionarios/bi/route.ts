@@ -176,6 +176,7 @@ export async function GET(req: Request) {
             timeSpentSeconds: true,
             participantName: true,
             participantDoc: true,
+            participantRegistration: true,
             attendanceId: true,
             attendance: { select: { id: true, name: true } },
             answers: {
@@ -336,7 +337,8 @@ export async function GET(req: Request) {
         // Nome e Colaborador Único
         const pName = (att.participantName || att.attendance?.name || 'Colaborador Anônimo').trim();
         const pRole = (att.participantDoc || 'Função não informada').trim();
-        const normKey = pName.toLowerCase();
+        const normKey = att.participantRegistration && /^\d{4}$/.test(att.participantRegistration)
+          ? `matricula:${att.participantRegistration}` : `legado:${pName.toLocaleLowerCase('pt-BR')}`;
         uniqueParticipantsSet.add(normKey);
         quizParticipantsSet.add(normKey);
 
