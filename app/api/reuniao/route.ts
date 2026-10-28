@@ -202,7 +202,7 @@ export async function GET(req: Request) {
         : { organizerId: sessionUser.id })
     };
 
-    const activeMeetingPromise = prisma.meeting.findFirst({
+    const activeMeetingPromise = prisma.meeting.findMany({
       where: activeWhere,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -255,8 +255,8 @@ export async function GET(req: Request) {
 
     // Se o cliente pediu apenas o DDS ativo (polling leve a cada 20s)
     if (activeOnly) {
-      const activeMeeting = await activeMeetingPromise;
-      return NextResponse.json({ success: true, meeting: activeMeeting });
+      const activeMeetings = await activeMeetingPromise;
+      return NextResponse.json({ success: true, meeting: activeMeetings[0] || null, activeMeetings });
     }
 
     // Histórico de DDS concluídos com evidências preservadas
@@ -332,12 +332,12 @@ export async function GET(req: Request) {
     });
 
     // Execução paralela ultrarrápida no banco
-    const [activeMeeting, history] = await Promise.all([
+    const [activeMeetings, history] = await Promise.all([
       activeMeetingPromise,
       historyPromise
     ]);
 
-    return NextResponse.json({ success: true, meeting: activeMeeting, history });
+    return NextResponse.json({ success: true, meeting: activeMeetings[0] || null, activeMeetings, history });
 
   } catch (error) {
     console.error("Erro no GET /api/reuniao:", error);
@@ -356,15 +356,6 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
     const { topic, farm, groupPhoto, type, classification, objective, programmaticContent, attachments } = body;
-
-    // Encerra apenas as reuniões ativas deste organizador autenticado
-    await prisma.meeting.updateMany({
-      where: {
-        status: 'LIVE',
-        organizerId: sessionUser.id
-      },
-      data: { status: 'ENDED' }
-    });
 
     // 1. Validação estrita da foto em grupo (se enviada)
     let validatedGroupPhoto: string | null = null;
@@ -403,7 +394,15 @@ export async function POST(req: Request) {
       }
     }
 
-    const newMeeting = await prisma.meeting.create({
+    // Serializa criações por organizador: duas abas não podem ultrapassar três salas.
+    // Nenhuma sala existente é encerrada automaticamente.
+    const newMeeting = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${sessionUser.id}))::text AS locked`;
+      const activeCount = await tx.meeting.count({
+        where: { organizerId: sessionUser.id, status: 'LIVE' }
+      });
+      if (activeCount >= 3) return null;
+      return tx.meeting.create({
       data: {
         topic: String(topic || 'DDS de Segurança').slice(0, 200).trim(),
         farm: String(farm || 'Unidade Operacional').slice(0, 150).trim(),
@@ -425,7 +424,15 @@ export async function POST(req: Request) {
           orderBy: { order: 'asc' }
         }
       }
+      });
     });
+
+    if (!newMeeting) {
+      return NextResponse.json({
+        success: false,
+        error: 'Limite de 3 salas simultâneas atingido. Encerre uma sala ativa para abrir outra.'
+      }, { status: 409 });
+    }
 
     logSecurityEvent('ADMIN_ACTION', {
       userId: sessionUser.id,
