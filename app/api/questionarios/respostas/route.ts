@@ -64,6 +64,10 @@ export async function POST(req: Request) {
       }
     }
 
+    if (typeof participantDoc !== 'string' || !participantDoc.trim()) {
+      return failure('Informe sua função antes de enviar o questionário.', 400);
+    }
+
     if (answers.length !== quiz.questions.length) return failure('Responda todas as perguntas.', 400);
 
     const questions: QuizQuestion[] = quiz.questions.map(q => ({
