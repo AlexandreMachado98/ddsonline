@@ -25,6 +25,11 @@ function ParticipantTile({ stream, label }: { stream: MediaStream; label: string
     <div className="relative aspect-video rounded-xl bg-slate-900 border border-slate-700 overflow-hidden">
       <video ref={ref} autoPlay playsInline className="w-full h-full object-cover" />
       <div className="absolute bottom-1 left-1 right-1 bg-black/65 text-white text-[10px] px-2 py-1 rounded truncate">{label}</div>
+      <button type="button" onClick={() => { if (ref.current) { ref.current.muted = false; ref.current.play().catch(() => {}); } }}
+        aria-label={`Ativar áudio de ${label}`}
+        className="absolute top-1 right-1 bg-slate-950/80 hover:bg-slate-900 text-white text-[10px] rounded px-2 py-1">
+        Ouvir
+      </button>
     </div>
   );
 }
@@ -155,7 +160,12 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
           activeCallsRef.current.push(call);
           setViewerCount(activeCallsRef.current.length);
           call.on('stream', (incoming: MediaStream) => {
-            setRemoteParticipants(prev => [...prev.filter(p => p.id !== call.peer), { id: call.peer, stream: incoming }]);
+            // Não exibir o canvas fictício de 1px usado por espectadores sem câmera.
+            const realVideo = incoming.getVideoTracks().some(track => (track.getSettings().width || 0) > 1);
+            const realAudio = incoming.getAudioTracks().length > 0;
+            if (realVideo || realAudio) {
+              setRemoteParticipants(prev => [...prev.filter(p => p.id !== call.peer), { id: call.peer, stream: incoming }]);
+            }
           });
 
           call.on('close', () => {
