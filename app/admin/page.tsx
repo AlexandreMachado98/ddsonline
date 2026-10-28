@@ -90,6 +90,16 @@ function AdminPanelContent() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 
+  // Cada sala mantém suas próprias evidências. A seleção inicial ou troca de sala
+  // carrega apenas as fotos vinculadas ao ID atual, nunca as do formulário de novo DDS.
+  useEffect(() => {
+    if (activeMeeting?.id) {
+      setTeamPhotos(parseGroupPhotos(activeMeeting.groupPhoto));
+    } else {
+      setTeamPhotos([]);
+    }
+  }, [activeMeeting?.id]);
+
   // Se a rota solicitou mode=live mas nenhuma reunião ativa existe após carga inicial, normaliza URL
   useEffect(() => {
     if (!isLoadingInitial && !activeMeeting && searchParams?.get('mode') === 'live') {
