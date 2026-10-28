@@ -100,6 +100,7 @@ export async function GET(req: Request) {
             submittedAt: true,
             participantName: true,
             participantDoc: true,
+            participantRegistration: true,
             attendance: { select: { id: true, name: true } },
             answers: {
               select: {

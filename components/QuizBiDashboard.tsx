@@ -938,8 +938,7 @@ export default function QuizBiDashboard({
               shareToken={activeRankingQuiz.shareToken}
               organizerName={organizerName}
               companyName={companyName}
-              onOpenCollaboratorModal={onOpenCollaboratorModal}
-            />
+              />
           ) : (
             <div className="p-8 text-center bg-slate-900 border border-slate-800 rounded-2xl">
               <Trophy size={36} className="mx-auto text-amber-500 mb-2" />

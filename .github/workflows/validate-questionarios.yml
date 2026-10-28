@@ -13,6 +13,9 @@ on:
       - 'app/admin/planos-de-acao/**'
       - 'app/api/planos-de-acao/**'
       - 'lib/quizGrading.ts'
+      - 'lib/quizRanking.ts'
+      - 'app/questionario/**'
+      - 'tests/quizRanking.test.cjs'
       - 'prisma/**'
       - '.github/workflows/validate-questionarios.yml'
 jobs:
@@ -37,7 +40,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Testes unitários de correção
-        run: node tests/quizGrading.test.cjs
+        run: node tests/quizGrading.test.cjs && node tests/quizRanking.test.cjs
 
       - name: Verificar build Next.js de produção
         run: npm run build
