@@ -1429,6 +1429,7 @@ function AdminPanelContent() {
                 <p className="text-[11px] text-slate-500">{room.attendees?.length || 0} presença(s) • Início: {new Date(room.createdAt).toLocaleString('pt-BR')}</p>
                 <button type="button" onClick={() => {
                   setActiveMeeting(room);
+                  setTeamPhotos(room.groupPhoto ? parseGroupPhotos(room.groupPhoto) : []);
                   setIsLiveMode(true);
                   router.push('/admin?mode=live');
                 }} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg py-2.5 flex justify-center items-center gap-2 cursor-pointer">
