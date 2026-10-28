@@ -658,6 +658,24 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
 
       </div>
 
+      {isAdmin && (
+        <section className="bg-slate-950 border-t border-slate-800 px-3 sm:px-5 py-3 space-y-2">
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-xs font-bold text-slate-200">Mosaico de participantes ({remoteParticipants.length})</span>
+            <span className="text-[10px] text-slate-400">Vídeo e áudio opcionais</span>
+          </div>
+          {remoteParticipants.length ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 max-h-64 overflow-y-auto">
+              {remoteParticipants.map((person, index) => (
+                <ParticipantTile key={person.id} stream={person.stream} label={`Participante ${index + 1}`} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500">Nenhum participante transmitindo câmera no momento.</p>
+          )}
+        </section>
+      )}
+
       {/* 3. BARRA INFERIOR DE CONTROLES */}
       <div className="w-full bg-slate-900/90 backdrop-blur-md px-3 sm:px-5 py-3 flex items-center justify-between border-t border-slate-800 z-20 flex-wrap gap-2">
         
