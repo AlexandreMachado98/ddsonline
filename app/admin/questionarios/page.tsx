@@ -56,6 +56,7 @@ interface AttemptSummary {
   submittedAt: string;
   participantName?: string | null;
   participantDoc?: string | null;
+  participantRegistration?: string | null;
   attendance?: {
     id: string;
     name: string;
@@ -86,6 +87,7 @@ export interface CollaboratorAttemptDetail {
 
 export interface ParticipantDetail {
   name: string;
+  registration?: string | null;
   role: string;
   count: number;
   totalScore: number;
@@ -433,11 +435,14 @@ function QuestionariosContent() {
 
         // Nome e Função do Colaborador
         const pName = (att.participantName || att.attendance?.name || 'Anônimo').trim();
+        const pKey = att.participantRegistration && /^\d{4}$/.test(att.participantRegistration)
+          ? `matricula:${att.participantRegistration}` : `legado:${pName.toLocaleLowerCase('pt-BR')}`;
         const pRole = (att.participantDoc || 'Função não informada').trim();
 
-        if (!participantStats[pName]) {
-          participantStats[pName] = {
+        if (!participantStats[pKey]) {
+          participantStats[pKey] = {
             name: pName,
+            registration: att.participantRegistration || null,
             role: pRole,
             count: 0,
             totalScore: 0,
@@ -446,13 +451,13 @@ function QuestionariosContent() {
             attempts: []
           };
         }
-        if (participantStats[pName].role === 'Função não informada' && pRole !== 'Função não informada') {
-          participantStats[pName].role = pRole;
+        if (participantStats[pKey].role === 'Função não informada' && pRole !== 'Função não informada') {
+          participantStats[pKey].role = pRole;
         }
 
-        participantStats[pName].count++;
-        participantStats[pName].totalScore += att.score;
-        if (att.passed) participantStats[pName].passedCount++;
+        participantStats[pKey].count++;
+        participantStats[pKey].totalScore += att.score;
+        if (att.passed) participantStats[pKey].passedCount++;
 
         // Breakdown detalhado de cada pergunta respondida por este colaborador
         const answersList = att.answers || [];
@@ -511,7 +516,7 @@ function QuestionariosContent() {
           });
         });
 
-        participantStats[pName].attempts.push({
+        participantStats[pKey].attempts.push({
           attemptId: att.id,
           quizId: quiz.id,
           quizTitle: quiz.title,
@@ -622,25 +627,22 @@ function QuestionariosContent() {
 
   // O ranking é sempre de UMA aplicação específica. Nunca misture no gabarito
   // as respostas de uma primeira avaliação com as de uma reavaliação clonada.
-  const handleOpenCollaboratorByName = (collabName: string) => {
-    if (!collabName || !biMetrics?.participantStats || !selectedRankingQuiz) return;
-    const detail = biMetrics.participantStats[collabName.trim()];
+  // Abre exatamente a tentativa do ranking (sem ambiguidade entre nomes iguais).
+  const handleOpenCollaboratorByAttempt = (attemptId: string) => {
+    if (!attemptId || !biMetrics?.participantStats || !selectedRankingQuiz) return;
+    const detail = Object.values(biMetrics.participantStats).find(p =>
+      p.attempts.some(a => a.attemptId === attemptId && a.quizId === selectedRankingQuiz.id));
     if (!detail) return;
-
-    const attemptsFromSelectedQuiz = detail.attempts
-      .filter(att => att.quizId === selectedRankingQuiz.id)
-      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
-    if (attemptsFromSelectedQuiz.length === 0) return;
-
-    // A nota e as respostas exibidas pertencem exclusivamente aos mesmos attemptIds.
-    const scoresSum = attemptsFromSelectedQuiz.reduce((sum, attempt) => sum + attempt.score, 0);
+    const attempt = detail.attempts.find(a =>
+      a.attemptId === attemptId && a.quizId === selectedRankingQuiz.id);
+    if (!attempt) return;
     setSelectedCollaborator({
       ...detail,
-      count: attemptsFromSelectedQuiz.length,
-      totalScore: scoresSum,
-      avgScore: Math.round(scoresSum / attemptsFromSelectedQuiz.length * 10) / 10,
-      passedCount: attemptsFromSelectedQuiz.filter(att => att.passed).length,
-      attempts: attemptsFromSelectedQuiz
+      count: 1,
+      totalScore: attempt.score,
+      avgScore: attempt.score,
+      passedCount: attempt.passed ? 1 : 0,
+      attempts: [attempt]
     });
   };
 
@@ -1714,7 +1716,7 @@ function QuestionariosContent() {
                 shareToken={selectedRankingQuiz.shareToken}
                 organizerName={currentUser?.name || 'Técnico de Segurança'}
                 companyName={currentUser?.company || 'DDS Online'}
-                onOpenCollaboratorModal={handleOpenCollaboratorByName}
+                onOpenCollaboratorModal={handleOpenCollaboratorByAttempt}
               />
             ) : (
               <div className="p-12 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-4 shadow-xl">
@@ -1836,7 +1838,7 @@ function QuestionariosContent() {
                   </div>
                   <h3 className="text-base sm:text-lg font-bold text-white">{selectedCollaborator.name}</h3>
                   <p className="text-xs text-slate-400">
-                    Função: <strong className="text-slate-200">{selectedCollaborator.role}</strong> • Total de Avaliações: {selectedCollaborator.count}
+                    Função: <strong className="text-slate-200">{selectedCollaborator.role}</strong> {selectedCollaborator.registration ? `• Matrícula: ${selectedCollaborator.registration}` : ''} • Total de Avaliações: {selectedCollaborator.count}
                   </p>
                 </div>
 
