@@ -82,6 +82,7 @@ function AdminPanelContent() {
   const [selectedMeetings, setSelectedMeetings] = useState<string[]>([]);
 
   const [activeMeeting, setActiveMeeting] = useState<any>(null);
+  const [activeMeetings, setActiveMeetings] = useState<any[]>([]);
   const [editAttachments, setEditAttachments] = useState<DdsAttachment[]>([]);
   const [isReviewingClose, setIsReviewingClose] = useState(false);
   const [previewMeeting, setPreviewMeeting] = useState<any | null>(null);
@@ -224,30 +225,23 @@ function AdminPanelContent() {
       const data = await res.json();
       
       if (data.success) {
-        if (data.meeting && data.meeting.status === 'LIVE') {
-          setActiveMeeting((prev: any) => {
-            // Preserva o fileData já baixado localmente para que a imagem não pisque/suma do modal
-            if (prev && prev.attachments && data.meeting.attachments) {
-              const updatedAttachments = data.meeting.attachments.map((newAtt: any) => {
-                const oldAtt = prev.attachments.find((a: any) => a.id === newAtt.id);
-                if (oldAtt && oldAtt.fileData && !newAtt.fileData) {
-                  return { ...newAtt, fileData: oldAtt.fileData };
-                }
-                return newAtt;
-              });
-              return { ...data.meeting, attachments: updatedAttachments };
-            }
-            return data.meeting;
-          });
-          cacheMeetingData(data.meeting);
-
-          if (data.meeting.groupPhoto) {
-            const parsedPhotos = parseGroupPhotos(data.meeting.groupPhoto);
-            if (parsedPhotos.length > 0) setTeamPhotos(parsedPhotos);
+        const liveRooms: any[] = Array.isArray(data.activeMeetings)
+          ? data.activeMeetings.filter((room: any) => room.status === 'LIVE')
+          : data.meeting?.status === 'LIVE' ? [data.meeting] : [];
+        setActiveMeetings(liveRooms);
+        // Mantenha a sala escolhida durante o polling. Só troque ao encerrar/indisponibilizar.
+        setActiveMeeting((previous: any) => {
+          const updated = liveRooms.find((room: any) => room.id === previous?.id) || liveRooms[0] || null;
+          if (!updated) return null;
+          if (previous?.id === updated.id && previous?.attachments && updated.attachments) {
+            const attachments = updated.attachments.map((file: any) => {
+              const oldFile = previous.attachments.find((existing: any) => existing.id === file.id);
+              return oldFile?.fileData && !file.fileData ? { ...file, fileData: oldFile.fileData } : file;
+            });
+            return { ...updated, attachments };
           }
-        } else {
-          setActiveMeeting(null);
-        }
+          return updated;
+        });
 
         if (!activeOnly && data.history) {
           setMeetingHistory(data.history);
@@ -291,6 +285,10 @@ function AdminPanelContent() {
   }, [currentUser?.id, fetchAllData]);
 
   const handleStartNewMeeting = async (e: React.FormEvent) => {
+    if (activeMeetings.filter(room => room.organizerId === currentUser?.id).length >= 3) {
+      showToast('Você já possui 3 salas abertas. Encerre uma para criar outra.', 'error');
+      return;
+    }
     e.preventDefault();
     if (isCreatingMeeting) return;
     if (!topic.trim() || !farm.trim()) {
@@ -325,6 +323,7 @@ function AdminPanelContent() {
           localStorage.removeItem('dds_draft_meeting');
         }
         setActiveMeeting(data.meeting);
+        setActiveMeetings(prev => [data.meeting, ...prev.filter(room => room.id !== data.meeting.id)]);
         cacheMeetingData(data.meeting);
         setIsLiveMode(true);
         router.push('/admin?mode=live');
@@ -636,6 +635,7 @@ function AdminPanelContent() {
       });
       setIsLiveMode(false);
       setIsReviewingClose(false);
+      setActiveMeetings(prev => prev.filter(room => room.id !== activeMeeting?.id));
       setActiveMeeting(null);
       setTeamPhotos([]);
       router.push('/admin');
@@ -1380,8 +1380,8 @@ function AdminPanelContent() {
         />
         <MetricCard
           title="Status Operacional"
-          value={activeMeeting ? '1 Ao Vivo' : 'Regular'}
-          subtitle={activeMeeting ? 'sala aberta' : 'sem pendências'}
+          value={activeMeetings.length ? `${activeMeetings.length} Ao Vivo` : 'Regular'}
+          subtitle={activeMeetings.length ? `${activeMeetings.length} sala(s) aberta(s)` : 'sem pendências'}
           icon={Radio}
           variant={activeMeeting ? 'emerald' : 'blue'}
           onClick={() => {
@@ -1403,60 +1403,42 @@ function AdminPanelContent() {
         />
       </section>
 
-      {/* Banner de Reunião em Andamento */}
-      {activeMeeting && (
-        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/90 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm animate-in fade-in duration-300">
-          <div className="flex items-start gap-3.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm animate-pulse">
-              <Radio size={20} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <StatusBadge status="LIVE" label="Reunião em Andamento" size="sm" />
-                <span className="text-xs text-slate-500 font-bold truncate">
-                  📍 {activeMeeting.farm}
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  Iniciado às {new Date(activeMeeting.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-              <h3 className="text-base sm:text-lg font-black text-slate-900 mt-1 truncate">
-                {activeMeeting.topic}
-              </h3>
-              <p className="text-xs text-emerald-800 font-bold mt-0.5">
-                {activeMeeting.attendees?.length || 0} colaborador(es) com presença confirmada até o momento
-              </p>
-            </div>
+      {/* Salas simultâneas independentes. Cada cartão abre sua própria sala e presenças. */}
+      <section className="rounded-2xl border border-emerald-200 bg-white p-4 sm:p-5 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="font-black text-slate-900 text-base">Salas de DDS em andamento</h2>
+            <p className="text-xs text-slate-500">Alterne entre as salas sem encerrar as outras. O limite é de 3 salas ativas por organizador.</p>
           </div>
-
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            <button
-              onClick={() => {
-                setIsLiveMode(true);
-                router.push('/admin?mode=live');
-              }}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer"
-            >
-              <Play size={14} />
-              <span>Acessar Sala / Presenças</span>
-            </button>
-            <button
-              onClick={() => handleOpenPreview(activeMeeting)}
-              className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-200/90 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-            >
-              <Eye size={14} />
-              <span>Ver Ata</span>
-            </button>
-            <button
-              onClick={handleDownloadActivePdf}
-              className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-200/90 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-            >
-              <Download size={14} />
-              <span>PDF</span>
-            </button>
-          </div>
+          <span className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 text-xs font-black border border-emerald-200">
+            {activeMeetings.filter(room => room.organizerId === currentUser?.id).length}/3 salas próprias
+          </span>
         </div>
-      )}
+        {activeMeetings.length === 0 ? (
+          <p className="text-sm text-slate-500 py-3">Nenhuma sala aberta. Crie um DDS abaixo para começar.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {activeMeetings.map((room: any) => (
+              <div key={room.id} className="rounded-xl border border-slate-200 p-3 space-y-2 bg-slate-50">
+                <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-700">
+                  <Radio size={13} /> Ao vivo
+                  <span className="text-slate-500 font-medium">• {room.type === 'REMOTE' ? 'EAD' : 'Presencial'}</span>
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 break-words">{room.topic}</h3>
+                <p className="text-xs text-slate-600 break-words">{room.farm}</p>
+                <p className="text-[11px] text-slate-500">{room.attendees?.length || 0} presença(s) • Início: {new Date(room.createdAt).toLocaleString('pt-BR')}</p>
+                <button type="button" onClick={() => {
+                  setActiveMeeting(room);
+                  setIsLiveMode(true);
+                  router.push('/admin?mode=live');
+                }} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg py-2.5 flex justify-center items-center gap-2 cursor-pointer">
+                  <Play size={14} /> Acessar esta sala
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* ===================================================================== */}
       {/* ABAS DE NAVEGAÇÃO SEGMENTADAS                                         */}
