@@ -204,6 +204,7 @@ model QuizAttempt {
 
   @@index([quizId, submittedAt])
   @@index([attendanceId])
+  @@index([participantRegistration])
 }
 
 model QuizAnswer {
