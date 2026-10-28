@@ -397,7 +397,7 @@ export async function POST(req: Request) {
     // Serializa criações por organizador: duas abas não podem ultrapassar três salas.
     // Nenhuma sala existente é encerrada automaticamente.
     const newMeeting = await prisma.$transaction(async tx => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${sessionUser.id}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${sessionUser.id}))`;
       const activeCount = await tx.meeting.count({
         where: { organizerId: sessionUser.id, status: 'LIVE' }
       });
