@@ -672,6 +672,9 @@ export default function QuizRankingView({
                               <p className="text-[10px] text-slate-400 sm:hidden">
                                 {item.participantRole}
                               </p>
+                              {!isPublicMode && item.participantRegistration && (
+                                <p className="text-[10px] font-semibold text-slate-500">Matrícula: {item.participantRegistration}</p>
+                              )}
                             </div>
                           </div>
                         </td>
