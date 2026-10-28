@@ -87,6 +87,7 @@ export interface CollaboratorAttemptDetail {
 
 export interface ParticipantDetail {
   name: string;
+  registration?: string | null;
   role: string;
   count: number;
   totalScore: number;
@@ -441,6 +442,7 @@ function QuestionariosContent() {
         if (!participantStats[pKey]) {
           participantStats[pKey] = {
             name: pName,
+            registration: att.participantRegistration || null,
             role: pRole,
             count: 0,
             totalScore: 0,
@@ -1836,7 +1838,7 @@ function QuestionariosContent() {
                   </div>
                   <h3 className="text-base sm:text-lg font-bold text-white">{selectedCollaborator.name}</h3>
                   <p className="text-xs text-slate-400">
-                    Função: <strong className="text-slate-200">{selectedCollaborator.role}</strong> • Total de Avaliações: {selectedCollaborator.count}
+                    Função: <strong className="text-slate-200">{selectedCollaborator.role}</strong> {selectedCollaborator.registration ? `• Matrícula: ${selectedCollaborator.registration}` : ''} • Total de Avaliações: {selectedCollaborator.count}
                   </p>
                 </div>
 
