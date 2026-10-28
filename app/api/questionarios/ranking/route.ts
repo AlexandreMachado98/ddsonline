@@ -46,7 +46,6 @@ export async function GET(req: Request) {
               participantName: true,
               participantDoc: true,
               participantRegistration: true,
-            participantRegistration: true,
               attendance: { select: { id: true, name: true } },
               answers: {
                 select: {
