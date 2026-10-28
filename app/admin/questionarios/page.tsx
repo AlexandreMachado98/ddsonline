@@ -620,13 +620,28 @@ function QuestionariosContent() {
     return withAttempts || (quizzes.length > 0 ? quizzes[0] : null);
   }, [quizzes, selectedRankingQuizId]);
 
-  // Abre modal de gabarito a partir do ranking
+  // O ranking é sempre de UMA aplicação específica. Nunca misture no gabarito
+  // as respostas de uma primeira avaliação com as de uma reavaliação clonada.
   const handleOpenCollaboratorByName = (collabName: string) => {
-    if (!collabName || !biMetrics?.participantStats) return;
+    if (!collabName || !biMetrics?.participantStats || !selectedRankingQuiz) return;
     const detail = biMetrics.participantStats[collabName.trim()];
-    if (detail) {
-      setSelectedCollaborator(detail);
-    }
+    if (!detail) return;
+
+    const attemptsFromSelectedQuiz = detail.attempts
+      .filter(att => att.quizId === selectedRankingQuiz.id)
+      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    if (attemptsFromSelectedQuiz.length === 0) return;
+
+    // A nota e as respostas exibidas pertencem exclusivamente aos mesmos attemptIds.
+    const scoresSum = attemptsFromSelectedQuiz.reduce((sum, attempt) => sum + attempt.score, 0);
+    setSelectedCollaborator({
+      ...detail,
+      count: attemptsFromSelectedQuiz.length,
+      totalScore: scoresSum,
+      avgScore: Math.round(scoresSum / attemptsFromSelectedQuiz.length * 10) / 10,
+      passedCount: attemptsFromSelectedQuiz.filter(att => att.passed).length,
+      attempts: attemptsFromSelectedQuiz
+    });
   };
 
   const [isImporting, setIsImporting] = useState(false);
@@ -1856,6 +1871,12 @@ function QuestionariosContent() {
                         </span>
                       </div>
                     </div>
+
+                    {att.score === 100 && att.questionsBreakdown.some(question => !question.isCorrect) && (
+                      <div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-950/40 px-3 py-2 text-xs font-semibold text-amber-200">
+                        Divergência nos dados desta tentativa: a nota registrada é 100%, mas há resposta marcada como incorreta. Verifique este registro antes de emitir conclusões. Nenhum dado foi alterado automaticamente.
+                      </div>
+                    )}
 
                     {/* Questões e Gabarito */}
                     <div className="space-y-3">
