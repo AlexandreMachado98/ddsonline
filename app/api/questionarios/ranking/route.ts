@@ -45,6 +45,8 @@ export async function GET(req: Request) {
               timeSpentSeconds: true,
               participantName: true,
               participantDoc: true,
+              participantRegistration: true,
+            participantRegistration: true,
               attendance: { select: { id: true, name: true } },
               answers: {
                 select: {
@@ -128,6 +130,7 @@ export async function GET(req: Request) {
             timeSpentSeconds: true,
             participantName: true,
             participantDoc: true,
+            participantRegistration: true,
             attendance: { select: { id: true, name: true } },
             answers: {
               select: {
