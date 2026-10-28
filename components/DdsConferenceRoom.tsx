@@ -408,6 +408,11 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
       screenStreamRef.current = null;
     }
 
+    mixedAudioRef.current?.getTracks().forEach(track => track.stop());
+    mixedAudioRef.current = null;
+    audioContextRef.current?.close().catch(() => {});
+    audioContextRef.current = null;
+
     // Restaura a câmera
     if (cameraStreamRef.current) {
       currentStreamRef.current = cameraStreamRef.current;
@@ -417,9 +422,10 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
         activeCallsRef.current.forEach((call) => {
           try {
             const sender = call.peerConnection?.getSenders()?.find((s: any) => s.track?.kind === 'video');
-            if (sender) {
-              sender.replaceTrack(cameraVideoTrack);
-            }
+            if (sender) sender.replaceTrack(cameraVideoTrack).catch(console.warn);
+            const audioSender = call.peerConnection?.getSenders()?.find((s: any) => s.track?.kind === 'audio');
+            const mic = cameraStreamRef.current?.getAudioTracks()[0];
+            if (audioSender && mic) audioSender.replaceTrack(mic).catch(console.warn);
           } catch (e) {}
         });
       }
