@@ -311,7 +311,8 @@ function AdminPanelContent() {
           programmaticContent: programmaticContent.trim(),
           organizerId: currentUser?.id,
           email: currentUser?.email,
-          groupPhoto: serializeGroupPhotos(teamPhotos),
+          // Evidências fotográficas são coletadas exclusivamente dentro da sala.
+          groupPhoto: null,
           attachments: newAttachments
         })
       });
@@ -322,6 +323,7 @@ function AdminPanelContent() {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('dds_draft_meeting');
         }
+        setTeamPhotos([]);
         setActiveMeeting(data.meeting);
         setActiveMeetings(prev => [data.meeting, ...prev.filter(room => room.id !== data.meeting.id)]);
         cacheMeetingData(data.meeting);
@@ -1007,6 +1009,7 @@ function AdminPanelContent() {
 
                   <div className="space-y-3 pt-2">
                     <GroupPhotoCapture 
+                      key={activeMeeting.id}
                       initialPhotos={teamPhotos}
                       onPhotosChange={(updatedPhotos) => {
                         setTeamPhotos(updatedPhotos);
@@ -1639,10 +1642,7 @@ function AdminPanelContent() {
                 onChange={setNewAttachments}
               />
 
-              <GroupPhotoCapture 
-                initialPhotos={teamPhotos}
-                onPhotosChange={setTeamPhotos}
-              />
+              {/* Fotos comprobatórias são anexadas na sala ativa, não no formulário inicial. */}
             </div>
 
             {/* Submit */}
