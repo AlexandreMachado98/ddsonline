@@ -251,7 +251,9 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
       outgoing = dummyCanvas.captureStream(1);
     }
 
-    viewerCallRef.current?.close();
+    const previousCall = viewerCallRef.current;
+    viewerCallRef.current = null;
+    previousCall?.close();
     const call = peerInstance.call(hostPeerId, outgoing);
     if (!call) return;
     viewerCallRef.current = call;
@@ -350,6 +352,22 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
       audioContextRef.current?.close().catch(() => {});
     };
   }, [isAdmin, initBroadcaster, initViewer]);
+
+  // O React substitui os elementos <video> ao alternar câmera/apresentação.
+  // Reassocie os streams após a montagem para evitar uma prévia preta.
+  useEffect(() => {
+    if (!isAdmin) return;
+    const preview = screenPreviewRef.current;
+    if (isSharingScreen && preview && screenStreamRef.current) {
+      preview.srcObject = screenStreamRef.current;
+      preview.play().catch(() => {});
+    }
+    const camera = localVideoRef.current;
+    if (camera && cameraStreamRef.current) {
+      camera.srcObject = cameraStreamRef.current;
+      camera.play().catch(() => {});
+    }
+  }, [isAdmin, isSharingScreen]);
 
   // =========================================================================
   // 3. COMPARTILHAMENTO DE TELA DIRETO (ZERO TELA PRETA)
