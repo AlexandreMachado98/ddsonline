@@ -11,7 +11,7 @@ function equals(a: string, b: string) { return timingSafeEqual(fingerprint(a), f
 export async function POST(req: Request) {
   let body: any;
   try { body = await req.json(); } catch { return failure('JSON inválido.', 400); }
-  const { token, attendanceId, answers, attendanceProof, participantName, participantDoc, timeSpentSeconds: incomingTimeSpent } = body || {};
+  const { token, attendanceId, answers, attendanceProof, participantName, participantDoc, participantRegistration, timeSpentSeconds: incomingTimeSpent } = body || {};
   const parsedTimeSpent = Number(incomingTimeSpent);
   const timeSpentSeconds = Number.isInteger(parsedTimeSpent) && parsedTimeSpent > 0 && parsedTimeSpent <= 14400 ? parsedTimeSpent : null;
 
@@ -64,6 +64,17 @@ export async function POST(req: Request) {
       }
     }
 
+    // Nunca aceite uma tentativa sem identificação completa, inclusive nas avaliações com DDS.
+    if (!finalParticipantName || finalParticipantName.trim().split(/\s+/).length < 2) {
+      return failure('Informe seu nome completo (nome e sobrenome).', 400);
+    }
+    if (typeof participantDoc !== 'string' || !participantDoc.trim()) {
+      return failure('Informe sua função.', 400);
+    }
+    if (typeof participantRegistration !== 'string' || !/^\d{4}$/.test(participantRegistration)) {
+      return failure('A matrícula deve conter exatamente 4 números.', 400);
+    }
+
     if (answers.length !== quiz.questions.length) return failure('Responda todas as perguntas.', 400);
 
     const questions: QuizQuestion[] = quiz.questions.map(q => ({
@@ -92,7 +103,8 @@ export async function POST(req: Request) {
           quizId: quiz.id,
           attendanceId: finalAttendanceId,
           participantName: finalParticipantName,
-          participantDoc: typeof participantDoc === 'string' ? participantDoc.trim() : null,
+          participantDoc: participantDoc.trim(),
+          participantRegistration,
           score: result.score,
           earnedPoints: result.earnedPoints,
           possiblePoints: result.possiblePoints,
