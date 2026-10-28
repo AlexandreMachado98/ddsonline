@@ -9,6 +9,26 @@ import {
   Volume2, VolumeX, Eye, Laptop, CheckCircle2, Play, Lock, HelpCircle
 } from 'lucide-react';
 
+// Cada stream remoto recebe um elemento de vídeo independente; alterações de sala
+// desmontam o componente e liberam os tracks, sem misturar participantes.
+function ParticipantTile({ stream, label }: { stream: MediaStream; label: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const video = ref.current;
+    if (video) {
+      video.srcObject = stream;
+      video.play().catch(() => {});
+    }
+    return () => { if (video) video.srcObject = null; };
+  }, [stream]);
+  return (
+    <div className="relative aspect-video rounded-xl bg-slate-900 border border-slate-700 overflow-hidden">
+      <video ref={ref} autoPlay playsInline className="w-full h-full object-cover" />
+      <div className="absolute bottom-1 left-1 right-1 bg-black/65 text-white text-[10px] px-2 py-1 rounded truncate">{label}</div>
+    </div>
+  );
+}
+
 interface DdsConferenceProps {
   roomName: string;
   userName: string;
@@ -29,6 +49,18 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
   // PeerJS
   const peerRef = useRef<any>(null);
   const activeCallsRef = useRef<any[]>([]);
+  const viewerCallRef = useRef<any>(null);
+  const viewerMediaRef = useRef<MediaStream | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(false);
+  const connectedRef = useRef(false);
+  const viewerMediaEnabledRef = useRef(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mixedAudioRef = useRef<MediaStream | null>(null);
+  const [remoteParticipants, setRemoteParticipants] = useState<{ id: string; stream: MediaStream }[]>([]);
+  const [viewerMicOn, setViewerMicOn] = useState(false);
+  const [viewerCameraOn, setViewerCameraOn] = useState(false);
+  const [isJoiningMedia, setIsJoiningMedia] = useState(false);
 
   // Estados gerais
   const [isConnected, setIsConnected] = useState(false);
@@ -57,6 +89,13 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     .toLowerCase();
 
   const hostPeerId = `dds-host-${cleanRoomId}`;
+  // TURN opcional: sem credenciais o P2P ainda pode falhar em redes corporativas.
+  const rtcIceServers: RTCIceServer[] = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    ...(process.env.NEXT_PUBLIC_DDS_TURN_URL && process.env.NEXT_PUBLIC_DDS_TURN_USERNAME && process.env.NEXT_PUBLIC_DDS_TURN_CREDENTIAL
+      ? [{ urls: process.env.NEXT_PUBLIC_DDS_TURN_URL, username: process.env.NEXT_PUBLIC_DDS_TURN_USERNAME, credential: process.env.NEXT_PUBLIC_DDS_TURN_CREDENTIAL }]
+      : [])
+  ];
 
   // =========================================================================
   // 1. ORGANIZADOR (ADMIN / BROADCASTER)
@@ -97,12 +136,7 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
 
       const peer = new Peer(hostPeerId, {
         config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun3.l.google.com:19302' }
-          ]
+          iceServers: rtcIceServers
         }
       });
 
@@ -120,21 +154,28 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
           call.answer(currentStreamRef.current);
           activeCallsRef.current.push(call);
           setViewerCount(activeCallsRef.current.length);
+          call.on('stream', (incoming: MediaStream) => {
+            setRemoteParticipants(prev => [...prev.filter(p => p.id !== call.peer), { id: call.peer, stream: incoming }]);
+          });
 
           call.on('close', () => {
             activeCallsRef.current = activeCallsRef.current.filter((c) => c !== call);
             setViewerCount(activeCallsRef.current.length);
+            setRemoteParticipants(prev => prev.filter(p => p.id !== call.peer));
           });
 
           call.on('error', () => {
             activeCallsRef.current = activeCallsRef.current.filter((c) => c !== call);
             setViewerCount(activeCallsRef.current.length);
+            setRemoteParticipants(prev => prev.filter(p => p.id !== call.peer));
           });
         }
       });
 
       peer.on('error', (err: any) => {
         console.warn('Aviso PeerJS Host:', err);
+        setIsLive(false);
+        setErrorMessage(err?.type === 'unavailable-id' ? 'Esta transmissão já está aberta em outra aba. Feche a outra transmissão e tente novamente.' : 'Falha de sinalização da transmissão. Verifique sua conexão.');
       });
 
     } catch (err: any) {
@@ -165,11 +206,7 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
       const randomViewerId = `dds-viewer-${cleanRoomId}-${Math.random().toString(36).substring(2, 9)}`;
       const peer = new Peer(randomViewerId, {
         config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' }
-          ]
+          iceServers: rtcIceServers
         }
       });
 
@@ -190,75 +227,117 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     }
   }, [cleanRoomId]);
 
-  // Função para chamar o Host e receber a transmissão
+  // Chamada única com reconexão limitada: impede loops de ligações P2P duplicadas.
   const connectToHost = (peerInstance: any) => {
+    if (!mountedRef.current || peerInstance?.destroyed || connectedRef.current) return;
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
     setStatusText('Conectando ao técnico de segurança...');
-    
-    // Cria stream vazio para a chamada de recepção
-    const dummyCanvas = document.createElement('canvas');
-    dummyCanvas.width = 1;
-    dummyCanvas.height = 1;
-    const dummyStream = dummyCanvas.captureStream(1);
 
-    const call = peerInstance.call(hostPeerId, dummyStream);
-
-    if (call) {
-      call.on('stream', (remoteStream: MediaStream) => {
-        setIsLive(true);
-        setStatusText('Transmissão Ao Vivo');
-        
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = remoteStream;
-          remoteVideoRef.current.play().then(() => {
-            setHasStartedPlayback(true);
-          }).catch(() => {
-            // Autoplay bloqueado pelo navegador
-            setHasStartedPlayback(false);
-          });
-        }
-      });
-
-      call.on('close', () => {
-        setIsLive(false);
-        setStatusText('Aguardando início pelo organizador...');
-      });
-
-      call.on('error', () => {
-        setIsLive(false);
-        setTimeout(() => {
-          if (peerRef.current && !peerRef.current.destroyed) {
-            connectToHost(peerRef.current);
-          }
-        }, 3000);
-      });
+    let outgoing = viewerMediaRef.current;
+    if (!outgoing) {
+      const dummyCanvas = document.createElement('canvas');
+      dummyCanvas.width = 1;
+      dummyCanvas.height = 1;
+      outgoing = dummyCanvas.captureStream(1);
     }
 
-    // Polling de reconexão suave a cada 3s caso o host entre depois
-    setTimeout(() => {
-      if (!isLive && peerRef.current && !peerRef.current.destroyed) {
-        connectToHost(peerRef.current);
+    viewerCallRef.current?.close();
+    const call = peerInstance.call(hostPeerId, outgoing);
+    if (!call) return;
+    viewerCallRef.current = call;
+    let received = false;
+
+    const scheduleRetry = () => {
+      if (!mountedRef.current || peerInstance.destroyed || viewerCallRef.current !== call) return;
+      connectedRef.current = false;
+      setIsLive(false);
+      setStatusText('Aguardando reconexão com o instrutor...');
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = setTimeout(() => {
+        if (mountedRef.current && !peerInstance.destroyed) connectToHost(peerInstance);
+      }, 4000);
+    };
+
+    call.on('stream', (remoteStream: MediaStream) => {
+      received = true;
+      connectedRef.current = true;
+      setIsLive(true);
+      setStatusText('Transmissão Ao Vivo');
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = remoteStream;
+        remoteVideoRef.current.play().then(() => setHasStartedPlayback(true))
+          .catch(() => setHasStartedPlayback(false));
       }
-    }, 3000);
+    });
+    call.on('close', scheduleRetry);
+    call.on('error', scheduleRetry);
+    // Host ainda não abriu: expira uma única tentativa, em vez de multiplicar chamadas.
+    reconnectTimerRef.current = setTimeout(() => {
+      if (!received && mountedRef.current && viewerCallRef.current === call) {
+        call.close();
+        scheduleRetry();
+      }
+    }, 9000);
+  };
+
+  const handleJoinWithMedia = async () => {
+    if (isJoiningMedia || viewerMediaEnabledRef.current) return;
+    setIsJoiningMedia(true);
+    try {
+      const media = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+        video: { width: { ideal: 640 }, height: { ideal: 360 } }
+      });
+      if (!mountedRef.current) { media.getTracks().forEach(t => t.stop()); return; }
+      viewerMediaRef.current = media;
+      viewerMediaEnabledRef.current = true;
+      setViewerMicOn(true);
+      setViewerCameraOn(true);
+      connectedRef.current = false;
+      const peer = peerRef.current;
+      if (peer && !peer.destroyed) connectToHost(peer);
+      setErrorMessage(null);
+    } catch (err: any) {
+      setErrorMessage(err?.name === 'NotAllowedError'
+        ? 'Permita câmera e microfone no navegador para participar com áudio/vídeo.'
+        : 'Não foi possível acessar a câmera ou microfone do colaborador.');
+    } finally {
+      setIsJoiningMedia(false);
+    }
+  };
+
+  const toggleViewerMic = () => {
+    const track = viewerMediaRef.current?.getAudioTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    setViewerMicOn(track.enabled);
+  };
+
+  const toggleViewerCamera = () => {
+    const track = viewerMediaRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    setViewerCameraOn(track.enabled);
   };
 
   useEffect(() => {
-    if (isAdmin) {
-      initBroadcaster();
-    } else {
-      initViewer();
-    }
+    mountedRef.current = true;
+    if (isAdmin) initBroadcaster();
+    else initViewer();
 
     return () => {
-      if (peerRef.current) {
-        peerRef.current.destroy();
-        peerRef.current = null;
-      }
-      if (cameraStreamRef.current) {
-        cameraStreamRef.current.getTracks().forEach((t) => t.stop());
-      }
-      if (screenStreamRef.current) {
-        screenStreamRef.current.getTracks().forEach((t) => t.stop());
-      }
+      mountedRef.current = false;
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      viewerCallRef.current?.close();
+      activeCallsRef.current.forEach(c => c.close());
+      activeCallsRef.current = [];
+      peerRef.current?.destroy();
+      peerRef.current = null;
+      cameraStreamRef.current?.getTracks().forEach(t => t.stop());
+      screenStreamRef.current?.getTracks().forEach(t => t.stop());
+      viewerMediaRef.current?.getTracks().forEach(t => t.stop());
+      mixedAudioRef.current?.getTracks().forEach(t => t.stop());
+      audioContextRef.current?.close().catch(() => {});
     };
   }, [isAdmin, initBroadcaster, initViewer]);
 
