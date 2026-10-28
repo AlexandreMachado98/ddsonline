@@ -730,7 +730,24 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {!viewerMediaEnabledRef.current ? (
+              <button type="button" onClick={handleJoinWithMedia} disabled={isJoiningMedia}
+                className="px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold min-h-[44px]">
+                {isJoiningMedia ? 'Solicitando permissão...' : 'Ativar câmera e microfone'}
+              </button>
+            ) : (
+              <>
+                <button type="button" onClick={toggleViewerMic}
+                  className="px-3 py-2.5 bg-slate-800 text-white rounded-xl text-xs font-bold min-h-[44px]">
+                  {viewerMicOn ? 'Silenciar microfone' : 'Ativar microfone'}
+                </button>
+                <button type="button" onClick={toggleViewerCamera}
+                  className="px-3 py-2.5 bg-slate-800 text-white rounded-xl text-xs font-bold min-h-[44px]">
+                  {viewerCameraOn ? 'Desligar câmera' : 'Ligar câmera'}
+                </button>
+              </>
+            )}
             <button
               onClick={() => {
                 if (remoteVideoRef.current) {
