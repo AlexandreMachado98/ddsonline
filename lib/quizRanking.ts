@@ -12,6 +12,7 @@ export interface RawAttempt {
   timeSpentSeconds?: number | null;
   participantName?: string | null;
   participantDoc?: string | null; // Usado para Função ou documento anonimizado
+  participantRegistration?: string | null;
   attendance?: { id: string; name: string } | null;
   answers?: any[];
 }
@@ -141,7 +142,8 @@ export function computeQuizRanking(
     const rawName = (att.participantName || att.attendance?.name || 'Colaborador').trim();
     if (!rawName) return;
 
-    const key = rawName.toLowerCase();
+    const key = att.participantRegistration && /^\d{4}$/.test(att.participantRegistration)
+      ? `matricula:${att.participantRegistration}` : `legado:${rawName.toLocaleLowerCase('pt-BR')}`;
     const correctCount = extractCorrectCount(att, totalQuestions);
 
     const existing = participantBestMap.get(key);
