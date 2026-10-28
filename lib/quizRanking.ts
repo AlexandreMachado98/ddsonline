@@ -22,6 +22,7 @@ export interface QuizRankingItem {
   attemptId: string;
   participantName: string;
   participantRole: string;
+  participantRegistration?: string | null;
   score: number;
   earnedPoints: number;
   possiblePoints: number;
@@ -221,6 +222,7 @@ export function computeQuizRanking(
       attemptId: current.attempt.id,
       participantName: displayName,
       participantRole,
+      participantRegistration: isPublicView ? null : current.attempt.participantRegistration || null,
       score: current.attempt.score,
       earnedPoints: current.attempt.earnedPoints ?? current.correctCount,
       possiblePoints: current.attempt.possiblePoints ?? totalQuestions,
