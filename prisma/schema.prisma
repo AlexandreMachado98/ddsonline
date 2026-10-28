@@ -192,6 +192,7 @@ model QuizAttempt {
   attendance       Attendance?  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
   participantName  String?
   participantDoc   String?
+  participantRegistration String? // matrícula de 4 dígitos; nulo para respostas históricas
   score            Float
   earnedPoints     Int
   possiblePoints   Int
