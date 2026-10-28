@@ -56,6 +56,7 @@ interface AttemptSummary {
   submittedAt: string;
   participantName?: string | null;
   participantDoc?: string | null;
+  participantRegistration?: string | null;
   attendance?: {
     id: string;
     name: string;
@@ -624,29 +625,22 @@ function QuestionariosContent() {
 
   // O ranking é sempre de UMA aplicação específica. Nunca misture no gabarito
   // as respostas de uma primeira avaliação com as de uma reavaliação clonada.
-  const handleOpenCollaboratorByName = (collabName: string) => {
-    if (!collabName || !biMetrics?.participantStats || !selectedRankingQuiz) return;
-    const normalized = collabName.trim().toLocaleLowerCase('pt-BR');
+  // Abre exatamente a tentativa do ranking (sem ambiguidade entre nomes iguais).
+  const handleOpenCollaboratorByAttempt = (attemptId: string) => {
+    if (!attemptId || !biMetrics?.participantStats || !selectedRankingQuiz) return;
     const detail = Object.values(biMetrics.participantStats).find(p =>
-      p.name.toLocaleLowerCase('pt-BR') === normalized &&
-      p.attempts.some(att => att.quizId === selectedRankingQuiz.id)
-    );
+      p.attempts.some(a => a.attemptId === attemptId && a.quizId === selectedRankingQuiz.id));
     if (!detail) return;
-
-    const attemptsFromSelectedQuiz = detail.attempts
-      .filter(att => att.quizId === selectedRankingQuiz.id)
-      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
-    if (attemptsFromSelectedQuiz.length === 0) return;
-
-    // A nota e as respostas exibidas pertencem exclusivamente aos mesmos attemptIds.
-    const scoresSum = attemptsFromSelectedQuiz.reduce((sum, attempt) => sum + attempt.score, 0);
+    const attempt = detail.attempts.find(a =>
+      a.attemptId === attemptId && a.quizId === selectedRankingQuiz.id);
+    if (!attempt) return;
     setSelectedCollaborator({
       ...detail,
-      count: attemptsFromSelectedQuiz.length,
-      totalScore: scoresSum,
-      avgScore: Math.round(scoresSum / attemptsFromSelectedQuiz.length * 10) / 10,
-      passedCount: attemptsFromSelectedQuiz.filter(att => att.passed).length,
-      attempts: attemptsFromSelectedQuiz
+      count: 1,
+      totalScore: attempt.score,
+      avgScore: attempt.score,
+      passedCount: attempt.passed ? 1 : 0,
+      attempts: [attempt]
     });
   };
 
@@ -1720,7 +1714,7 @@ function QuestionariosContent() {
                 shareToken={selectedRankingQuiz.shareToken}
                 organizerName={currentUser?.name || 'Técnico de Segurança'}
                 companyName={currentUser?.company || 'DDS Online'}
-                onOpenCollaboratorModal={handleOpenCollaboratorByName}
+                onOpenCollaboratorModal={handleOpenCollaboratorByAttempt}
               />
             ) : (
               <div className="p-12 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-4 shadow-xl">
