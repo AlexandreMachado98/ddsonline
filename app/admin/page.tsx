@@ -90,6 +90,16 @@ function AdminPanelContent() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 
+  // Cada sala mantém suas próprias evidências. A seleção inicial ou troca de sala
+  // carrega apenas as fotos vinculadas ao ID atual, nunca as do formulário de novo DDS.
+  useEffect(() => {
+    if (activeMeeting?.id) {
+      setTeamPhotos(parseGroupPhotos(activeMeeting.groupPhoto));
+    } else {
+      setTeamPhotos([]);
+    }
+  }, [activeMeeting?.id]);
+
   // Se a rota solicitou mode=live mas nenhuma reunião ativa existe após carga inicial, normaliza URL
   useEffect(() => {
     if (!isLoadingInitial && !activeMeeting && searchParams?.get('mode') === 'live') {
@@ -311,7 +321,8 @@ function AdminPanelContent() {
           programmaticContent: programmaticContent.trim(),
           organizerId: currentUser?.id,
           email: currentUser?.email,
-          groupPhoto: serializeGroupPhotos(teamPhotos),
+          // Evidências fotográficas são coletadas exclusivamente dentro da sala.
+          groupPhoto: null,
           attachments: newAttachments
         })
       });
@@ -322,6 +333,7 @@ function AdminPanelContent() {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('dds_draft_meeting');
         }
+        setTeamPhotos([]);
         setActiveMeeting(data.meeting);
         setActiveMeetings(prev => [data.meeting, ...prev.filter(room => room.id !== data.meeting.id)]);
         cacheMeetingData(data.meeting);
@@ -1007,6 +1019,7 @@ function AdminPanelContent() {
 
                   <div className="space-y-3 pt-2">
                     <GroupPhotoCapture 
+                      key={activeMeeting.id}
                       initialPhotos={teamPhotos}
                       onPhotosChange={(updatedPhotos) => {
                         setTeamPhotos(updatedPhotos);
@@ -1639,10 +1652,7 @@ function AdminPanelContent() {
                 onChange={setNewAttachments}
               />
 
-              <GroupPhotoCapture 
-                initialPhotos={teamPhotos}
-                onPhotosChange={setTeamPhotos}
-              />
+              {/* Fotos comprobatórias são anexadas na sala ativa, não no formulário inicial. */}
             </div>
 
             {/* Submit */}
