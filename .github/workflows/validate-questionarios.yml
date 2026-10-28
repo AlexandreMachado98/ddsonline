@@ -7,6 +7,7 @@ on:
       - 'app/api/questionarios/**'
       - 'app/api/reuniao/**'
       - 'app/admin/page.tsx'
+      - 'components/DdsConferenceRoom.tsx'
       - 'app/admin/questionarios/**'
       - 'app/admin/bi/**'
       - 'app/api/bi/**'
