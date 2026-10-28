@@ -5,6 +5,8 @@ on:
   pull_request:
     paths:
       - 'app/api/questionarios/**'
+      - 'app/api/reuniao/**'
+      - 'app/admin/page.tsx'
       - 'app/admin/questionarios/**'
       - 'app/admin/bi/**'
       - 'app/api/bi/**'
