@@ -144,7 +144,7 @@ function QuestionarioPublicoContent() {
       setError('Por favor, informe o Nome Completo do colaborador.');
       return;
     }
-    if (!attendanceId && !collaboratorRole.trim()) {
+    if (!collaboratorRole.trim()) {
       setError('Por favor, informe a Função do colaborador na operação.');
       return;
     }
@@ -601,21 +601,22 @@ function QuestionarioPublicoContent() {
                 <UserCheck size={16} className="text-emerald-400 shrink-0" />
                 <span>Colaborador: <strong className="text-white">{collaboratorName}</strong></span>
               </div>
-              {collaboratorRole ? (
-                <p className="text-[11px] text-slate-400 pl-6">
-                  Função: <strong className="text-emerald-400">{collaboratorRole}</strong>
-                </p>
-              ) : (
-                <div className="pt-1.5 pl-6">
-                  <input
-                    type="text"
-                    value={collaboratorRole}
-                    onChange={e => setCollaboratorRole(e.target.value)}
-                    placeholder="Sua Função na operação (ex: Motorista, Operador) *"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-emerald-500 outline-none"
-                  />
-                </div>
-              )}
+              <div className="pt-1.5 pl-6">
+                <label htmlFor="linked-quiz-role" className="block text-[10px] font-bold text-slate-400 mb-1">
+                  Função na operação *
+                </label>
+                <input
+                  id="linked-quiz-role"
+                  type="text"
+                  required
+                  autoComplete="organization-title"
+                  value={collaboratorRole}
+                  onChange={e => setCollaboratorRole(e.target.value)}
+                  placeholder="Ex.: Motorista, Operador, Mecânico"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Confira ou corrija a função antes de enviar.</p>
+              </div>
             </div>
           ) : (
             <div className="space-y-2 pt-1">
