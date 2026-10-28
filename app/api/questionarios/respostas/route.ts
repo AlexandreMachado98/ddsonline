@@ -56,7 +56,8 @@ export async function POST(req: Request) {
         return failure('Credencial individual inválida.', 403);
       }
       finalAttendanceId = attendance.id;
-      finalParticipantName = attendance.name;
+      // A credencial prova a presença; o nome completo confirmado no formulário é preservado.
+      finalParticipantName = typeof participantName === 'string' ? participantName.trim() : attendance.name;
     } else {
       // Cenário 2: Questionário avulso / autônomo (sem obrigatoriedade de DDS)
       if (!finalParticipantName) {
