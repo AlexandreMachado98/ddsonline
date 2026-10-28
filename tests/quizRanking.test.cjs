@@ -148,3 +148,28 @@ assert.equal(timeTieResult.podium.third[0].participantName, 'Carlos Devagar');
 console.log('✓ Teste 8: Desempate por menor tempo de conclusão validado com sucesso.');
 
 console.log('✅ TODOS OS 8 TESTES AUTOMATIZADOS DO MOTOR DE RANKING PASSARAM!');
+
+
+// Matrícula é a identidade preferencial: diferenças no nome não duplicam o colaborador.
+const sameRegistration = computeQuizRanking([
+  { id: 'reg-1', participantName: 'José A Silva', participantRegistration: '0042', score: 80, earnedPoints: 4, possiblePoints: 5, passed: true },
+  { id: 'reg-2', participantName: 'José Silva', participantRegistration: '0042', score: 100, earnedPoints: 5, possiblePoints: 5, passed: true }
+], 5);
+assert.equal(sameRegistration.totalParticipants, 1);
+assert.equal(sameRegistration.ranking[0].attemptId, 'reg-2');
+assert.equal(sameRegistration.ranking[0].score, 100);
+
+// Homônimos com matrículas diferentes devem permanecer distintos.
+const homonyms = computeQuizRanking([
+  { id: 'h-1', participantName: 'João Souza', participantRegistration: '0001', score: 80, earnedPoints: 4, possiblePoints: 5, passed: true },
+  { id: 'h-2', participantName: 'João Souza', participantRegistration: '0002', score: 100, earnedPoints: 5, possiblePoints: 5, passed: true }
+], 5);
+assert.equal(homonyms.totalParticipants, 2);
+
+// Dados históricos sem matrícula continuam sendo consultáveis pelo nome.
+const historical = computeQuizRanking([
+  { id: 'old-1', participantName: 'Maria Silva', score: 60, earnedPoints: 3, possiblePoints: 5, passed: false },
+  { id: 'old-2', participantName: 'Maria Silva', score: 80, earnedPoints: 4, possiblePoints: 5, passed: true }
+], 5);
+assert.equal(historical.totalParticipants, 1);
+console.log('✓ Matrícula preserva identidade e histórico legado.');

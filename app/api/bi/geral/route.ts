@@ -76,7 +76,7 @@ export async function GET(request: Request) {
           id: true, title: true, status: true, meetingId: true, createdAt: true,
           attempts: {
             where: range ? { submittedAt: range } : {},
-            select: { score: true, passed: true, participantName: true, participantDoc: true, attendanceId: true }
+            select: { score: true, passed: true, participantName: true, participantDoc: true, participantRegistration: true, attendanceId: true }
           }
         }
       })
@@ -99,8 +99,9 @@ export async function GET(request: Request) {
     }
     const attempts = quizRows.flatMap(q => q.attempts);
     const approved = attempts.filter(a => a.passed).length;
-    const uniqueQuizPeople = new Set(attempts.map((a, i) => a.participantDoc?.trim() ||
-      a.attendanceId || a.participantName?.trim().toLocaleLowerCase('pt-BR') || 'attempt-' + i)).size;
+    const uniqueQuizPeople = new Set(attempts.map((a, i) => a.participantRegistration && /^\d{4}$/.test(a.participantRegistration)
+      ? 'matricula:' + a.participantRegistration
+      : a.attendanceId || a.participantName?.trim().toLocaleLowerCase('pt-BR') || 'attempt-' + i)).size;
     const totalPresences = meetings.reduce((sum, m) => sum + m._count.attendees, 0);
     const closed = meetings.filter(m => m.status !== 'LIVE' && m.status !== 'ACTIVE').length;
     const unansweredActivities = meetings.filter(m => m._count.attendees === 0).length;

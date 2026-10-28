@@ -51,6 +51,7 @@ function QuestionarioPublicoContent() {
   const [attendanceProof, setAttendanceProof] = useState<string>('');
   const [collaboratorName, setCollaboratorName] = useState<string>('');
   const [collaboratorRole, setCollaboratorRole] = useState<string>('');
+  const [collaboratorRegistration, setCollaboratorRegistration] = useState('');
 
   // Respostas { [questionId]: string[] }
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string[]>>({});
@@ -139,13 +140,18 @@ function QuestionarioPublicoContent() {
   const handleSubmit = async () => {
     if (!quiz) return;
 
-    // Se o questionário for autônomo ou não vinculado à presença, exige Nome e Função
-    if (!attendanceId && !collaboratorName.trim()) {
+    // A identificação é obrigatória em qualquer aplicação, com ou sem presença vinculada.
+    if (collaboratorName.trim().split(/\s+/).length < 2) {
       setError('Por favor, informe o Nome Completo do colaborador.');
       return;
     }
     if (!collaboratorRole.trim()) {
       setError('Por favor, informe a Função do colaborador na operação.');
+      return;
+    }
+
+    if (!/^\d{4}$/.test(collaboratorRegistration)) {
+      setError('A matrícula deve conter exatamente 4 números (incluindo zeros à esquerda).');
       return;
     }
 
@@ -167,6 +173,7 @@ function QuestionarioPublicoContent() {
       attendanceProof: attendanceProof || undefined,
       participantName: collaboratorName.trim(),
       participantDoc: collaboratorRole.trim(),
+      participantRegistration: collaboratorRegistration,
       timeSpentSeconds,
       answers: quiz.questions.map(q => ({
         questionId: q.id,
@@ -602,20 +609,11 @@ function QuestionarioPublicoContent() {
                 <span>Colaborador: <strong className="text-white">{collaboratorName}</strong></span>
               </div>
               <div className="pt-1.5 pl-6">
-                <label htmlFor="linked-quiz-role" className="block text-[10px] font-bold text-slate-400 mb-1">
-                  Função na operação *
-                </label>
-                <input
-                  id="linked-quiz-role"
-                  type="text"
-                  required
-                  autoComplete="organization-title"
-                  value={collaboratorRole}
+                <label htmlFor="linked-quiz-role" className="block text-[10px] font-bold text-slate-400 mb-1">Função na operação *</label>
+                <input id="linked-quiz-role" type="text" required value={collaboratorRole}
                   onChange={e => setCollaboratorRole(e.target.value)}
                   placeholder="Ex.: Motorista, Operador, Mecânico"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">Confira ou corrija a função antes de enviar.</p>
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-emerald-500 outline-none" />
               </div>
             </div>
           ) : (
@@ -654,6 +652,24 @@ function QuestionarioPublicoContent() {
               </div>
             </div>
           )}
+
+          <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-3 space-y-2">
+            {attendanceId && (
+              <div>
+                <label htmlFor="quiz-fullname" className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Confirme seu nome completo *</label>
+                <input id="quiz-fullname" type="text" autoComplete="name" required value={collaboratorName}
+                  onChange={e => setCollaboratorName(e.target.value)}
+                  placeholder="Nome e sobrenome" className="w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white" />
+              </div>
+            )}
+            <label htmlFor="quiz-registration" className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Matrícula (4 números) *</label>
+            <input id="quiz-registration" type="text" inputMode="numeric" pattern="[0-9]{4}" minLength={4} maxLength={4}
+              autoComplete="off" required value={collaboratorRegistration}
+              onChange={e => setCollaboratorRegistration(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              placeholder="Ex.: 0042" className="w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white tracking-wider"
+              aria-describedby="quiz-registration-help" />
+            <p id="quiz-registration-help" className="text-[11px] text-slate-400">Informe sua matrícula oficial. Ela será usada para associar suas avaliações e reavaliações, mesmo que seu nome seja escrito de maneira diferente.</p>
+          </div>
 
           {/* Barra de Progresso */}
           <div className="pt-2">
