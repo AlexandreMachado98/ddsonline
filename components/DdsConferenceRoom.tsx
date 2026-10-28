@@ -290,19 +290,19 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     }, 9000);
   };
 
-  const handleJoinWithMedia = async () => {
+  const handleJoinWithMedia = async (enableVideo = true) => {
     if (isJoiningMedia || viewerMediaEnabledRef.current) return;
     setIsJoiningMedia(true);
     try {
       const media = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true },
-        video: { width: { ideal: 640 }, height: { ideal: 360 } }
+        video: enableVideo ? { width: { ideal: 640 }, height: { ideal: 360 } } : false
       });
       if (!mountedRef.current) { media.getTracks().forEach(t => t.stop()); return; }
       viewerMediaRef.current = media;
       viewerMediaEnabledRef.current = true;
       setViewerMicOn(true);
-      setViewerCameraOn(true);
+      setViewerCameraOn(media.getVideoTracks().length > 0);
       connectedRef.current = false;
       const peer = peerRef.current;
       if (peer && !peer.destroyed) connectToHost(peer);
@@ -742,10 +742,16 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             {!viewerMediaEnabledRef.current ? (
-              <button type="button" onClick={handleJoinWithMedia} disabled={isJoiningMedia}
-                className="px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold min-h-[44px]">
-                {isJoiningMedia ? 'Solicitando permissão...' : 'Ativar câmera e microfone'}
-              </button>
+              <>
+                <button type="button" onClick={() => handleJoinWithMedia(false)} disabled={isJoiningMedia}
+                  className="px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold min-h-[44px]">
+                  {isJoiningMedia ? 'Solicitando permissão...' : 'Participar somente com microfone'}
+                </button>
+                <button type="button" onClick={() => handleJoinWithMedia(true)} disabled={isJoiningMedia}
+                  className="px-3 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold min-h-[44px]">
+                  Participar com câmera e microfone
+                </button>
+              </>
             ) : (
               <>
                 <button type="button" onClick={toggleViewerMic}
