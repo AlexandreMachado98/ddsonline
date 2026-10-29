@@ -52,13 +52,17 @@ function QuestionarioPublicoContent() {
   const [collaboratorName, setCollaboratorName] = useState<string>('');
   const [collaboratorRole, setCollaboratorRole] = useState<string>('');
   const [collaboratorRegistration, setCollaboratorRegistration] = useState('');
+  const [entryStage, setEntryStage] = useState<'identity' | 'instructions' | 'quiz'>('identity');
 
   // Respostas { [questionId]: string[] }
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string[]>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
+  // Cronômetro: começa somente quando o colaborador inicia a avaliação.
+  const [quizStartTime, setQuizStartTime] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
   // Submissão e Resultado
-  const [startTime] = useState<number>(() => Date.now());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<any | null>(null);
   const [viewingPublicRanking, setViewingPublicRanking] = useState(false);
@@ -72,6 +76,48 @@ function QuestionarioPublicoContent() {
     if (secs === 0) return `${mins} min`;
     return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
   }
+
+
+  function formatStopwatch(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    const pad = (value: number) => String(value).padStart(2, '0');
+    return hours > 0 ? pad(hours) + ':' + pad(minutes) + ':' + pad(secs) : pad(minutes) + ':' + pad(secs);
+  }
+
+  useEffect(() => {
+    if (entryStage !== 'quiz' || quizStartTime === null || submitResult) return;
+    const updateElapsed = () => setElapsedSeconds(Math.floor((Date.now() - quizStartTime) / 1000));
+    updateElapsed();
+    const intervalId = window.setInterval(updateElapsed, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [entryStage, quizStartTime, submitResult]);
+
+  // O navegador não permite bloquear totalmente a saída. Avisamos antes de fechar
+  // e descartamos a tentativa se a página ficar oculta durante o preenchimento.
+  useEffect(() => {
+    if (entryStage !== 'quiz' || submitResult || isSubmitting) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    const resetIfHidden = () => {
+      if (document.visibilityState !== 'hidden') return;
+      setSelectedAnswers({});
+      setCurrentQuestionIndex(0);
+      setQuizStartTime(null);
+      setElapsedSeconds(0);
+      setEntryStage('instructions');
+      setError('A tela da avaliação foi deixada. Por segurança, as respostas foram descartadas. Inicie novamente do zero.');
+    };
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    document.addEventListener('visibilitychange', resetIfHidden);
+    return () => {
+      window.removeEventListener('beforeunload', warnBeforeLeaving);
+      document.removeEventListener('visibilitychange', resetIfHidden);
+    };
+  }, [entryStage, submitResult, isSubmitting]);
 
   useEffect(() => {
     // 1. Tenta recuperar credencial de presença da URL ou sessionStorage (quando houver)
@@ -124,6 +170,33 @@ function QuestionarioPublicoContent() {
     if (token) fetchQuiz();
   }, [token, searchParams]);
 
+
+  const handleContinueToInstructions = () => {
+    setError(null);
+    if (collaboratorName.trim().split(/\s+/).length < 2) {
+      setError('Informe seu nome completo (nome e sobrenome).');
+      return;
+    }
+    if (!collaboratorRole.trim()) {
+      setError('Informe sua função.');
+      return;
+    }
+    if (!/^\d{4}$/.test(collaboratorRegistration)) {
+      setError('A matrícula deve conter exatamente 4 números, incluindo zeros à esquerda.');
+      return;
+    }
+    setEntryStage('instructions');
+  };
+
+  const handleStartQuiz = () => {
+    setSelectedAnswers({});
+    setCurrentQuestionIndex(0);
+    setElapsedSeconds(0);
+    setQuizStartTime(Date.now());
+    setError(null);
+    setEntryStage('quiz');
+  };
+
   const handleSelectOption = (question: QuizQuestion, optionId: string) => {
     setSelectedAnswers(prev => {
       const current = prev[question.id] || [];
@@ -165,7 +238,7 @@ function QuestionarioPublicoContent() {
     setIsSubmitting(true);
     setError(null);
 
-    const timeSpentSeconds = Math.max(5, Math.round((Date.now() - startTime) / 1000));
+    const timeSpentSeconds = Math.max(1, Math.floor((Date.now() - (quizStartTime ?? Date.now())) / 1000));
 
     const payload = {
       token,
@@ -582,6 +655,67 @@ function QuestionarioPublicoContent() {
     );
   }
 
+
+  // Primeira etapa: identificação do colaborador, antes de exibir qualquer pergunta.
+  if (entryStage === 'identity') {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center py-8 px-4 font-sans">
+        <section className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center"><User size={25} /></div>
+            <div><p className="text-[10px] uppercase tracking-widest text-emerald-400 font-black">DDS ON • Identificação</p><h1 className="text-xl font-black text-white">Antes de começar</h1></div>
+          </div>
+          <div><h2 className="text-base font-bold">{quiz?.title}</h2><p className="text-sm text-slate-400 mt-1">Preencha seus dados para registrar corretamente sua avaliação.</p></div>
+          {error && <div role="alert" className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm rounded-xl flex gap-2"><AlertCircle size={17} className="shrink-0 mt-0.5" /><span>{error}</span></div>}
+          <div className="space-y-4">
+            <div><label htmlFor="participant-full-name" className="block text-xs font-bold text-slate-300 mb-1.5">Nome completo *</label>
+              <input id="participant-full-name" autoComplete="name" value={collaboratorName} onChange={e => setCollaboratorName(e.target.value)} placeholder="Digite seu nome e sobrenome" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" required /></div>
+            <div><label htmlFor="participant-role" className="block text-xs font-bold text-slate-300 mb-1.5">Função *</label>
+              <input id="participant-role" autoComplete="organization-title" value={collaboratorRole} onChange={e => setCollaboratorRole(e.target.value)} placeholder="Ex.: Motorista, Operador, Mecânico" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" required /></div>
+            <div><label htmlFor="participant-registration" className="block text-xs font-bold text-slate-300 mb-1.5">Matrícula (4 números) *</label>
+              <input id="participant-registration" type="text" inputMode="numeric" pattern="[0-9]{4}" minLength={4} maxLength={4} autoComplete="off" value={collaboratorRegistration} onChange={e => setCollaboratorRegistration(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="Ex.: 0042" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm tracking-widest text-white outline-none focus:border-emerald-500" required />
+              <p className="text-[11px] text-slate-500 mt-1.5">Digite os quatro números da sua matrícula, incluindo zeros à esquerda.</p></div>
+          </div>
+          <button type="button" onClick={handleContinueToInstructions} className="w-full min-h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2 transition-colors">Responder questionário <ArrowRight size={17} /></button>
+          <p className="text-[11px] text-slate-500 text-center">Seus dados serão vinculados ao resultado desta avaliação.</p>
+        </section>
+      </main>
+    );
+  }
+
+  // Segunda etapa: orientações e confirmação explícita antes de iniciar o cronômetro.
+  if (entryStage === 'instructions') {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center py-8 px-4 font-sans">
+        <section className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-300 flex items-center justify-center"><AlertTriangle size={25} /></div>
+            <div><p className="text-[10px] uppercase tracking-widest text-amber-300 font-black">Leia antes de iniciar</p><h1 className="text-xl font-black text-white">Orientações do questionário</h1></div>
+          </div>
+          <div className="rounded-2xl border border-slate-700 bg-slate-950 p-4 space-y-2">
+            <p className="text-sm text-slate-200 leading-relaxed">Este questionário é baseado nos DDS, campanhas e treinamentos realizados por você dentro da plataforma DDS ON.</p>
+            <p className="text-sm text-slate-200 leading-relaxed">Ao iniciar, o cronômetro começará a contar o tempo da sua avaliação.</p>
+          </div>
+          <div className="rounded-2xl border border-rose-500/40 bg-rose-950/30 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-rose-300 font-black text-sm"><ShieldCheck size={18} /> Atenção: não saia da avaliação</div>
+            <p className="text-sm text-slate-200 leading-relaxed">Permaneça nesta tela até concluir e enviar todas as respostas. Se fechar ou atualizar a página, trocar de aba ou sair da avaliação, suas respostas serão descartadas e você terá que reiniciar o questionário do zero.</p>
+            <p className="text-xs text-slate-400 leading-relaxed">O navegador pode exibir um aviso antes de fechar a página. Se a tela da avaliação ficar oculta, a tentativa em andamento será reiniciada por segurança.</p>
+          </div>
+          {error && <div role="alert" className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm rounded-xl flex gap-2"><AlertCircle size={17} className="shrink-0 mt-0.5" /><span>{error}</span></div>}
+          <div className="rounded-xl bg-slate-950/70 border border-slate-800 p-3 text-xs text-slate-400 space-y-1">
+            <p><span className="text-slate-500">Colaborador:</span> <strong className="text-white">{collaboratorName}</strong></p>
+            <p><span className="text-slate-500">Função:</span> <strong className="text-white">{collaboratorRole}</strong></p>
+            <p><span className="text-slate-500">Matrícula:</span> <strong className="text-white">{collaboratorRegistration}</strong></p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button type="button" onClick={() => { setError(null); setEntryStage('identity'); }} className="min-h-12 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm flex items-center justify-center gap-2"><ArrowLeft size={16} /> Corrigir meus dados</button>
+            <button type="button" onClick={handleStartQuiz} className="min-h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2">Iniciar questionário <ArrowRight size={16} /></button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   const currentQ = quiz?.questions[currentQuestionIndex];
   const totalQ = quiz?.questions.length || 0;
 
@@ -590,85 +724,18 @@ function QuestionarioPublicoContent() {
       <div className="w-full max-w-xl mx-auto space-y-5">
         {/* Header do Questionário */}
         <header className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-2xl shadow-lg space-y-3">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span className="font-bold text-emerald-400 flex items-center gap-1.5">
-              <ShieldCheck size={14} /> DDS ON • Avaliação
-            </span>
-            <span className="bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 font-mono text-[11px]">
-              {quiz?.meeting?.topic ? `DDS: ${quiz.meeting.topic}` : 'Avaliação Autônoma'}
-            </span>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+            <span className="font-bold text-emerald-400 flex items-center gap-1.5"><ShieldCheck size={14} /> DDS ON • Avaliação</span>
+            <span className="bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 font-mono text-[11px]">{quiz?.meeting?.topic ? 'DDS: ' + quiz.meeting.topic : 'Avaliação Autônoma'}</span>
+            <span role="timer" aria-live="off" className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 font-mono text-sm font-black tabular-nums text-emerald-300"><Clock size={14} /> {formatStopwatch(elapsedSeconds)}</span>
           </div>
 
           <h1 className="text-lg sm:text-xl font-black text-white">{quiz?.title}</h1>
 
-          {/* Campo de Identificação do Participante */}
-          {attendanceId ? (
-            <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl text-xs space-y-1">
-              <div className="flex items-center gap-2 text-slate-300">
-                <UserCheck size={16} className="text-emerald-400 shrink-0" />
-                <span>Colaborador: <strong className="text-white">{collaboratorName}</strong></span>
-              </div>
-              <div className="pt-1.5 pl-6">
-                <label htmlFor="linked-quiz-role" className="block text-[10px] font-bold text-slate-400 mb-1">Função na operação *</label>
-                <input id="linked-quiz-role" type="text" required value={collaboratorRole}
-                  onChange={e => setCollaboratorRole(e.target.value)}
-                  placeholder="Ex.: Motorista, Operador, Mecânico"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-emerald-500 outline-none" />
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2 pt-1">
-              <div className="flex items-center gap-1.5 text-xs text-slate-300 font-bold">
-                <User size={14} className="text-emerald-400" />
-                <span>Identificação do Colaborador:</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Nome Completo
-                  </label>
-                  <input
-                    type="text"
-                    value={collaboratorName}
-                    onChange={e => setCollaboratorName(e.target.value)}
-                    placeholder="Nome Completo do Colaborador *"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Função na Operação
-                  </label>
-                  <input
-                    type="text"
-                    value={collaboratorRole}
-                    onChange={e => setCollaboratorRole(e.target.value)}
-                    placeholder="Função (Ex: Motorista, Mecânico, etc.) *"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-3 space-y-2">
-            {attendanceId && (
-              <div>
-                <label htmlFor="quiz-fullname" className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Confirme seu nome completo *</label>
-                <input id="quiz-fullname" type="text" autoComplete="name" required value={collaboratorName}
-                  onChange={e => setCollaboratorName(e.target.value)}
-                  placeholder="Nome e sobrenome" className="w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white" />
-              </div>
-            )}
-            <label htmlFor="quiz-registration" className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Matrícula (4 números) *</label>
-            <input id="quiz-registration" type="text" inputMode="numeric" pattern="[0-9]{4}" minLength={4} maxLength={4}
-              autoComplete="off" required value={collaboratorRegistration}
-              onChange={e => setCollaboratorRegistration(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              placeholder="Ex.: 0042" className="w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white tracking-wider"
-              aria-describedby="quiz-registration-help" />
-            <p id="quiz-registration-help" className="text-[11px] text-slate-400">Informe sua matrícula oficial. Ela será usada para associar suas avaliações e reavaliações, mesmo que seu nome seja escrito de maneira diferente.</p>
+          <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-3 text-xs text-slate-300 flex flex-wrap gap-x-4 gap-y-1">
+            <span>Colaborador: <strong className="text-white">{collaboratorName}</strong></span>
+            <span>Função: <strong className="text-white">{collaboratorRole}</strong></span>
+            <span>Matrícula: <strong className="text-white">{collaboratorRegistration}</strong></span>
           </div>
 
           {/* Barra de Progresso */}
