@@ -1252,11 +1252,11 @@ export default function ActionPlanModal({
                         </div>
 
                         {att.fileData && (att.mimeType?.startsWith('image/') || att.fileData.startsWith('data:image/')) ? (
-                          <div className="h-28 rounded-xl overflow-hidden bg-slate-100 border border-slate-100 flex items-center justify-center">
+                          <div className="h-44 rounded-xl overflow-hidden bg-slate-100 border border-slate-100 flex items-center justify-center p-2">
                             <img
                               src={att.fileData}
                               alt={att.displayName}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-contain"
                             />
                           </div>
                         ) : (
