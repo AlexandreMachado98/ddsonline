@@ -125,6 +125,23 @@ export async function generateActionPlanIndividualPdf(plan: ActionPlanFullData):
   const borderLight: [number, number, number] = [226, 232, 240];
   const bgCard: [number, number, number] = [248, 250, 252];
 
+  // Insere a imagem sem deformar: mantém a proporção original e centraliza
+  // dentro da área disponível, seja a foto horizontal, vertical ou captura de tela.
+  const addImageContained = (fileData: string, x: number, y: number, maxW: number, maxH: number) => {
+    const imageData = normalizeImageDataUrl(fileData);
+    const imageProps = doc.getImageProperties(imageData);
+    if (!imageProps.width || !imageProps.height) {
+      throw new Error('Não foi possível identificar as dimensões da evidência.');
+    }
+
+    const scale = Math.min(maxW / imageProps.width, maxH / imageProps.height);
+    const imageW = imageProps.width * scale;
+    const imageH = imageProps.height * scale;
+    const imageX = x + (maxW - imageW) / 2;
+    const imageY = y + (maxH - imageH) / 2;
+    doc.addImage(imageData, 'JPEG', imageX, imageY, imageW, imageH);
+  };
+
   let currentY = 0;
 
   // Função para desenhar cabeçalho corporativo institucional
@@ -513,69 +530,80 @@ export async function generateActionPlanIndividualPdf(plan: ActionPlanFullData):
     const beforePhotos = validPhotos.filter(p => p.evidenceType === 'BEFORE');
     const afterPhotos = validPhotos.filter(p => p.evidenceType === 'AFTER');
 
-    // Se houver fotos Antes e Depois, renderiza comparativo lado a lado
+    // Comparativo Antes/Depois com imagens maiores e proporção preservada.
     if (beforePhotos.length > 0 && afterPhotos.length > 0) {
       const boxW = (pageWidth - 32) / 2;
-      const boxH = 46;
-
+      const boxH = 72;
       const pBefore = beforePhotos[0];
       const pAfter = afterPhotos[0];
 
-      // Box Antes
+      if (currentY + boxH > pageHeight - 18) {
+        doc.addPage();
+        renderHeader();
+        currentY = 32;
+      }
+
+      // Card Antes
       doc.setFillColor(254, 242, 242);
       doc.roundedRect(14, currentY, boxW, boxH, 2, 2, 'F');
       doc.setDrawColor(254, 205, 211);
       doc.roundedRect(14, currentY, boxW, boxH, 2, 2, 'S');
-      doc.setFontSize(7.5);
+      doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(225, 29, 72);
-      doc.text('EVIDÊNCIA: ANTES DA INTERVENÇÃO (DESVIO IDENTIFICADO)', 16, currentY + 4.5);
+      doc.text('ANTES DA INTERVENÇÃO', 16, currentY + 5);
 
       try {
-        const normBefore = normalizeImageDataUrl(pBefore.fileData);
-        doc.addImage(normBefore, 'JPEG', 16, currentY + 6, boxW - 4, boxH - 12);
+        addImageContained(pBefore.fileData, 16, currentY + 8, boxW - 4, 49);
       } catch (e) {}
 
       doc.setFontSize(6.5);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-      doc.text(cleanTextForPdf(pBefore.caption || pBefore.displayName || 'Condição inicial identificada'), 16, currentY + boxH - 2);
+      const beforeCaption = doc.splitTextToSize(
+        cleanTextForPdf(pBefore.caption || pBefore.displayName || 'Condição inicial identificada'),
+        boxW - 8
+      ).slice(0, 2);
+      doc.text(beforeCaption, 16, currentY + boxH - 5);
 
-      // Box Depois
+      // Card Depois
       const xAfter = 14 + boxW + 4;
       doc.setFillColor(236, 253, 245);
       doc.roundedRect(xAfter, currentY, boxW, boxH, 2, 2, 'F');
       doc.setDrawColor(167, 243, 208);
       doc.roundedRect(xAfter, currentY, boxW, boxH, 2, 2, 'S');
-      doc.setFontSize(7.5);
+      doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(16, 185, 129);
-      doc.text('EVIDÊNCIA: DEPOIS DA INTERVENÇÃO (CONCLUÍDO)', xAfter + 2, currentY + 4.5);
+      doc.text('DEPOIS DA INTERVENÇÃO', xAfter + 2, currentY + 5);
 
       try {
-        const normAfter = normalizeImageDataUrl(pAfter.fileData);
-        doc.addImage(normAfter, 'JPEG', xAfter + 2, currentY + 6, boxW - 4, boxH - 12);
+        addImageContained(pAfter.fileData, xAfter + 2, currentY + 8, boxW - 4, 49);
       } catch (e) {}
 
       doc.setFontSize(6.5);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-      doc.text(cleanTextForPdf(pAfter.caption || pAfter.displayName || 'Resultado após implementação'), xAfter + 2, currentY + boxH - 2);
+      const afterCaption = doc.splitTextToSize(
+        cleanTextForPdf(pAfter.caption || pAfter.displayName || 'Resultado após implementação'),
+        boxW - 8
+      ).slice(0, 2);
+      doc.text(afterCaption, xAfter + 2, currentY + boxH - 5);
 
       currentY += boxH + 6;
     }
 
-    // Renderiza demais fotos em grade 2x2
-    const remainingPhotos = validPhotos.filter(p => 
+    // Demais evidências em duas colunas, com área de imagem ampliada.
+    const remainingPhotos = validPhotos.filter(p =>
       !(beforePhotos.length > 0 && afterPhotos.length > 0 && (p === beforePhotos[0] || p === afterPhotos[0]))
     );
 
     if (remainingPhotos.length > 0) {
       const gridW = (pageWidth - 32) / 2;
-      const gridH = 40;
+      const gridH = 70;
 
       for (let i = 0; i < remainingPhotos.length; i += 2) {
-        if (currentY > pageHeight - 50) {
+        if (currentY + gridH > pageHeight - 18) {
           doc.addPage();
           renderHeader();
           currentY = 32;
@@ -584,26 +612,29 @@ export async function generateActionPlanIndividualPdf(plan: ActionPlanFullData):
         const p1 = remainingPhotos[i];
         const p2 = remainingPhotos[i + 1];
 
-        // Foto 1
+        // Card da primeira evidência
         doc.setFillColor(bgCard[0], bgCard[1], bgCard[2]);
         doc.roundedRect(14, currentY, gridW, gridH, 1.5, 1.5, 'F');
         doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
         doc.roundedRect(14, currentY, gridW, gridH, 1.5, 1.5, 'S');
 
         try {
-          const norm1 = normalizeImageDataUrl(p1.fileData);
-          doc.addImage(norm1, 'JPEG', 16, currentY + 2, gridW - 4, gridH - 10);
+          addImageContained(p1.fileData, 16, currentY + 3, gridW - 4, 51);
         } catch (e) {}
 
         const p1TypeLabel = p1.evidenceType === 'BEFORE' ? 'ANTES' :
                             p1.evidenceType === 'AFTER' ? 'DEPOIS' :
                             p1.evidenceType === 'DURING' ? 'DURANTE' : 'COMPLEMENTAR';
-
         doc.setFontSize(6.5);
+        doc.setFont('helvetica', 'normal');
         doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-        doc.text(cleanTextForPdf(`[${p1TypeLabel}] ${p1.caption || p1.displayName || p1.fileName}`), 16, currentY + gridH - 2);
+        const p1Caption = doc.splitTextToSize(
+          cleanTextForPdf(`[${p1TypeLabel}] ${p1.caption || p1.displayName || p1.fileName}`),
+          gridW - 8
+        ).slice(0, 2);
+        doc.text(p1Caption, 16, currentY + gridH - 5);
 
-        // Foto 2
+        // Card da segunda evidência, quando houver
         if (p2) {
           const x2 = 14 + gridW + 4;
           doc.setFillColor(bgCard[0], bgCard[1], bgCard[2]);
@@ -612,16 +643,18 @@ export async function generateActionPlanIndividualPdf(plan: ActionPlanFullData):
           doc.roundedRect(x2, currentY, gridW, gridH, 1.5, 1.5, 'S');
 
           try {
-            const norm2 = normalizeImageDataUrl(p2.fileData);
-            doc.addImage(norm2, 'JPEG', x2 + 2, currentY + 2, gridW - 4, gridH - 10);
+            addImageContained(p2.fileData, x2 + 2, currentY + 3, gridW - 4, 51);
           } catch (e) {}
 
           const p2TypeLabel = p2.evidenceType === 'BEFORE' ? 'ANTES' :
                               p2.evidenceType === 'AFTER' ? 'DEPOIS' :
                               p2.evidenceType === 'DURING' ? 'DURANTE' : 'COMPLEMENTAR';
-
           doc.setFontSize(6.5);
-          doc.text(cleanTextForPdf(`[${p2TypeLabel}] ${p2.caption || p2.displayName || p2.fileName}`), x2 + 2, currentY + gridH - 2);
+          const p2Caption = doc.splitTextToSize(
+            cleanTextForPdf(`[${p2TypeLabel}] ${p2.caption || p2.displayName || p2.fileName}`),
+            gridW - 8
+          ).slice(0, 2);
+          doc.text(p2Caption, x2 + 2, currentY + gridH - 5);
         }
 
         currentY += gridH + 4;
