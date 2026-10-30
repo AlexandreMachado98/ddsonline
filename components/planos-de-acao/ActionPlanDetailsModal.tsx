@@ -888,12 +888,12 @@ export default function ActionPlanDetailsModal({
                       <div key={att.id} className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm flex flex-col">
                         <div 
                           onClick={() => setLightboxImage(att.fileData)}
-                          className="h-44 bg-slate-100 overflow-hidden relative cursor-pointer group"
+                          className="h-56 bg-slate-100 overflow-hidden relative cursor-zoom-in group flex items-center justify-center p-2"
                         >
                           <img
                             src={att.fileData}
                             alt={att.displayName || att.fileName}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            className="w-full h-full object-contain transition-transform duration-200"
                           />
                           <div className="absolute top-2 left-2">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase text-white shadow-sm ${
