@@ -5,12 +5,12 @@ import { Award, CalendarDays, CheckCircle2, Clock3, Crown, Loader2, Plus, Refres
 
 type Participant = {
   registration: string; name: string; totalPoints: number;
-  ddsParticipations: number; quizParticipations: number; performancePoints: number;
+  ddsParticipations: number; quizParticipations: number; performancePoints: number; speedPoints: number;
 };
 type Competition = {
   id: string; name: string; description?: string | null;
   startDate: string; endDate: string; status: 'SCHEDULED' | 'ACTIVE' | 'FINISHED' | 'CANCELLED';
-  ddsAttendancePoints: number; quizParticipationPoints: number; quizPerformancePoints: number;
+  ddsAttendancePoints: number; quizParticipationPoints: number; quizPerformancePoints: number; quizSpeedPoints: number;
   leaderboard: Participant[];
 };
 
@@ -31,6 +31,7 @@ export default function CompetitionManager() {
   const [ddsPoints, setDdsPoints] = useState(10);
   const [quizPoints, setQuizPoints] = useState(5);
   const [performancePoints, setPerformancePoints] = useState(1);
+  const [speedPoints, setSpeedPoints] = useState(5);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -56,7 +57,7 @@ export default function CompetitionManager() {
           name, description, startDate: new Date(startDate + 'T00:00:00').toISOString(),
           endDate: new Date(endDate + 'T23:59:59').toISOString(),
           ddsAttendancePoints: ddsPoints, quizParticipationPoints: quizPoints,
-          quizPerformancePoints: performancePoints
+          quizPerformancePoints: performancePoints, quizSpeedPoints: speedPoints
         })
       });
       const data = await response.json();
@@ -116,7 +117,7 @@ export default function CompetitionManager() {
           </div>
           <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
             <h4 className="font-extrabold text-slate-800 text-sm mb-3">Pontuação por critério</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <label className="text-xs font-semibold text-slate-600">Presença em cada DDS
                 <input type="number" min="0" max="1000" value={ddsPoints} onChange={e => setDdsPoints(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"/>
               </label>
@@ -126,8 +127,12 @@ export default function CompetitionManager() {
               <label className="text-xs font-semibold text-slate-600">Por ponto percentual de desempenho
                 <input type="number" min="0" max="1000" value={performancePoints} onChange={e => setPerformancePoints(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"/>
               </label>
+              <label className="text-xs font-semibold text-slate-600">Bônus por responder em até 1min30s
+                <input type="number" min="0" max="1000" value={speedPoints} onChange={e => setSpeedPoints(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"/>
+              </label>
             </div>
-            <p className="text-[11px] text-slate-500 mt-2">Exemplo: com 1 ponto por percentual, uma nota de 85% gera 85 pontos de desempenho, além dos pontos por participação.</p>
+            <p className="text-[11px] text-slate-500 mt-2">O bônus de velocidade é concedido uma vez por questionário quando a conclusão ocorre em até 90 segundos. Acima desse tempo, não há bônus.</p>
+            <p className="text-[11px] text-slate-500 mt-1">Exemplo: com 1 ponto por percentual, uma nota de 85% gera 85 pontos de desempenho, além dos pontos por participação.</p>
           </div>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm">Cancelar</button>
@@ -149,7 +154,7 @@ export default function CompetitionManager() {
             <div className="p-4 sm:p-5">
               <div className="flex items-center gap-2 mb-3 text-xs font-black uppercase tracking-wider text-slate-500"><Users size={14}/> Classificação geral</div>
               {!comp.leaderboard?.length ? <p className="text-sm text-slate-500 py-4">Ainda não há participações pontuadas com matrícula nesta competição.</p> :
-                <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200"><th className="py-2 pr-3">Pos.</th><th className="py-2 pr-3">Colaborador</th><th className="py-2 pr-3">Matrícula</th><th className="py-2 pr-3">DDS</th><th className="py-2 pr-3">Questionários</th><th className="py-2 pr-3">Desempenho</th><th className="py-2 text-right">Total</th></tr></thead><tbody>{comp.leaderboard.map((p,i)=><tr key={p.registration} className="border-b border-slate-100 last:border-0"><td className="py-3 pr-3 font-black text-slate-500">{i+1}º</td><td className="py-3 pr-3 font-bold text-slate-800">{p.name}</td><td className="py-3 pr-3 font-mono text-slate-600">{p.registration}</td><td className="py-3 pr-3">{p.ddsParticipations}</td><td className="py-3 pr-3">{p.quizParticipations}</td><td className="py-3 pr-3">{p.performancePoints}</td><td className="py-3 text-right font-black text-emerald-700">{p.totalPoints}</td></tr>)}</tbody></table></div>}
+                <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200"><th className="py-2 pr-3">Pos.</th><th className="py-2 pr-3">Colaborador</th><th className="py-2 pr-3">Matrícula</th><th className="py-2 pr-3">DDS</th><th className="py-2 pr-3">Questionários</th><th className="py-2 pr-3">Desempenho</th><th className="py-2 pr-3">Velocidade</th><th className="py-2 text-right">Total</th></tr></thead><tbody>{comp.leaderboard.map((p,i)=><tr key={p.registration} className="border-b border-slate-100 last:border-0"><td className="py-3 pr-3 font-black text-slate-500">{i+1}º</td><td className="py-3 pr-3 font-bold text-slate-800">{p.name}</td><td className="py-3 pr-3 font-mono text-slate-600">{p.registration}</td><td className="py-3 pr-3">{p.ddsParticipations}</td><td className="py-3 pr-3">{p.quizParticipations}</td><td className="py-3 pr-3">{p.performancePoints}</td><td className="py-3 pr-3">{p.speedPoints}</td><td className="py-3 text-right font-black text-emerald-700">{p.totalPoints}</td></tr>)}</tbody></table></div>}
             </div>
           </section>;
         })}</div>}
