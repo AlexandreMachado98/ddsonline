@@ -38,7 +38,7 @@ async function refreshCompetitionEvents(competition: any) {
     },
     select: {
       id: true, quizId: true, participantName: true, participantRegistration: true,
-      score: true, earnedPoints: true, possiblePoints: true, submittedAt: true
+      score: true, earnedPoints: true, possiblePoints: true, submittedAt: true, timeSpentSeconds: true
     }
   });
 
@@ -61,7 +61,7 @@ async function refreshCompetitionEvents(competition: any) {
         if (!registration) continue;
         const key = registration + ':' + attempt.quizId;
         const previous = bestAttempts.get(key);
-        if (!previous || attempt.score > previous.score) bestAttempts.set(key, attempt);
+        if (!previous || attempt.score > previous.score || (attempt.score === previous.score && (attempt.timeSpentSeconds ?? Infinity) < (previous.timeSpentSeconds ?? Infinity))) bestAttempts.set(key, attempt);
       }
       return [...bestAttempts.values()].flatMap((a: any) => {
         const registration = a.participantRegistration.trim();
@@ -85,7 +85,16 @@ async function refreshCompetitionEvents(competition: any) {
             participantName: name,
             points: Math.max(0, Math.round((a.score || 0) * competition.quizPerformancePoints)),
             details: { quizId: a.quizId, score: a.score, earnedPoints: a.earnedPoints, possiblePoints: a.possiblePoints }
-          }
+          },
+          ...(typeof a.timeSpentSeconds === 'number' && a.timeSpentSeconds > 0 && a.timeSpentSeconds <= 90 ? [{
+            competitionId: competition.id,
+            type: 'QUIZ_SPEED' as const,
+            sourceId,
+            participantRegistration: registration,
+            participantName: name,
+            points: competition.quizSpeedPoints,
+            details: { quizId: a.quizId, timeSpentSeconds: a.timeSpentSeconds, thresholdSeconds: 90 }
+          }] : [])
         ];
       });
     })()
@@ -134,17 +143,18 @@ export async function GET(req: Request) {
         const key = event.participantRegistration;
         const current = participants.get(key) || {
           registration: key, name: event.participantName, totalPoints: 0,
-          ddsParticipations: 0, quizParticipations: 0, performancePoints: 0
+          ddsParticipations: 0, quizParticipations: 0, performancePoints: 0, speedPoints: 0
         };
         current.name = event.participantName || current.name;
         current.totalPoints += event.points;
         if (event.type === 'DDS_ATTENDANCE') current.ddsParticipations += 1;
         if (event.type === 'QUIZ_PARTICIPATION') current.quizParticipations += 1;
         if (event.type === 'QUIZ_PERFORMANCE') current.performancePoints += event.points;
+        if (event.type === 'QUIZ_SPEED') current.speedPoints += event.points;
         participants.set(key, current);
       }
       const leaderboard = [...participants.values()].sort((a, b) =>
-        b.totalPoints - a.totalPoints || a.name.localeCompare(b.name, 'pt-BR')
+        b.totalPoints - a.totalPoints || b.performancePoints - a.performancePoints || b.ddsParticipations - a.ddsParticipations || b.quizParticipations - a.quizParticipations || b.speedPoints - a.speedPoints || a.name.localeCompare(b.name, 'pt-BR')
       );
       return { ...competition, events: undefined, leaderboard, eventCount: competition.events.length };
     });
@@ -170,13 +180,14 @@ export async function POST(req: Request) {
     const ddsAttendancePoints = Number(body.ddsAttendancePoints ?? 10);
     const quizParticipationPoints = Number(body.quizParticipationPoints ?? 5);
     const quizPerformancePoints = Number(body.quizPerformancePoints ?? 1);
+    const quizSpeedPoints = Number(body.quizSpeedPoints ?? 5);
 
     if (!name || name.length > 120) return json('Informe um nome de até 120 caracteres.', 400);
     if (!companyId) return json('A conta não está vinculada a uma empresa.', 400);
     if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < startDate) {
       return json('Informe um período válido para a competição.', 400);
     }
-    if (![ddsAttendancePoints, quizParticipationPoints, quizPerformancePoints].every(v => Number.isInteger(v) && v >= 0 && v <= 1000)) {
+    if (![ddsAttendancePoints, quizParticipationPoints, quizPerformancePoints, quizSpeedPoints].every(v => Number.isInteger(v) && v >= 0 && v <= 1000)) {
       return json('As pontuações devem ser números inteiros entre 0 e 1000.', 400);
     }
 
@@ -184,7 +195,7 @@ export async function POST(req: Request) {
       data: {
         name, description: typeof body.description === 'string' ? body.description.trim().slice(0, 1000) : null,
         startDate, endDate, companyId, organizerId: user.id,
-        ddsAttendancePoints, quizParticipationPoints, quizPerformancePoints,
+        ddsAttendancePoints, quizParticipationPoints, quizPerformancePoints, quizSpeedPoints,
         status: startDate > new Date() ? 'SCHEDULED' : 'ACTIVE'
       }
     });
