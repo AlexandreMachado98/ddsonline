@@ -21,7 +21,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'A função/cargo é obrigatória.' }, { status: 400 });
     }
 
-    if (typeof registration !== 'string' || !/^\\d{4}$/.test(registration.trim())) {\n      return NextResponse.json({ success: false, error: 'Informe sua matrícula com 4 dígitos.' }, { status: 400 });\n    }\n\n    if (!meetingId || typeof meetingId !== 'string') {
+    if (typeof registration !== 'string' || !/^\d{4}$/.test(registration.trim())) {\n      return NextResponse.json({ success: false, error: 'Informe sua matrícula com 4 dígitos.' }, { status: 400 });\n    }\n\n    if (!meetingId || typeof meetingId !== 'string') {
       return NextResponse.json({ success: false, error: 'Identificador do DDS não informado ou inválido.' }, { status: 400 });
     }
 
