@@ -37,7 +37,7 @@ async function refreshCompetitionEvents(competition: any) {
       ]
     },
     select: {
-      id: true, participantName: true, participantRegistration: true,
+      id: true, quizId: true, participantName: true, participantRegistration: true,
       score: true, earnedPoints: true, possiblePoints: true, submittedAt: true
     }
   });
@@ -52,31 +52,43 @@ async function refreshCompetitionEvents(competition: any) {
       points: competition.ddsAttendancePoints,
       details: { date: a.createdAt.toISOString() }
     })),
-    ...attempts.flatMap((a: any) => {
-      const registration = a.participantRegistration?.trim();
-      if (!registration) return [];
-      const name = a.participantName?.trim() || 'Colaborador';
-      return [
-        {
-          competitionId: competition.id,
-          type: 'QUIZ_PARTICIPATION' as const,
-          sourceId: a.id,
-          participantRegistration: registration,
-          participantName: name,
-          points: competition.quizParticipationPoints,
-          details: { date: a.submittedAt.toISOString() }
-        },
-        {
-          competitionId: competition.id,
-          type: 'QUIZ_PERFORMANCE' as const,
-          sourceId: a.id,
-          participantRegistration: registration,
-          participantName: name,
-          points: Math.max(0, Math.round((a.score || 0) * competition.quizPerformancePoints)),
-          details: { score: a.score, earnedPoints: a.earnedPoints, possiblePoints: a.possiblePoints }
-        }
-      ];
-    })
+    ...(() => {
+      // Uma participação por colaborador e questionário: em caso de novas tentativas,
+      // considera o melhor desempenho para evitar pontuação artificial por repetição.
+      const bestAttempts = new Map<string, any>();
+      for (const attempt of attempts as any[]) {
+        const registration = attempt.participantRegistration?.trim();
+        if (!registration) continue;
+        const key = registration + ':' + attempt.quizId;
+        const previous = bestAttempts.get(key);
+        if (!previous || attempt.score > previous.score) bestAttempts.set(key, attempt);
+      }
+      return [...bestAttempts.values()].flatMap((a: any) => {
+        const registration = a.participantRegistration.trim();
+        const name = a.participantName?.trim() || 'Colaborador';
+        const sourceId = registration + ':' + a.quizId;
+        return [
+          {
+            competitionId: competition.id,
+            type: 'QUIZ_PARTICIPATION' as const,
+            sourceId,
+            participantRegistration: registration,
+            participantName: name,
+            points: competition.quizParticipationPoints,
+            details: { quizId: a.quizId, date: a.submittedAt.toISOString() }
+          },
+          {
+            competitionId: competition.id,
+            type: 'QUIZ_PERFORMANCE' as const,
+            sourceId,
+            participantRegistration: registration,
+            participantName: name,
+            points: Math.max(0, Math.round((a.score || 0) * competition.quizPerformancePoints)),
+            details: { quizId: a.quizId, score: a.score, earnedPoints: a.earnedPoints, possiblePoints: a.possiblePoints }
+          }
+        ];
+      });
+    })()
   ];
 
   await prisma.competitionEvent.deleteMany({ where: { competitionId: competition.id } });
