@@ -502,6 +502,7 @@ model Competition {
   ddsAttendancePoints      Int                @default(10)
   quizParticipationPoints  Int                @default(5)
   quizPerformancePoints    Int                @default(1) // pontos por ponto obtido no questionário
+  quizSpeedPoints           Int                @default(5) // bônus por conclusão em até 90 segundos
   companyId                String
   company                  Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   organizerId              String
