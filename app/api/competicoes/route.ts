@@ -85,7 +85,7 @@ async function refreshCompetitionEvents(competition: any) {
             participantName: name,
             points: Math.max(0, Math.round((a.score || 0) * competition.quizPerformancePoints)),
             details: { quizId: a.quizId, score: a.score, earnedPoints: a.earnedPoints, possiblePoints: a.possiblePoints }
-          }
+          },
           ...(typeof a.timeSpentSeconds === 'number' && a.timeSpentSeconds > 0 && a.timeSpentSeconds <= 90 ? [{
             competitionId: competition.id,
             type: 'QUIZ_SPEED' as const,
