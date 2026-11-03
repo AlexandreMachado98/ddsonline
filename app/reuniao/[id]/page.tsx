@@ -78,7 +78,7 @@ export default function MeetingRoom() {
   };
 
   const handleRegistrationChange = (val: string) => {
-    const digits = val.replace(/\\D/g, '').slice(0, 4);
+    const digits = val.replace(/\D/g, '').slice(0, 4);
     setRegistration(digits);
     try { sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name, funcao, registration: digits })); } catch {}
   };
@@ -194,7 +194,7 @@ export default function MeetingRoom() {
       return;
     }
 
-    if (!/^\\d{4}$/.test(registration)) {\n      toast.warning('Matrícula obrigatória', 'Informe sua matrícula com 4 dígitos.');\n      return;\n    }\n\n    if (!savedSelfie) {
+    if (!/^\d{4}$/.test(registration)) {\n      toast.warning('Matrícula obrigatória', 'Informe sua matrícula com 4 dígitos.');\n      return;\n    }\n\n    if (!savedSelfie) {
       toast.warning('Foto Facial Pendente', 'Por favor, tire sua foto facial ou selecione do aparelho.');
       return;
     }
