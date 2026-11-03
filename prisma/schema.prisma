@@ -33,6 +33,7 @@ model Company {
   users              User[]
   meetings           Meeting[]
   actionPlans        ActionPlan[]
+  competitions       Competition[]
 }
 
 model User {
@@ -51,6 +52,7 @@ model User {
   companyRel Company?  @relation(fields: [companyId], references: [id])
   meetings   Meeting[]
   quizzes    Quiz[]
+  organizedCompetitions Competition[]
 
   // Relações do Módulo de Planos de Ação
   createdActionPlans          ActionPlan[]                  @relation("ActionPlanCreator")
@@ -102,6 +104,7 @@ model Attendance {
   cpf           String
   selfie        String
   signature     String
+  registration  String?   // Matrícula informada pelo colaborador na assinatura do DDS
   exitReason    String?
   exitSignature String?
   leftAt        DateTime?
@@ -469,4 +472,60 @@ model ActionPlanNotification {
   @@index([userId, read])
   @@index([actionPlanId])
   @@index([createdAt])
+}
+
+
+// =========================================================================
+// COMPETIÇÕES DE PARTICIPAÇÃO E DESEMPENHO
+// =========================================================================
+enum CompetitionStatus {
+  SCHEDULED
+  ACTIVE
+  FINISHED
+  CANCELLED
+}
+
+enum CompetitionEventType {
+  DDS_ATTENDANCE
+  QUIZ_PARTICIPATION
+  QUIZ_PERFORMANCE
+}
+
+model Competition {
+  id                       String             @id @default(uuid())
+  name                     String
+  description              String?
+  startDate                DateTime
+  endDate                  DateTime
+  status                   CompetitionStatus  @default(SCHEDULED)
+  ddsAttendancePoints      Int                @default(10)
+  quizParticipationPoints  Int                @default(5)
+  quizPerformancePoints    Int                @default(1) // pontos por ponto obtido no questionário
+  companyId                String
+  company                  Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  organizerId              String
+  organizer                User               @relation(fields: [organizerId], references: [id], onDelete: Restrict)
+  events                   CompetitionEvent[]
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+
+  @@index([companyId, status, startDate, endDate])
+  @@index([organizerId, createdAt])
+}
+
+model CompetitionEvent {
+  id                     String               @id @default(uuid())
+  competitionId          String
+  competition            Competition          @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  type                   CompetitionEventType
+  sourceId               String
+  participantRegistration String
+  participantName        String
+  points                 Int
+  details                Json?
+  createdAt              DateTime             @default(now())
+
+  @@unique([competitionId, type, sourceId])
+  @@index([competitionId, participantRegistration])
+  @@index([competitionId, createdAt])
 }
