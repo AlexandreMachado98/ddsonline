@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { name, cpf, savedSelfie, savedSignature, meetingId } = body;
+    const { name, cpf, registration, savedSelfie, savedSignature, meetingId } = body;
 
     // 1. Validação estrita de tipos e presença dos campos
     if (!name || typeof name !== 'string' || name.trim().length < 2) {
@@ -21,12 +21,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'A função/cargo é obrigatória.' }, { status: 400 });
     }
 
-    if (!meetingId || typeof meetingId !== 'string') {
+    if (typeof registration !== 'string' || !/^\\d{4}$/.test(registration.trim())) {\n      return NextResponse.json({ success: false, error: 'Informe sua matrícula com 4 dígitos.' }, { status: 400 });\n    }\n\n    if (!meetingId || typeof meetingId !== 'string') {
       return NextResponse.json({ success: false, error: 'Identificador do DDS não informado ou inválido.' }, { status: 400 });
     }
 
     const trimmedName = name.trim().slice(0, 100);
-    const trimmedCpf = cpf.trim().slice(0, 80);
+    const trimmedCpf = cpf.trim().slice(0, 80);\n    const trimmedRegistration = registration.trim();
 
     // 2. Busca a reunião específica para vincular com precisão
     const meeting = await prisma.meeting.findUnique({
