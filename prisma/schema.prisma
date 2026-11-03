@@ -489,6 +489,7 @@ enum CompetitionEventType {
   DDS_ATTENDANCE
   QUIZ_PARTICIPATION
   QUIZ_PERFORMANCE
+  QUIZ_SPEED
 }
 
 model Competition {
