@@ -100,6 +100,7 @@ export async function GET(req: Request) {
     for (const competition of competitions) {
       if (competition.status === 'CANCELLED' || competition.status === 'FINISHED') continue;
       if (competition.endDate < now) {
+        await refreshCompetitionEvents(competition);
         await prisma.competition.update({ where: { id: competition.id }, data: { status: 'FINISHED' } });
         continue;
       }
@@ -193,6 +194,7 @@ export async function PATCH(req: Request) {
     const competition = await prisma.competition.findUnique({ where: { id: body.id } });
     if (!competition) return json('Competição não encontrada.', 404);
     if (!canManage(user, competition)) return json('Acesso negado a esta competição.', 403);
+    if (body.status === 'FINISHED') await refreshCompetitionEvents(competition);
     const updated = await prisma.competition.update({ where: { id: competition.id }, data: { status: body.status } });
     return NextResponse.json({ success: true, competition: updated });
   } catch (error) {
