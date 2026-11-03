@@ -312,8 +312,8 @@ export default function DdsReportPreviewModal({
           {/* Conteúdo da Página 1 */}
           <div className="p-4 sm:p-6 space-y-4 flex-1 flex flex-col">
             {/* Cabeçalho Editorial do Documento */}
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3">
-              <div className="flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 border-b border-slate-100 pb-3 min-w-0">
+              <div className="flex-1 min-w-0">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 block mb-1">
                   {meeting.classification === 'Treinamento'
                     ? 'Registro de Treinamento Obrigatório (SST)'
@@ -321,13 +321,13 @@ export default function DdsReportPreviewModal({
                     ? 'Campanha de Saúde, Segurança e Conscientização (SST)'
                     : 'Diálogo Diário de Segurança e Saúde do Trabalho'}
                 </span>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
+                <h1 className="text-base sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-snug break-words [overflow-wrap:anywhere] min-w-0">
                   {meeting.topic || 'Diálogo Diário de Segurança'}
                 </h1>
               </div>
 
               {/* Badge de Total Registrado */}
-              <div style={{ backgroundColor: lightGreenBg }} className="shrink-0 px-4 py-2.5 rounded-xl border border-emerald-900/10 text-center min-w-[100px]">
+              <div style={{ backgroundColor: lightGreenBg }} className="shrink-0 px-3 sm:px-4 py-2.5 rounded-xl border border-emerald-900/10 text-center min-w-[100px] sm:min-w-[120px] self-start">
                 <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-800 block">
                   Total Registrado
                 </span>
