@@ -217,6 +217,7 @@ export default function MeetingRoom() {
         await saveOfflineAttendance({
           name: name.trim(),
           cpf: funcao.trim(),
+          registration,
           savedSelfie,
           savedSignature,
           meetingId: roomId
@@ -240,6 +241,7 @@ export default function MeetingRoom() {
         body: JSON.stringify({
           name: name.trim(),
           cpf: funcao.trim(),
+          registration,
           savedSelfie,
           savedSignature,
           meetingId: roomId
@@ -272,6 +274,7 @@ export default function MeetingRoom() {
         await saveOfflineAttendance({
           name: name.trim(),
           cpf: funcao.trim(),
+          registration,
           savedSelfie,
           savedSignature,
           meetingId: roomId
@@ -309,6 +312,7 @@ export default function MeetingRoom() {
           meetingId: roomId,
           name: name.trim(),
           cpf: funcao.trim(),
+          registration,
           exitReason: exitReason.trim(),
           exitSignature
         })
