@@ -14,6 +14,7 @@ import { useSearchParams } from 'next/navigation';
 import DdsLogo from '@/components/DdsLogo';
 import QuizRankingView from '@/components/QuizRankingView';
 import AppShell from '@/components/layout/AppShell';
+import CompetitionManager from '@/components/CompetitionManager';
 
 interface QuizOptionInput {
   id: string;
@@ -215,7 +216,7 @@ function QuestionariosContent() {
   const searchParams = useSearchParams();
 
   // Abas da tela: Avaliações Ativas, Ranking de Desempenho, Banco de Formulários, e Inteligência BI
-  const [activeTab, setActiveTab] = useState<'QUIZZES' | 'TEMPLATES' | 'RANKING'>('QUIZZES');
+  const [activeTab, setActiveTab] = useState<'QUIZZES' | 'TEMPLATES' | 'RANKING' | 'COMPETITIONS'>('QUIZZES');
   const [selectedRankingQuizId, setSelectedRankingQuizId] = useState<string>('');
 
   // Sincroniza aba e quiz da URL
@@ -225,7 +226,7 @@ function QuestionariosContent() {
       window.location.replace('/admin/bi');
       return;
     }
-    if (tab && ['QUIZZES', 'TEMPLATES', 'RANKING'].includes(tab)) {
+    if (tab && ['QUIZZES', 'TEMPLATES', 'RANKING', 'COMPETITIONS'].includes(tab)) {
       setActiveTab(tab as any);
     }
     const qId = searchParams.get('quizId');
@@ -1127,6 +1128,18 @@ function QuestionariosContent() {
             </button>
 
             <button
+              onClick={() => setActiveTab('COMPETITIONS')}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'COMPETITIONS'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50'
+              }`}
+            >
+              <Trophy size={15} />
+              <span>Competições</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('TEMPLATES')}
               className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
                 activeTab === 'TEMPLATES'
@@ -1739,6 +1752,24 @@ function QuestionariosContent() {
             )}
 
           </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* ABA: COMPETIÇÕES DE PARTICIPAÇÃO E DESEMPENHO                             */}
+        {/* ========================================================================= */}
+        {activeTab === 'COMPETITIONS' && (
+          <section className="space-y-5">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h2 className="text-lg font-black text-slate-900">Competições</h2>
+                <p className="text-xs text-slate-500">Crie campanhas, acompanhe os pontos e reconheça o colaborador destaque.</p>
+              </div>
+              <button type="button" onClick={() => setActiveTab('RANKING')} className="px-3 py-2 rounded-xl bg-slate-800 text-white text-xs font-bold inline-flex items-center gap-2">
+                <Trophy size={14}/> Ranking de questionários
+              </button>
+            </div>
+            <CompetitionManager />
+          </section>
         )}
 
         {/* ========================================================================= */}
