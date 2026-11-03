@@ -79,8 +79,9 @@ async function refreshCompetitionEvents(competition: any) {
     })
   ];
 
+  await prisma.competitionEvent.deleteMany({ where: { competitionId: competition.id } });
   if (events.length) {
-    await prisma.competitionEvent.createMany({ data: events, skipDuplicates: true });
+    await prisma.competitionEvent.createMany({ data: events });
   }
 }
 
@@ -95,8 +96,17 @@ export async function GET(req: Request) {
       include: { events: { orderBy: { createdAt: 'asc' } } }
     });
 
+    const now = new Date();
     for (const competition of competitions) {
-      if (competition.status !== 'CANCELLED') await refreshCompetitionEvents(competition);
+      if (competition.status === 'CANCELLED' || competition.status === 'FINISHED') continue;
+      if (competition.endDate < now) {
+        await prisma.competition.update({ where: { id: competition.id }, data: { status: 'FINISHED' } });
+        continue;
+      }
+      if (competition.startDate <= now && competition.status === 'SCHEDULED') {
+        await prisma.competition.update({ where: { id: competition.id }, data: { status: 'ACTIVE' } });
+      }
+      await refreshCompetitionEvents(competition);
     }
 
     const refreshed = await prisma.competition.findMany({
