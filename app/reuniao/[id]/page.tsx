@@ -194,7 +194,12 @@ export default function MeetingRoom() {
       return;
     }
 
-    if (!/^\d{4}$/.test(registration)) {\n      toast.warning('Matrícula obrigatória', 'Informe sua matrícula com 4 dígitos.');\n      return;\n    }\n\n    if (!savedSelfie) {
+    if (!/^\d{4}$/.test(registration)) {
+      toast.warning('Matrícula obrigatória', 'Informe sua matrícula com 4 dígitos.');
+      return;
+    }
+
+    if (!savedSelfie) {
       toast.warning('Foto Facial Pendente', 'Por favor, tire sua foto facial ou selecione do aparelho.');
       return;
     }
