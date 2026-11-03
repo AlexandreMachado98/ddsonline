@@ -43,6 +43,7 @@ export default function MeetingRoom() {
   // Estados do Formulário do Colaborador com persistência de rascunho
   const [name, setName] = useState('');
   const [funcao, setFuncao] = useState('');
+  const [registration, setRegistration] = useState('');
   const [savedSelfie, setSavedSelfie] = useState<string | null>(null);
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,6 +58,7 @@ export default function MeetingRoom() {
         const parsed = JSON.parse(saved);
         if (parsed.name) setName(parsed.name);
         if (parsed.funcao) setFuncao(parsed.funcao);
+        if (parsed.registration) setRegistration(parsed.registration);
       }
     } catch {}
   }, []);
@@ -64,15 +66,21 @@ export default function MeetingRoom() {
   const handleNameChange = (val: string) => {
     setName(val);
     try {
-      sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name: val, funcao }));
+      sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name: val, funcao, registration }));
     } catch {}
   };
 
   const handleFuncaoChange = (val: string) => {
     setFuncao(val);
     try {
-      sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name, funcao: val }));
+      sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name, funcao: val, registration }));
     } catch {}
+  };
+
+  const handleRegistrationChange = (val: string) => {
+    const digits = val.replace(/\\D/g, '').slice(0, 4);
+    setRegistration(digits);
+    try { sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name, funcao, registration: digits })); } catch {}
   };
 
   // Estados do Modal de Saída Antecipada
@@ -186,7 +194,7 @@ export default function MeetingRoom() {
       return;
     }
 
-    if (!savedSelfie) {
+    if (!/^\\d{4}$/.test(registration)) {\n      toast.warning('Matrícula obrigatória', 'Informe sua matrícula com 4 dígitos.');\n      return;\n    }\n\n    if (!savedSelfie) {
       toast.warning('Foto Facial Pendente', 'Por favor, tire sua foto facial ou selecione do aparelho.');
       return;
     }
@@ -646,6 +654,20 @@ export default function MeetingRoom() {
               />
             </div>
 
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Matrícula (4 dígitos) *</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]{4}"
+                maxLength={4}
+                value={registration}
+                onChange={(e) => handleRegistrationChange(e.target.value)}
+                placeholder="Ex: 1234"
+                autoComplete="off"
+                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-base sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[48px]"
+              />
+            </div>
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Função / Cargo</label>
               <div className="relative flex items-center">
