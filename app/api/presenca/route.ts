@@ -82,8 +82,10 @@ export async function POST(req: Request) {
     const existing = await prisma.attendance.findFirst({
       where: {
         meetingId: meeting.id,
-        name: { equals: trimmedName, mode: 'insensitive' },
-        cpf: { equals: trimmedCpf, mode: 'insensitive' }
+        OR: [
+          { registration: trimmedRegistration },
+          { name: { equals: trimmedName, mode: 'insensitive' }, cpf: { equals: trimmedCpf, mode: 'insensitive' } }
+        ]
       }
     });
 
@@ -94,6 +96,7 @@ export async function POST(req: Request) {
         data: {
           name: trimmedName,
           cpf: trimmedCpf,
+          registration: trimmedRegistration,
           selfie: sanitizedSelfie || existing.selfie,
           signature: sanitizedSignature || existing.signature
         }
@@ -108,6 +111,7 @@ export async function POST(req: Request) {
       data: {
         name: trimmedName,
         cpf: trimmedCpf,
+        registration: trimmedRegistration,
         selfie: sanitizedSelfie,
         signature: sanitizedSignature,
         quizProofHash: createHash('sha256').update(quizProof).digest('hex'),
