@@ -6,6 +6,7 @@ export interface OfflineAttendance {
   meetingId: string;
   name: string;
   cpf: string; // Função / Cargo
+  registration?: string; // Matrícula do colaborador
   savedSelfie: string;
   savedSignature: string;
   timestamp: string;
@@ -221,6 +222,7 @@ export async function syncOfflineQueue(
         body: JSON.stringify({
           name: item.name,
           cpf: item.cpf,
+          registration: item.registration,
           savedSelfie: item.savedSelfie,
           savedSignature: item.savedSignature,
           meetingId: item.meetingId
