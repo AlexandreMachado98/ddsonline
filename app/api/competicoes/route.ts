@@ -50,7 +50,7 @@ async function refreshCompetitionEvents(competition: any) {
       participantRegistration: a.registration!.trim(),
       participantName: a.name,
       points: competition.ddsAttendancePoints,
-      details: { date: a.createdAt }
+      details: { date: a.createdAt.toISOString() }
     })),
     ...attempts.flatMap((a: any) => {
       const registration = a.participantRegistration?.trim();
@@ -64,7 +64,7 @@ async function refreshCompetitionEvents(competition: any) {
           participantRegistration: registration,
           participantName: name,
           points: competition.quizParticipationPoints,
-          details: { date: a.submittedAt }
+          details: { date: a.submittedAt.toISOString() }
         },
         {
           competitionId: competition.id,
