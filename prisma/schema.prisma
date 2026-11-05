@@ -89,13 +89,26 @@ model Meeting {
   instructorName      String?
   classification      String?             @default("DDS")
   documentHash        String?
+  attendanceCollectionOpen Boolean @default(false)
   attendees           Attendance[]
+  attendanceWindows   AttendanceCollectionWindow[]
   attachments         MeetingAttachment[]
   quizzes             Quiz[]
   actionPlans         ActionPlan[]
 
   @@index([organizerId, status, createdAt(sort: Desc)])
   @@index([companyId])
+}
+
+model AttendanceCollectionWindow {
+  id         String   @id @default(uuid())
+  meetingId  String
+  meeting    Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  openedAt   DateTime @default(now())
+  openedById String
+  closedAt   DateTime?
+
+  @@index([meetingId, openedAt])
 }
 
 model Attendance {
