@@ -1863,7 +1863,7 @@ function AdminPanelContent() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0 self-end md:self-auto pt-2 md:pt-0 border-t border-slate-200 md:border-0 w-full md:w-auto justify-end">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0 self-end md:self-auto pt-2 md:pt-0 border-t border-slate-200 md:border-0 w-full md:w-auto justify-end">
                     {m.attendanceCollectionOpen && (
                       <button
                         onClick={() => handleCopyAttendanceLink(m)}
