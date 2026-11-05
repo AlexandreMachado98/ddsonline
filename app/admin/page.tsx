@@ -901,8 +901,8 @@ function AdminPanelContent() {
 
         <div className="max-w-7xl w-full mx-auto space-y-4 sm:space-y-6">
           {/* Banner de Status do DDS */}
-          <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 rounded-3xl p-4 sm:p-6 text-white shadow-xl space-y-4 border border-emerald-500/40 overflow-hidden max-w-full">
-            <div className="min-w-0 max-w-full overflow-hidden space-y-1.5">
+          <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 rounded-3xl p-4 sm:p-6 text-white shadow-xl space-y-4 border border-emerald-500/40 overflow-visible max-w-full">
+            <div className="min-w-0 max-w-full overflow-visible space-y-1.5">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="relative flex h-2.5 w-2.5 shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -918,14 +918,14 @@ function AdminPanelContent() {
                 <span className="break-words font-medium">{activeMeeting.farm}</span>
               </p>
               {activeMeeting.objective && (
-                <p className="text-emerald-200/90 text-xs mt-1 bg-black/20 p-2.5 rounded-xl border border-white/5 break-words">
+                <div className="text-emerald-200/90 text-xs mt-1 bg-black/20 p-3 rounded-xl border border-white/5 whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed">
                   🎯 <strong>Objetivo:</strong> {activeMeeting.objective}
-                </p>
+                </div>
               )}
               {activeMeeting.programmaticContent && (
-                <p className="text-teal-200/90 text-xs mt-1 bg-black/20 p-2.5 rounded-xl border border-white/5 whitespace-pre-line break-words">
+                <div className="text-teal-200/90 text-xs mt-1 bg-black/20 p-3 rounded-xl border border-white/5 whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed">
                   📚 <strong>Conteúdo:</strong> {activeMeeting.programmaticContent}
-                </p>
+                </div>
               )}
             </div>
             
