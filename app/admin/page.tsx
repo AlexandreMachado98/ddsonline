@@ -573,6 +573,39 @@ function AdminPanelContent() {
     }
   };
 
+  const handleToggleAttendanceCollection = (meeting: any) => {
+    const reopening = !meeting.attendanceCollectionOpen;
+    setConfirmDialog({
+      title: reopening ? 'Reabrir lista de presença' : 'Encerrar coleta complementar',
+      message: reopening
+        ? `A lista do DDS "${meeting.topic}" será reaberta somente para novas assinaturas. O DDS continuará encerrado e as presenças existentes serão preservadas.`
+        : `A coleta complementar do DDS "${meeting.topic}" será encerrada. O sistema atualizará a integridade da ata com todas as assinaturas registradas.`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/reuniao', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              meetingId: meeting.id,
+              action: reopening ? 'reopen_attendance' : 'close_attendance_collection'
+            })
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            showToast(data.error || 'Não foi possível atualizar a lista de presença.', 'error');
+          } else {
+            showToast(data.message || 'Lista de presença atualizada.', 'success');
+            await fetchAllData(false);
+          }
+        } catch {
+          showToast('Erro de conexão ao atualizar a lista de presença.', 'error');
+        } finally {
+          setConfirmDialog(null);
+        }
+      }
+    });
+  };
+
   const handleDeleteMeetings = (ids: string[], isMultiple = false, topicName = '') => {
     setConfirmDialog({
       title: isMultiple ? 'Exclusão Múltipla' : 'Excluir DDS',
@@ -1805,6 +1838,11 @@ function AdminPanelContent() {
                           <Users size={12} />
                           {m.attendees?.length || 0} presenças
                         </span>
+                        {m.attendanceCollectionOpen && (
+                          <span className="inline-flex items-center gap-1 font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                            <Clock size={12} /> Coleta complementar aberta
+                          </span>
+                        )}
                       </div>
 
                       {m.objective && (
@@ -1817,7 +1855,16 @@ function AdminPanelContent() {
 
                   <div className="flex items-center gap-2 shrink-0 self-end md:self-auto pt-2 md:pt-0 border-t border-slate-200 md:border-0 w-full md:w-auto justify-end">
                     <button
-                      onClick={() => handleOpenPreview(m)}
+                      onClick={() => handleToggleAttendanceCollection(m)}
+                      className={`px-3 py-2 font-bold text-xs rounded-xl flex items-center gap-1.5 border cursor-pointer transition-all shadow-sm ${m.attendanceCollectionOpen ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200'}`}
+                      title={m.attendanceCollectionOpen ? 'Encerrar coleta complementar' : 'Reabrir para novas assinaturas'}
+                    >
+                      <RefreshCw size={14} />
+                      <span>{m.attendanceCollectionOpen ? 'Encerrar coleta' : 'Reabrir lista'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleOpenPreview(m)
                       className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-200 cursor-pointer transition-all shadow-sm"
                       title="Pré-visualizar Lista de Presença e Dossiê Completo"
                     >
