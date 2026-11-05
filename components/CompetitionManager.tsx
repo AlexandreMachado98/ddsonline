@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Award, CalendarDays, CheckCircle2, Clock3, Crown, Loader2, Plus, RefreshCw, Trophy, Users } from 'lucide-react';
+import { Award, CalendarDays, Check, CheckCircle2, Clock3, Crown, Loader2, Pencil, Plus, RefreshCw, RotateCcw, Trophy, Users, X } from 'lucide-react';
 
 type Participant = {
   registration: string; name: string; totalPoints: number;
@@ -32,6 +32,8 @@ export default function CompetitionManager() {
   const [quizPoints, setQuizPoints] = useState(5);
   const [performancePoints, setPerformancePoints] = useState(1);
   const [speedPoints, setSpeedPoints] = useState(5);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -80,6 +82,17 @@ export default function CompetitionManager() {
       if (!response.ok || !data.success) throw new Error(data.error || 'Não foi possível encerrar.');
       await load();
     } catch (e: any) { setError(e.message || 'Erro ao encerrar competição.'); }
+  };
+
+  const updateCompetition = async (id: string, changes: { name?: string; status?: 'ACTIVE' }) => {
+    setSaving(true); setError('');
+    try {
+      const response = await fetch('/api/competicoes', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...changes }) });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Não foi possível atualizar a competição.');
+      setEditingId(null); setEditingName(''); await load();
+    } catch (e: any) { setError(e.message || 'Erro ao atualizar competição.'); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -147,8 +160,8 @@ export default function CompetitionManager() {
           const winner = comp.status === 'FINISHED' ? comp.leaderboard?.[0] : null;
           return <section key={comp.id} className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100">
-              <div><div className="flex flex-wrap items-center gap-2"><h3 className="font-black text-slate-900 text-lg">{comp.name}</h3><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${comp.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : comp.status === 'FINISHED' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-700'}`}>{statusLabels[comp.status]}</span></div>{comp.description && <p className="text-sm text-slate-500 mt-1">{comp.description}</p>}<p className="text-xs text-slate-500 mt-2 flex items-center gap-2"><CalendarDays size={13}/>{new Date(comp.startDate).toLocaleDateString('pt-BR')} até {new Date(comp.endDate).toLocaleDateString('pt-BR')}</p></div>
-              {comp.status === 'ACTIVE' && <button type="button" onClick={() => finishCompetition(comp.id)} className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white">Encerrar competição</button>}
+              <div><div className="flex flex-wrap items-center gap-2">{editingId === comp.id ? <form className="flex flex-wrap items-center gap-2" onSubmit={e => { e.preventDefault(); updateCompetition(comp.id, { name: editingName }); }}><input autoFocus maxLength={120} value={editingName} onChange={e => setEditingName(e.target.value)} className="min-w-[220px] rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold" aria-label="Novo nome da competição"/><button disabled={saving || !editingName.trim()} className="rounded-lg bg-emerald-600 p-2 text-white" title="Salvar nome"><Check size={16}/></button><button type="button" onClick={() => { setEditingId(null); setEditingName(''); }} className="rounded-lg border border-slate-200 p-2 text-slate-600" title="Cancelar edição"><X size={16}/></button></form> : <><h3 className="font-black text-slate-900 text-lg">{comp.name}</h3><button type="button" onClick={() => { setEditingId(comp.id); setEditingName(comp.name); }} className="rounded-lg border border-slate-200 p-1.5 text-slate-500" title="Editar nome da competição"><Pencil size={14}/></button></>}<span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${comp.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : comp.status === 'FINISHED' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-700'}`}>{statusLabels[comp.status]}</span></div>{comp.description && <p className="text-sm text-slate-500 mt-1">{comp.description}</p>}<p className="text-xs text-slate-500 mt-2 flex items-center gap-2"><CalendarDays size={13}/>{new Date(comp.startDate).toLocaleDateString('pt-BR')} até {new Date(comp.endDate).toLocaleDateString('pt-BR')}</p></div>
+              <div className="flex flex-wrap gap-2">{comp.status === 'ACTIVE' && <button type="button" onClick={() => finishCompetition(comp.id)} className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white">Encerrar competição</button>}{comp.status === 'FINISHED' && <button type="button" disabled={saving} onClick={() => { if (window.confirm('Deseja reabrir esta competição? Ela voltará para Em andamento e manterá o período e os critérios configurados.')) updateCompetition(comp.id, { status: 'ACTIVE' }); }} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 text-xs font-extrabold text-white inline-flex items-center gap-2 disabled:opacity-60"><RotateCcw size={14}/> Reabrir competição</button>}</div>
             </div>
             {winner && <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-3"><Crown className="text-amber-600" size={22}/><div><p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Grande vencedor</p><p className="font-black text-slate-900">{winner.name} · Matrícula {winner.registration} · {winner.totalPoints} pontos</p></div></div>}
             <div className="p-4 sm:p-5">
