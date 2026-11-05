@@ -139,6 +139,7 @@ export async function GET(req: Request) {
           objective: true,
           programmaticContent: true,
           status: true,
+          attendanceCollectionOpen: true,
           documentHash: true,
           createdAt: true,
           endedAt: true,
@@ -215,6 +216,7 @@ export async function GET(req: Request) {
         programmaticContent: true,
         groupPhoto: true,
         status: true,
+        attendanceCollectionOpen: true,
         documentHash: true,
         createdAt: true,
         endedAt: true,
@@ -294,6 +296,7 @@ export async function GET(req: Request) {
         objective: true,
         programmaticContent: true,
         status: true,
+        attendanceCollectionOpen: true,
         documentHash: true,
         createdAt: true,
         endedAt: true,
@@ -503,6 +506,47 @@ export async function PUT(req: Request) {
       return NextResponse.json({ success: false, error: 'Você não tem permissão para alterar esta reunião.' }, { status: 403 });
     }
 
+    // Reabertura controlada: o DDS permanece ENDED e fora das salas ao vivo.
+    if (action === 'reopen_attendance' || action === 'close_attendance_collection') {
+      if (existingMeeting.status !== 'ENDED') {
+        return NextResponse.json({ success: false, error: 'A coleta complementar só pode ser controlada em um DDS encerrado.' }, { status: 409 });
+      }
+
+      const result = await prisma.$transaction(async tx => {
+        await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', meetingId);
+        const current = await tx.meeting.findUnique({
+          where: { id: meetingId },
+          include: {
+            attendees: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, cpf: true } },
+            attachments: { orderBy: { order: 'asc' }, select: { id: true, fileName: true } }
+          }
+        });
+        if (!current || current.status !== 'ENDED') return { error: 'O DDS não está mais encerrado.' };
+
+        if (action === 'reopen_attendance') {
+          if (current.attendanceCollectionOpen) return { error: 'A lista já está aberta para assinaturas.' };
+          await tx.meeting.update({ where: { id: meetingId }, data: { attendanceCollectionOpen: true, documentHash: null } });
+          await tx.attendanceCollectionWindow.create({ data: { meetingId, openedById: sessionUser.id } });
+          return { success: true };
+        }
+
+        if (!current.attendanceCollectionOpen) return { error: 'A lista não está aberta para coleta complementar.' };
+        const crypto = await import('crypto');
+        const endTimestamp = current.endedAt ? current.endedAt.toISOString() : new Date().toISOString();
+        const rawDigest = [meetingId, current.topic || '', current.createdAt?.toISOString() || '', endTimestamp,
+          current.attendees.map((a: any) => [a.id, a.name, a.cpf].join(':')).join(';'),
+          current.attachments.map((att: any) => [att.id, att.fileName].join(':')).join(';')].join('|');
+        const documentHash = crypto.createHash('sha256').update(rawDigest).digest('hex');
+        await tx.meeting.update({ where: { id: meetingId }, data: { attendanceCollectionOpen: false, documentHash } });
+        await tx.attendanceCollectionWindow.updateMany({ where: { meetingId, closedAt: null }, data: { closedAt: new Date() } });
+        return { success: true };
+      });
+
+      if (!result.success) return NextResponse.json({ success: false, error: result.error || 'Não foi possível atualizar a coleta.' }, { status: 409 });
+      logSecurityEvent('ADMIN_ACTION', { userId: sessionUser.id, reason: action === 'reopen_attendance' ? 'ATTENDANCE_COLLECTION_REOPENED: ' + meetingId : 'ATTENDANCE_COLLECTION_CLOSED: ' + meetingId });
+      return NextResponse.json({ success: true, message: action === 'reopen_attendance' ? 'Lista reaberta para novas assinaturas.' : 'Coleta complementar encerrada e ata atualizada.' });
+    }
+
     const updateData: any = {};
     if (status) updateData.status = status;
     if (groupPhoto !== undefined) {
@@ -534,6 +578,7 @@ export async function PUT(req: Request) {
 
     // Ao encerrar o DDS, gera e congela o hash SHA-256 de integridade documental
     if (status === 'ENDED' || updateData.status === 'ENDED') {
+      updateData.attendanceCollectionOpen = false;
       const crypto = await import('crypto');
       const endTimestamp = updateData.endedAt ? new Date(updateData.endedAt).toISOString() : new Date().toISOString();
       const rawDigest = [
@@ -605,6 +650,7 @@ export async function PUT(req: Request) {
         programmaticContent: true,
         groupPhoto: true,
         status: true,
+        attendanceCollectionOpen: true,
         documentHash: true,
         createdAt: true,
         endedAt: true,
