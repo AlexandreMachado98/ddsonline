@@ -576,22 +576,10 @@ export async function PUT(req: Request) {
       updateData.status = 'ENDED';
     }
 
-    // Ao encerrar o DDS, gera e congela o hash SHA-256 de integridade documental
+    // Ao encerrar o DDS, fecha a coleta. O hash será calculado dentro da transação
+    // após obter o mesmo bloqueio usado pelas APIs de assinatura.
     if (status === 'ENDED' || updateData.status === 'ENDED') {
       updateData.attendanceCollectionOpen = false;
-      const crypto = await import('crypto');
-      const endTimestamp = updateData.endedAt ? new Date(updateData.endedAt).toISOString() : new Date().toISOString();
-      const rawDigest = [
-        meetingId,
-        existingMeeting.topic || '',
-        existingMeeting.createdAt?.toISOString() || '',
-        endTimestamp,
-        existingMeeting.attendees?.map((a: any) => `${a.id}:${a.name}:${a.cpf}`).join(';') || '',
-        existingMeeting.attachments?.map((att: any) => `${att.id}:${att.fileName}`).join(';') || ''
-      ].join('|');
-      
-      updateData.documentHash = crypto.createHash('sha256').update(rawDigest).digest('hex');
-      if (!updateData.endedAt) updateData.endedAt = new Date();
     }
 
     // Sincroniza anexos se fornecidos preservando fileData se já existirem
@@ -637,7 +625,31 @@ export async function PUT(req: Request) {
       }
     }
 
-    const updated = await prisma.meeting.update({
+    const updated = await prisma.$transaction(async tx => {
+      if (updateData.status === 'ENDED') {
+        await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', meetingId);
+        const current = await tx.meeting.findUnique({
+          where: { id: meetingId },
+          include: {
+            attendees: { select: { id: true, name: true, cpf: true } },
+            attachments: { select: { id: true, fileName: true } }
+          }
+        });
+        if (!current) throw new Error('Reunião não encontrada durante o encerramento.');
+        const crypto = await import('crypto');
+        const finalEndedAt = updateData.endedAt ? new Date(updateData.endedAt) : (current.endedAt || new Date());
+        const rawDigest = [
+          meetingId,
+          current.topic || '',
+          current.createdAt?.toISOString() || '',
+          finalEndedAt.toISOString(),
+          current.attendees.map((a: any) => [a.id, a.name, a.cpf].join(':')).join(';'),
+          current.attachments.map((att: any) => [att.id, att.fileName].join(':')).join(';')
+        ].join('|');
+        updateData.endedAt = finalEndedAt;
+        updateData.documentHash = crypto.createHash('sha256').update(rawDigest).digest('hex');
+      }
+      return tx.meeting.update({
       where: { id: meetingId },
       data: updateData,
       select: {
@@ -687,6 +699,7 @@ export async function PUT(req: Request) {
           orderBy: { order: 'asc' }
         }
       }
+      });
     });
 
     logSecurityEvent('ADMIN_ACTION', {
