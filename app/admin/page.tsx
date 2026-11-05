@@ -573,6 +573,16 @@ function AdminPanelContent() {
     }
   };
 
+  const handleCopyAttendanceLink = async (meeting: any) => {
+    try {
+      const attendanceUrl = `${window.location.origin}/presencial?id=${encodeURIComponent(meeting.id)}`;
+      await navigator.clipboard.writeText(attendanceUrl);
+      showToast('Link da coleta complementar copiado. Envie aos colaboradores pendentes.', 'success');
+    } catch {
+      showToast('Não foi possível copiar o link. Abra a coleta e copie o endereço do navegador.', 'error');
+    }
+  };
+
   const handleToggleAttendanceCollection = (meeting: any) => {
     const reopening = !meeting.attendanceCollectionOpen;
     setConfirmDialog({
@@ -1854,8 +1864,18 @@ function AdminPanelContent() {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 self-end md:self-auto pt-2 md:pt-0 border-t border-slate-200 md:border-0 w-full md:w-auto justify-end">
+                    {m.attendanceCollectionOpen && (
+                      <button
+                        onClick={() => handleCopyAttendanceLink(m)}
+                        className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-200 cursor-pointer transition-all shadow-sm"
+                        title="Copiar link para os colaboradores assinarem"
+                      >
+                        <Copy size={14} />
+                        <span>Copiar link</span>
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleToggleAttendanceCollection(m)}
+                      onClick={() => handleToggleAttendanceCollection(m)
                       className={`px-3 py-2 font-bold text-xs rounded-xl flex items-center gap-1.5 border cursor-pointer transition-all shadow-sm ${m.attendanceCollectionOpen ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200'}`}
                       title={m.attendanceCollectionOpen ? 'Encerrar coleta complementar' : 'Reabrir para novas assinaturas'}
                     >
