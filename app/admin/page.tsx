@@ -1876,7 +1876,7 @@ function AdminPanelContent() {
                     )}
                     {(m.organizerId === currentUser?.id || currentUser?.role === 'SUPER_ADMIN') && (
                       <button
-                        onClick={() => handleToggleAttendanceCollection(m)
+                        onClick={() => handleToggleAttendanceCollection(m)}
                       className={`px-3 py-2 font-bold text-xs rounded-xl flex items-center gap-1.5 border cursor-pointer transition-all shadow-sm ${m.attendanceCollectionOpen ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200'}`}
                       title={m.attendanceCollectionOpen ? 'Encerrar coleta complementar' : 'Reabrir para novas assinaturas'}
                     >
@@ -1886,7 +1886,7 @@ function AdminPanelContent() {
                     )}
 
                     <button
-                      onClick={() => handleOpenPreview(m)
+                      onClick={() => handleOpenPreview(m)}
                       className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-200 cursor-pointer transition-all shadow-sm"
                       title="Pré-visualizar Lista de Presença e Dossiê Completo"
                     >
