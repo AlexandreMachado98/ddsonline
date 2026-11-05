@@ -120,7 +120,7 @@ export async function GET(req: Request) {
     const now = new Date();
     for (const competition of competitions) {
       if (competition.status === 'CANCELLED' || competition.status === 'FINISHED') continue;
-      if (competition.endDate < now) {
+      if (competition.endDate < now && competition.updatedAt <= competition.endDate) {
         await refreshCompetitionEvents(competition);
         await prisma.competition.update({ where: { id: competition.id }, data: { status: 'FINISHED' } });
         continue;
@@ -211,14 +211,23 @@ export async function PATCH(req: Request) {
   if (!user) return json('Sessão inválida.', 401);
   try {
     const body = await req.json();
-    if (typeof body.id !== 'string' || !['FINISHED', 'CANCELLED', 'ACTIVE'].includes(body.status)) {
-      return json('Solicitação inválida.', 400);
-    }
+    if (typeof body.id !== 'string') return json('Solicitação inválida.', 400);
+    const hasStatus = body.status !== undefined;
+    const hasName = body.name !== undefined;
+    if ((!hasStatus && !hasName) || (hasStatus && !['FINISHED', 'CANCELLED', 'ACTIVE'].includes(body.status))) return json('Informe um nome ou uma situação válida para a competição.', 400);
     const competition = await prisma.competition.findUnique({ where: { id: body.id } });
     if (!competition) return json('Competição não encontrada.', 404);
     if (!canManage(user, competition)) return json('Acesso negado a esta competição.', 403);
-    if (body.status === 'FINISHED') await refreshCompetitionEvents(competition);
-    const updated = await prisma.competition.update({ where: { id: competition.id }, data: { status: body.status } });
+    const data: { status?: 'FINISHED' | 'CANCELLED' | 'ACTIVE'; name?: string } = {};
+    if (hasName) {
+      if (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 120) return json('O nome deve ter entre 1 e 120 caracteres.', 400);
+      data.name = body.name.trim();
+    }
+    if (hasStatus) {
+      if (body.status === 'FINISHED') await refreshCompetitionEvents(competition);
+      data.status = body.status;
+    }
+    const updated = await prisma.competition.update({ where: { id: competition.id }, data });
     return NextResponse.json({ success: true, competition: updated });
   } catch (error) {
     console.error('Erro ao atualizar competição:', error);
