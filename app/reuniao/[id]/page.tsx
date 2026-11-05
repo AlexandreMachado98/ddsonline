@@ -34,6 +34,7 @@ export default function MeetingRoom() {
   const [programmaticContent, setProgrammaticContent] = useState('');
   const [classification, setClassification] = useState('DDS');
   const [meetingStatus, setMeetingStatus] = useState<'LIVE' | 'ENDED'>('LIVE');
+  const [attendanceCollectionOpen, setAttendanceCollectionOpen] = useState(false);
   const [meetingType, setMeetingType] = useState<'PRESENTIAL' | 'REMOTE'>('REMOTE');
   const [organizerInfo, setOrganizerInfo] = useState<any>(null);
   const [attachments, setAttachments] = useState<any[]>([]);
@@ -112,6 +113,7 @@ export default function MeetingRoom() {
           if (data.meeting.attachments) setAttachments(data.meeting.attachments);
           cacheMeetingData(data.meeting);
 
+          setAttendanceCollectionOpen(Boolean(data.meeting.attendanceCollectionOpen));
           if (data.meeting.status === 'ENDED') {
             setMeetingStatus('ENDED');
           } else {
@@ -127,6 +129,7 @@ export default function MeetingRoom() {
             setObjective(cached.objective || '');
             setProgrammaticContent(cached.programmaticContent || '');
             setClassification(cached.classification || 'DDS');
+            setAttendanceCollectionOpen(Boolean(cached.attendanceCollectionOpen));
             if (cached.type) setMeetingType(cached.type);
             if (cached.organizer) setOrganizerInfo(cached.organizer);
             if (cached.attachments) setAttachments(cached.attachments);
@@ -352,7 +355,7 @@ export default function MeetingRoom() {
   // =========================================================================
   // CENÁRIO 2: SALA ENCERRADA PELO ORGANIZADOR (DESCONEXÃO EM TEMPO REAL)
   // =========================================================================
-  if (meetingStatus === 'ENDED') {
+  if (meetingStatus === 'ENDED' && !attendanceCollectionOpen) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-600/10 blur-[140px] rounded-full pointer-events-none"></div>

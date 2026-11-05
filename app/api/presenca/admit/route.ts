@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     }
 
     // 4. Verificação de status da reunião
-    if (meeting.status !== 'LIVE') {
+    if (meeting.status !== 'LIVE' && !meeting.attendanceCollectionOpen) {
       logSecurityEvent('FORBIDDEN_ACCESS', {
         path: 'POST /api/presenca/admit',
         reason: `ATTEMPT_ATTENDANCE_ON_CLOSED_MEETING (${meeting.id})`
@@ -101,55 +101,38 @@ export async function POST(req: Request) {
       }
     }
 
-    // 7. Evita duplicatas do mesmo colaborador na mesma reunião
-    const existing = await prisma.attendance.findFirst({
-      where: {
-        meetingId: meeting.id,
-        name: { equals: cleanName, mode: 'insensitive' },
-        cpf: { equals: cleanCpf, mode: 'insensitive' }
+    // Serializa a gravação com o encerramento da coleta.
+    const saved = await prisma.$transaction(async tx => {
+      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', meeting.id);
+      const currentMeeting = await tx.meeting.findUnique({
+        where: { id: meeting.id },
+        select: { id: true, status: true, attendanceCollectionOpen: true }
+      });
+      if (!currentMeeting || (currentMeeting.status !== 'LIVE' && !currentMeeting.attendanceCollectionOpen)) return { error: 'CLOSED' as const };
+      const existing = await tx.attendance.findFirst({
+        where: { meetingId: meeting.id, name: { equals: cleanName, mode: 'insensitive' }, cpf: { equals: cleanCpf, mode: 'insensitive' } }
+      });
+      if (existing && currentMeeting.status === 'ENDED') return { error: 'DUPLICATE' as const };
+      if (existing) {
+        const updated = await tx.attendance.update({
+          where: { id: existing.id },
+          data: { name: cleanName, cpf: cleanCpf, selfie: sanitizedSelfie || existing.selfie, signature: sanitizedSignature || existing.signature }
+        });
+        return { attendance: updated, updated: true };
       }
+      const attendance = await tx.attendance.create({
+        data: { name: cleanName, cpf: cleanCpf, selfie: sanitizedSelfie, signature: sanitizedSignature, meetingId: meeting.id }
+      });
+      return { attendance, updated: false };
     });
-
-    if (existing) {
-      const updated = await prisma.attendance.update({
-        where: { id: existing.id },
-        data: {
-          name: cleanName,
-          cpf: cleanCpf,
-          selfie: sanitizedSelfie || existing.selfie,
-          signature: sanitizedSignature || existing.signature
-        }
-      });
-
-      return NextResponse.json({ 
-        success: true, 
-        data: updated, 
-        attendanceId: updated.id,
-        status: 'ADMITTED',
-        meetingType: meeting.type || 'PRESENTIAL',
-        updated: true
-      });
+    if ('error' in saved) {
+      const duplicate = saved.error === 'DUPLICATE';
+      return NextResponse.json({ success: false, error: duplicate ? 'Este colaborador já possui presença registrada nesta lista.' : 'A coleta de presença foi encerrada pelo organizador.' }, { status: duplicate ? 409 : 403 });
     }
-
-    // 8. Registra presença vinculada
-    const attendance = await prisma.attendance.create({
-      data: {
-        name: cleanName,
-        cpf: cleanCpf,
-        selfie: sanitizedSelfie,
-        signature: sanitizedSignature,
-        meetingId: meeting.id
-      }
+    return NextResponse.json({
+      success: true, data: saved.attendance, attendanceId: saved.attendance.id,
+      status: 'ADMITTED', meetingType: meeting.type || 'PRESENTIAL', updated: saved.updated
     });
-
-    return NextResponse.json({ 
-      success: true, 
-      data: attendance, 
-      attendanceId: attendance.id,
-      status: 'ADMITTED',
-      meetingType: meeting.type || 'PRESENTIAL'
-    });
-
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro no servidor';
     console.error("Erro na API Central de Presença:", message);

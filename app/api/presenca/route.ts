@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     }
 
     // 3. Regra de Segurança: Reunião precisa estar ativa ('LIVE')
-    if (meeting.status !== 'LIVE') {
+    if (meeting.status !== 'LIVE' && !meeting.attendanceCollectionOpen) {
       logSecurityEvent('FORBIDDEN_ACCESS', {
         path: 'POST /api/presenca',
         reason: `ATTEMPT_ATTENDANCE_ON_CLOSED_MEETING (${meeting.id})`
@@ -78,50 +78,67 @@ export async function POST(req: Request) {
       sanitizedSignature = savedSignature;
     }
 
-    // 6. Evita duplicatas/sobrescritas indevidas de homônimos
-    const existing = await prisma.attendance.findFirst({
-      where: {
-        meetingId: meeting.id,
-        OR: [
-          { registration: trimmedRegistration },
-          { name: { equals: trimmedName, mode: 'insensitive' }, cpf: { equals: trimmedCpf, mode: 'insensitive' } }
-        ]
+    // Serializa a gravação com o encerramento da coleta para impedir assinaturas após o fechamento.
+    const saved = await prisma.$transaction(async tx => {
+      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', meeting.id);
+      const currentMeeting = await tx.meeting.findUnique({
+        where: { id: meeting.id },
+        select: { id: true, status: true, attendanceCollectionOpen: true }
+      });
+      if (!currentMeeting || (currentMeeting.status !== 'LIVE' && !currentMeeting.attendanceCollectionOpen)) {
+        return { error: 'CLOSED' as const };
       }
-    });
 
-    if (existing) {
-      // Se for o mesmo colaborador atualizando seus dados na mesma sessão ativa
-      const updated = await prisma.attendance.update({
-        where: { id: existing.id },
-        data: {
-          name: trimmedName,
-          cpf: trimmedCpf,
-          registration: trimmedRegistration,
-          selfie: sanitizedSelfie || existing.selfie,
-          signature: sanitizedSignature || existing.signature
+      const existing = await tx.attendance.findFirst({
+        where: {
+          meetingId: meeting.id,
+          OR: [
+            { registration: trimmedRegistration },
+            { name: { equals: trimmedName, mode: 'insensitive' }, cpf: { equals: trimmedCpf, mode: 'insensitive' } }
+          ]
         }
       });
-      const { quizProofHash: _privateProof, ...safeUpdated } = updated;
-      return NextResponse.json({ success: true, data: safeUpdated, meetingId: meeting.id, updated: true });
-    }
 
-    // 7. Salva a presença atrelada estritamente à reunião correta
-    const quizProof = randomBytes(32).toString('hex');
-    const attendance = await prisma.attendance.create({
-      data: {
-        name: trimmedName,
-        cpf: trimmedCpf,
-        registration: trimmedRegistration,
-        selfie: sanitizedSelfie,
-        signature: sanitizedSignature,
-        quizProofHash: createHash('sha256').update(quizProof).digest('hex'),
-        meetingId: meeting.id
+      // Em coleta complementar, nunca sobrescreve uma assinatura anterior.
+      if (existing && currentMeeting.status === 'ENDED') return { error: 'DUPLICATE' as const };
+      if (existing) {
+        const updated = await tx.attendance.update({
+          where: { id: existing.id },
+          data: {
+            name: trimmedName, cpf: trimmedCpf, registration: trimmedRegistration,
+            selfie: sanitizedSelfie || existing.selfie,
+            signature: sanitizedSignature || existing.signature
+          }
+        });
+        return { attendance: updated, updated: true, quizProof: null as string | null };
       }
+
+      const quizProof = randomBytes(32).toString('hex');
+      const attendance = await tx.attendance.create({
+        data: {
+          name: trimmedName, cpf: trimmedCpf, registration: trimmedRegistration,
+          selfie: sanitizedSelfie, signature: sanitizedSignature,
+          quizProofHash: createHash('sha256').update(quizProof).digest('hex'),
+          meetingId: meeting.id
+        }
+      });
+      return { attendance, quizProof, updated: false };
     });
 
-    const { quizProofHash: _privateProof, ...safeAttendance } = attendance;
-    return NextResponse.json({ success: true, data: safeAttendance, meetingId: meeting.id, quizProof });
+    if ('error' in saved) {
+      const duplicate = saved.error === 'DUPLICATE';
+      return NextResponse.json({
+        success: false,
+        error: duplicate ? 'Esta matrícula já possui presença registrada nesta lista.' : 'A coleta de presença foi encerrada pelo organizador.'
+      }, { status: duplicate ? 409 : 403 });
+    }
 
+    const { quizProofHash: _privateProof, ...safeAttendance } = saved.attendance;
+    return NextResponse.json({
+      success: true, data: safeAttendance, meetingId: meeting.id,
+      ...(saved.quizProof ? { quizProof: saved.quizProof } : {}),
+      updated: saved.updated
+    });
   } catch (error) {
     console.error("Erro interno no POST /api/presenca");
     return NextResponse.json({ success: false, error: 'Erro interno ao salvar presença' }, { status: 500 });
