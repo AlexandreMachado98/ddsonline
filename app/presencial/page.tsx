@@ -119,7 +119,7 @@ function PresencialContent() {
           setProgrammaticContent(data.meeting.programmaticContent || '');
           setClassification(data.meeting.classification || 'DDS');
           cacheMeetingData(data.meeting);
-          if (data.meeting.status === 'ENDED') {
+          if (data.meeting.status === 'ENDED' && !data.meeting.attendanceCollectionOpen) {
             setIsMeetingEnded(true);
           } else {
             setIsMeetingEnded(false);
@@ -136,7 +136,7 @@ function PresencialContent() {
             setObjective(cached.objective || '');
             setProgrammaticContent(cached.programmaticContent || '');
             setClassification(cached.classification || 'DDS');
-            setIsMeetingEnded(false);
+            setIsMeetingEnded(Boolean(cached.status === 'ENDED' && !cached.attendanceCollectionOpen));
             setNoMeetingFound(false);
           } else {
             setNoMeetingFound(true);
