@@ -1877,12 +1877,12 @@ function AdminPanelContent() {
                     {(m.organizerId === currentUser?.id || currentUser?.role === 'SUPER_ADMIN') && (
                       <button
                         onClick={() => handleToggleAttendanceCollection(m)}
-                      className={`px-3 py-2 font-bold text-xs rounded-xl flex items-center gap-1.5 border cursor-pointer transition-all shadow-sm ${m.attendanceCollectionOpen ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200'}`}
-                      title={m.attendanceCollectionOpen ? 'Encerrar coleta complementar' : 'Reabrir para novas assinaturas'}
-                    >
-                      <RefreshCw size={14} />
-                      <span>{m.attendanceCollectionOpen ? 'Encerrar coleta' : 'Reabrir lista'}</span>
-                    </button>
+                        className={`px-3 py-2 font-bold text-xs rounded-xl flex items-center gap-1.5 border cursor-pointer transition-all shadow-sm ${m.attendanceCollectionOpen ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-200'}`}
+                        title={m.attendanceCollectionOpen ? 'Encerrar coleta complementar' : 'Reabrir para novas assinaturas'}
+                      >
+                        <RefreshCw size={14} />
+                        <span>{m.attendanceCollectionOpen ? 'Encerrar coleta' : 'Reabrir lista'}</span>
+                      </button>
                     )}
 
                     <button
