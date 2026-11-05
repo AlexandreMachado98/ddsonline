@@ -542,7 +542,7 @@ export async function PUT(req: Request) {
         return { success: true };
       });
 
-      if (!result.success) return NextResponse.json({ success: false, error: result.error || 'Não foi possível atualizar a coleta.' }, { status: 409 });
+      if (!('success' in result) || !result.success) return NextResponse.json({ success: false, error: 'error' in result ? result.error : 'Não foi possível atualizar a coleta.' }, { status: 409 });
       logSecurityEvent('ADMIN_ACTION', { userId: sessionUser.id, reason: action === 'reopen_attendance' ? 'ATTENDANCE_COLLECTION_REOPENED: ' + meetingId : 'ATTENDANCE_COLLECTION_CLOSED: ' + meetingId });
       return NextResponse.json({ success: true, message: action === 'reopen_attendance' ? 'Lista reaberta para novas assinaturas.' : 'Coleta complementar encerrada e ata atualizada.' });
     }
