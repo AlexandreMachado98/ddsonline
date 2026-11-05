@@ -41,6 +41,7 @@ function PresencialContent() {
   // Estados do Formulário do Colaborador com persistência de rascunho
   const [name, setName] = useState('');
   const [funcao, setFuncao] = useState('');
+  const [registration, setRegistration] = useState('');
   const [savedSelfie, setSavedSelfie] = useState<string | null>(null);
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,6 +56,7 @@ function PresencialContent() {
         const parsed = JSON.parse(saved);
         if (parsed.name) setName(parsed.name);
         if (parsed.funcao) setFuncao(parsed.funcao);
+        if (parsed.registration) setRegistration(String(parsed.registration).replace(/\D/g, '').slice(0, 4));
       }
     } catch {}
   }, []);
@@ -62,14 +64,22 @@ function PresencialContent() {
   const handleNameChange = (val: string) => {
     setName(val);
     try {
-      sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name: val, funcao }));
+      sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name: val, funcao, registration }));
     } catch {}
   };
 
   const handleFuncaoChange = (val: string) => {
     setFuncao(val);
     try {
-      sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name, funcao: val }));
+      sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name, funcao: val, registration }));
+    } catch {}
+  };
+
+  const handleRegistrationChange = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 4);
+    setRegistration(digits);
+    try {
+      sessionStorage.setItem('dds_participant_draft', JSON.stringify({ name, funcao, registration: digits }));
     } catch {}
   };
 
@@ -194,6 +204,11 @@ function PresencialContent() {
       return;
     }
 
+    if (!/^\d{4}$/.test(registration)) {
+      toast.warning('Matrícula obrigatória', 'Informe os 4 números da matrícula do colaborador.');
+      return;
+    }
+
     if (!savedSelfie) {
       toast.warning('Foto Facial Pendente', 'Por favor, tire sua foto facial ou envie uma foto.');
       return;
@@ -212,6 +227,7 @@ function PresencialContent() {
         await saveOfflineAttendance({
           name: name.trim(),
           cpf: funcao.trim(),
+          registration,
           savedSelfie,
           savedSignature,
           meetingId: meetingId || 'presencial'
@@ -236,6 +252,7 @@ function PresencialContent() {
         body: JSON.stringify({
           name: name.trim(),
           cpf: funcao.trim(),
+          registration,
           savedSelfie,
           savedSignature,
           meetingId: meetingId || 'presencial'
@@ -268,6 +285,7 @@ function PresencialContent() {
         await saveOfflineAttendance({
           name: name.trim(),
           cpf: funcao.trim(),
+          registration,
           savedSelfie,
           savedSignature,
           meetingId: meetingId || 'presencial'
@@ -287,6 +305,7 @@ function PresencialContent() {
   const handleRegisterAnother = () => {
     setName('');
     setFuncao('');
+    setRegistration('');
     setSavedSelfie(null);
     setSavedSignature(null);
     setIsOfflineSubmitted(false);
@@ -558,6 +577,31 @@ function PresencialContent() {
                 )}
               </div>
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Matrícula</label>
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  value={registration}
+                  onChange={(e) => handleRegistrationChange(e.target.value)}
+                  placeholder="Digite os 4 números da matrícula"
+                  inputMode="numeric"
+                  pattern="[0-9]{4}"
+                  maxLength={4}
+                  autoComplete="off"
+                  enterKeyHint="next"
+                  aria-describedby="registration-help"
+                  className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-base sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[48px]"
+                />
+                {registration.length === 4 && (
+                  <Check size={18} className="absolute right-3.5 text-emerald-400 pointer-events-none" />
+                )}
+              </div>
+              <p id="registration-help" className="mt-1 text-[10px] text-slate-500">
+                Informe os 4 números da matrícula para identificar corretamente sua presença.
+              </p>
+            </div>
+
           </div>
         </section>
 
