@@ -547,6 +547,13 @@ export async function PUT(req: Request) {
       return NextResponse.json({ success: true, message: action === 'reopen_attendance' ? 'Lista reaberta para novas assinaturas.' : 'Coleta complementar encerrada e ata atualizada.' });
     }
 
+    if (existingMeeting.status === 'ENDED' && existingMeeting.attendanceCollectionOpen) {
+      return NextResponse.json({
+        success: false,
+        error: 'Finalize a coleta complementar antes de editar os dados da reunião.'
+      }, { status: 409 });
+    }
+
     const updateData: any = {};
     if (status) updateData.status = status;
     if (groupPhoto !== undefined) {
