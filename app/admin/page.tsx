@@ -85,6 +85,7 @@ function AdminPanelContent() {
   const [activeMeetings, setActiveMeetings] = useState<any[]>([]);
   const [editAttachments, setEditAttachments] = useState<DdsAttachment[]>([]);
   const [isReviewingClose, setIsReviewingClose] = useState(false);
+  const [isClosingMeeting, setIsClosingMeeting] = useState(false);
   const [previewMeeting, setPreviewMeeting] = useState<any | null>(null);
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -679,25 +680,46 @@ function AdminPanelContent() {
   };
 
   const handleConfirmCloseDds = async () => {
+    const meetingToClose = activeMeeting;
+    if (!meetingToClose?.id) {
+      showToast('Não foi possível identificar a sala que será encerrada. Atualize o painel e tente novamente.', 'error');
+      return;
+    }
+    if (isClosingMeeting) return;
+
+    setIsClosingMeeting(true);
     try {
-      if (activeMeeting && activeMeeting.attendees && activeMeeting.attendees.length > 0) {
+      if (meetingToClose.attendees && meetingToClose.attendees.length > 0) {
         await handleDownloadActivePdf();
       }
-      await fetch('/api/reuniao', {
+
+      const response = await fetch('/api/reuniao', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meetingId: activeMeeting?.id })
+        cache: 'no-store',
+        body: JSON.stringify({ meetingId: meetingToClose.id, action: 'end_meeting' })
       });
+      const result = await response.json().catch(() => null);
+
+      // Só fecha a interface depois de receber confirmação explícita do banco/API.
+      if (!response.ok || !result?.success || result?.meeting?.status !== 'ENDED') {
+        throw new Error(result?.error || 'O servidor não confirmou o encerramento desta sala.');
+      }
+
       setIsLiveMode(false);
       setIsReviewingClose(false);
-      setActiveMeetings(prev => prev.filter(room => room.id !== activeMeeting?.id));
+      setActiveMeetings(prev => prev.filter(room => room.id !== meetingToClose.id));
       setActiveMeeting(null);
       setTeamPhotos([]);
       router.push('/admin');
-      fetchAllData();
-      showToast('DDS Encerrado! Ata arquivada com sucesso.', 'success');
-    } catch (e) {
-      showToast('Erro ao encerrar DDS.', 'error');
+      await fetchAllData();
+      showToast(result.message || 'DDS encerrado e ata arquivada com sucesso.', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao encerrar DDS.';
+      showToast(message, 'error');
+      // Mantém a sala aberta na tela quando o servidor não confirmar o encerramento.
+    } finally {
+      setIsClosingMeeting(false);
     }
   };
 
@@ -917,9 +939,10 @@ function AdminPanelContent() {
                 <button
                   type="button"
                   onClick={handleConfirmCloseDds}
-                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all min-h-[44px]"
+                  disabled={isClosingMeeting}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:bg-red-900/60 disabled:cursor-wait text-white font-bold text-xs rounded-xl shadow-lg transition-all min-h-[44px]"
                 >
-                  Confirmar Encerramento
+                  {isClosingMeeting ? 'Encerrando e confirmando...' : 'Confirmar Encerramento'}
                 </button>
               </div>
             </div>
