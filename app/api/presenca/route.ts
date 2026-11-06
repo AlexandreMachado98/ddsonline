@@ -80,7 +80,7 @@ export async function POST(req: Request) {
 
     // Serializa a gravação com o encerramento da coleta para impedir assinaturas após o fechamento.
     const saved = await prisma.$transaction(async tx => {
-      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', meeting.id);
+      await tx.$queryRawUnsafe('SELECT 1 AS lock_acquired FROM pg_advisory_xact_lock(hashtext($1))', meeting.id);
       const currentMeeting = await tx.meeting.findUnique({
         where: { id: meeting.id },
         select: { id: true, status: true, attendanceCollectionOpen: true }
@@ -140,7 +140,30 @@ export async function POST(req: Request) {
       updated: saved.updated
     });
   } catch (error) {
-    console.error("Erro interno no POST /api/presenca");
-    return NextResponse.json({ success: false, error: 'Erro interno ao salvar presença' }, { status: 500 });
+    // Registre apenas informações técnicas, sem nome, matrícula, foto ou assinatura.
+    const code = error && typeof error === 'object' && 'code' in error
+      ? String(error.code) : 'UNKNOWN';
+    const category = error instanceof Error ? error.name : 'UnknownError';
+    console.error('[attendance:create] failure', { code, category });
+
+    if (code === 'P2022') {
+      return NextResponse.json({
+        success: false,
+        error: 'O cadastro de presenças está temporariamente indisponível. Avise o organizador para atualizar o banco de dados.',
+        code: 'ATTENDANCE_SCHEMA_OUTDATED'
+      }, { status: 503 });
+    }
+    if (['P1001', 'P1002', 'P2024', 'P2028'].includes(code)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Não foi possível conectar ao servidor de presenças. Tente novamente em instantes.',
+        code: 'ATTENDANCE_DATABASE_UNAVAILABLE'
+      }, { status: 503 });
+    }
+    return NextResponse.json({
+      success: false,
+      error: 'Não foi possível salvar a presença. Avise o organizador se o erro persistir.',
+      code: 'ATTENDANCE_SAVE_FAILED'
+    }, { status: 500 });
   }
 }

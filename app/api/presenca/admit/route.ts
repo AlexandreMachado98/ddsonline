@@ -103,7 +103,7 @@ export async function POST(req: Request) {
 
     // Serializa a gravação com o encerramento da coleta.
     const saved = await prisma.$transaction(async tx => {
-      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', meeting.id);
+      await tx.$queryRawUnsafe('SELECT 1 AS lock_acquired FROM pg_advisory_xact_lock(hashtext($1))', meeting.id);
       const currentMeeting = await tx.meeting.findUnique({
         where: { id: meeting.id },
         select: { id: true, status: true, attendanceCollectionOpen: true }
