@@ -122,6 +122,10 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
         },
         audio: true
       });
+      if (!mountedRef.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
 
       cameraStreamRef.current = stream;
       currentStreamRef.current = stream;
@@ -211,6 +215,7 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
       setErrorMessage(null);
 
       const { default: Peer } = await import('peerjs');
+      if (!mountedRef.current || meetingEndedRef.current) return;
 
       if (peerRef.current) {
         peerRef.current.destroy();
@@ -307,7 +312,10 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
         audio: { echoCancellation: true, noiseSuppression: true },
         video: enableVideo ? { width: { ideal: 640 }, height: { ideal: 360 } } : false
       });
-      if (!mountedRef.current) { media.getTracks().forEach(t => t.stop()); return; }
+      if (!mountedRef.current || meetingEndedRef.current) {
+        media.getTracks().forEach(track => track.stop());
+        return;
+      }
       viewerMediaRef.current = media;
       viewerMediaEnabledRef.current = true;
       setViewerMicOn(true);
