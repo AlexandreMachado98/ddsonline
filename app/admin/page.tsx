@@ -707,14 +707,54 @@ function AdminPanelContent() {
         throw new Error(result?.error || 'O servidor não confirmou o encerramento desta sala.');
       }
 
+      // O banco ja confirmou o encerramento. O PDF e emitido somente depois;
+      // problemas com a emissao nao afetam o encerramento nem a navegacao.
       setIsLiveMode(false);
       setIsReviewingClose(false);
       setActiveMeetings(prev => prev.filter(room => room.id !== meetingToClose.id));
       setActiveMeeting(null);
       setTeamPhotos([]);
       router.push('/admin');
-      await fetchAllData();
       showToast(result.message || 'DDS encerrado e ata arquivada com sucesso.', 'success');
+
+      // Baixa a ata definitiva sem bloquear a saida da sala.
+      void (async () => {
+        try {
+          const pdfResponse = await fetch(`/api/reuniao?id=${encodeURIComponent(meetingToClose.id)}&full=true`, {
+            cache: 'no-store'
+          });
+          const pdfData = await pdfResponse.json().catch(() => null);
+          if (!pdfResponse.ok || !pdfData?.success || !pdfData?.meeting) {
+            throw new Error(pdfData?.error || 'Nao foi possivel carregar a ata encerrada.');
+          }
+          const finalMeeting = pdfData.meeting;
+          if (finalMeeting.status !== 'ENDED') {
+            throw new Error('O servidor ainda nao confirmou a ata como encerrada.');
+          }
+          await generateDdsPdf({
+            topic: finalMeeting.topic,
+            farm: finalMeeting.farm,
+            type: finalMeeting.type,
+            classification: finalMeeting.classification,
+            instructorName: finalMeeting.instructorName,
+            endedAt: finalMeeting.endedAt,
+            organizer: finalMeeting.organizer,
+            objective: finalMeeting.objective,
+            programmaticContent: finalMeeting.programmaticContent,
+            groupPhoto: finalMeeting.groupPhoto,
+            createdAt: finalMeeting.createdAt,
+            attendees: finalMeeting.attendees || [],
+            attachments: finalMeeting.attachments || []
+          });
+          showToast('DDS encerrado. PDF da ata baixado automaticamente.', 'success');
+        } catch (pdfError) {
+          console.error('Falha no download automatico da ata apos encerramento:', pdfError);
+          showToast('DDS encerrado com sucesso, mas o PDF nao foi baixado. Use o botao PDF no Historico.', 'error');
+        }
+      })();
+      void fetchAllData().catch((refreshError) => {
+        console.warn('Falha ao atualizar lista de DDS apos encerramento:', refreshError);
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao encerrar DDS.';
       showToast(message, 'error');
