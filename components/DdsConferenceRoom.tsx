@@ -261,6 +261,7 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
       dummyCanvas.width = 1;
       dummyCanvas.height = 1;
       outgoing = dummyCanvas.captureStream(1);
+      currentStreamRef.current = outgoing;
     }
 
     const previousCall = viewerCallRef.current;
@@ -362,6 +363,8 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
       activeCallsRef.current = [];
       peerRef.current?.destroy();
       peerRef.current = null;
+      currentStreamRef.current?.getTracks().forEach(track => track.stop());
+      currentStreamRef.current = null;
       cameraStreamRef.current?.getTracks().forEach(t => t.stop());
       screenStreamRef.current?.getTracks().forEach(t => t.stop());
       viewerMediaRef.current?.getTracks().forEach(t => t.stop());
@@ -537,6 +540,8 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     activeCallsRef.current = [];
     peerRef.current?.destroy();
     peerRef.current = null;
+    currentStreamRef.current?.getTracks().forEach(track => track.stop());
+    currentStreamRef.current = null;
     viewerMediaRef.current?.getTracks().forEach(track => track.stop());
     viewerMediaRef.current = null;
     viewerMediaEnabledRef.current = false;
