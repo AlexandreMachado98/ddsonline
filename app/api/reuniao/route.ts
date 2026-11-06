@@ -520,7 +520,7 @@ export async function PUT(req: Request) {
     const isAuthorized =
       existingMeeting.organizerId === sessionUser.id ||
       sessionUser.role === 'SUPER_ADMIN' ||
-      isCompanyAdminForMeeting;
+      (action === 'end_meeting' && isCompanyAdminForMeeting);
     if (!isAuthorized) {
       logSecurityEvent('FORBIDDEN_ACCESS', {
         userId: sessionUser.id,
