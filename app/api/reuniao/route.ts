@@ -499,11 +499,16 @@ export async function PUT(req: Request) {
     }
 
     // PROTEÇÃO IDOR: Confirma se a reunião pertence ao organizador autenticado
+    // O encerramento não precisa carregar fotos, assinaturas ou anexos em base64.
+    // Buscar esses dados em toda requisição causava lentidão e timeouts em salas grandes.
     const existingMeeting = await prisma.meeting.findUnique({
       where: { id: meetingId },
-      include: {
-        attendees: { select: { id: true, name: true, cpf: true, createdAt: true } },
-        attachments: { select: { id: true, fileName: true, fileSize: true, fileData: true } }
+      select: {
+        id: true,
+        organizerId: true,
+        companyId: true,
+        status: true,
+        attendanceCollectionOpen: true
       }
     });
 
@@ -537,7 +542,7 @@ export async function PUT(req: Request) {
       }
 
       const result = await prisma.$transaction(async tx => {
-        await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', meetingId);
+        await tx.$queryRawUnsafe('SELECT 1 AS lock_acquired FROM pg_advisory_xact_lock(hashtext($1))', meetingId);
         const current = await tx.meeting.findUnique({
           where: { id: meetingId },
           include: {
@@ -579,6 +584,66 @@ export async function PUT(req: Request) {
         meeting: { id: existingMeeting.id, status: 'ENDED' },
         message: 'Este DDS já estava encerrado.'
       });
+    }
+
+    // Caminho dedicado e leve: encerra primeiro, sem depender da geração do PDF
+    // ou de retornar fotos, assinaturas e evidências pesadas para o navegador.
+    if (action === 'end_meeting') {
+      const closed = await prisma.$transaction(async tx => {
+        // A consulta retorna um inteiro, não o tipo PostgreSQL void, que o Prisma
+        // pode falhar ao desserializar. Mantém o mesmo lock das assinaturas.
+        await tx.$queryRawUnsafe('SELECT 1 AS lock_acquired FROM pg_advisory_xact_lock(hashtext($1))', meetingId);
+        const current = await tx.meeting.findUnique({
+          where: { id: meetingId },
+          select: {
+            id: true,
+            status: true,
+            topic: true,
+            createdAt: true,
+            endedAt: true,
+            attendees: {
+              select: { id: true, name: true, cpf: true },
+              orderBy: { createdAt: 'asc' }
+            },
+            attachments: {
+              select: { id: true, fileName: true },
+              orderBy: { order: 'asc' }
+            }
+          }
+        });
+        if (!current) throw new Error('Reunião não encontrada durante o encerramento.');
+        if (current.status === 'ENDED') {
+          return { id: current.id, status: 'ENDED', endedAt: current.endedAt };
+        }
+
+        const endedAt = new Date();
+        const crypto = await import('crypto');
+        const digest = [
+          meetingId,
+          current.topic || '',
+          current.createdAt?.toISOString() || '',
+          endedAt.toISOString(),
+          current.attendees.map(a => [a.id, a.name, a.cpf].join(':')).join(';'),
+          current.attachments.map(att => [att.id, att.fileName].join(':')).join(';')
+        ].join('|');
+        const documentHash = crypto.createHash('sha256').update(digest).digest('hex');
+
+        return tx.meeting.update({
+          where: { id: meetingId },
+          data: { status: 'ENDED', endedAt, attendanceCollectionOpen: false, documentHash },
+          select: { id: true, status: true, endedAt: true }
+        });
+      });
+
+      logSecurityEvent('ADMIN_ACTION', {
+        userId: sessionUser.id,
+        reason: `MEETING_ENDED: ${meetingId}`
+      });
+      return NextResponse.json({
+        success: true,
+        meeting: closed,
+        message: 'DDS encerrado. A ata permanece disponível no histórico.'
+      }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
     if (existingMeeting.status === 'ENDED' && existingMeeting.attendanceCollectionOpen) {
@@ -630,7 +695,11 @@ export async function PUT(req: Request) {
 
     // Sincroniza anexos se fornecidos preservando fileData se já existirem
     if (Array.isArray(attachments)) {
-      const existingMap = new Map(existingMeeting.attachments.map((a: any) => [a.id, a.fileData]));
+      const savedAttachments = await prisma.meetingAttachment.findMany({
+        where: { meetingId },
+        select: { id: true, fileData: true }
+      });
+      const existingMap = new Map(savedAttachments.map(a => [a.id, a.fileData]));
 
       const sanitizedPutAttachments: any[] = [];
       for (let idx = 0; idx < Math.min(attachments.length, 10); idx++) {
@@ -673,7 +742,7 @@ export async function PUT(req: Request) {
 
     const updated = await prisma.$transaction(async tx => {
       if (updateData.status === 'ENDED') {
-        await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', meetingId);
+        await tx.$queryRawUnsafe('SELECT 1 AS lock_acquired FROM pg_advisory_xact_lock(hashtext($1))', meetingId);
         const current = await tx.meeting.findUnique({
           where: { id: meetingId },
           include: {

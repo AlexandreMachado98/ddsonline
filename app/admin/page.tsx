@@ -86,6 +86,7 @@ function AdminPanelContent() {
   const [editAttachments, setEditAttachments] = useState<DdsAttachment[]>([]);
   const [isReviewingClose, setIsReviewingClose] = useState(false);
   const [isClosingMeeting, setIsClosingMeeting] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
   const [previewMeeting, setPreviewMeeting] = useState<any | null>(null);
   const [meetingHistory, setMeetingHistory] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -676,6 +677,7 @@ function AdminPanelContent() {
   };
 
   const handleEndMeeting = () => {
+    setCloseError(null);
     setIsReviewingClose(true);
   };
 
@@ -688,11 +690,10 @@ function AdminPanelContent() {
     if (isClosingMeeting) return;
 
     setIsClosingMeeting(true);
+    setCloseError(null);
     try {
-      if (meetingToClose.attendees && meetingToClose.attendees.length > 0) {
-        await handleDownloadActivePdf();
-      }
-
+      // Primeiro confirma o encerramento no servidor. O PDF é opcional e pode
+      // ser baixado pelo botão da ata ou pelo histórico após fechar a sala.
       const response = await fetch('/api/reuniao', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -717,6 +718,7 @@ function AdminPanelContent() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao encerrar DDS.';
       showToast(message, 'error');
+      setCloseError(message);
       // Mantém a sala aberta na tela quando o servidor não confirmar o encerramento.
     } finally {
       setIsClosingMeeting(false);
@@ -919,6 +921,11 @@ function AdminPanelContent() {
                 </div>
               </div>
 
+              {closeError && (
+                <p role="alert" className="text-xs text-red-300 bg-red-950/50 border border-red-500/40 rounded-xl p-3">
+                  Não foi possível encerrar a sala: {closeError}
+                </p>
+              )}
               <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
                 <button
                   type="button"
