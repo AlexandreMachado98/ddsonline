@@ -571,6 +571,16 @@ export async function PUT(req: Request) {
       return NextResponse.json({ success: true, message: action === 'reopen_attendance' ? 'Lista reaberta para novas assinaturas.' : 'Coleta complementar encerrada e ata atualizada.' });
     }
 
+    // Repetir uma solicitação de encerramento não altera a coleta complementar
+    // de um DDS que já estava encerrado.
+    if (action === 'end_meeting' && existingMeeting.status === 'ENDED') {
+      return NextResponse.json({
+        success: true,
+        meeting: { id: existingMeeting.id, status: 'ENDED' },
+        message: 'Este DDS já estava encerrado.'
+      });
+    }
+
     if (existingMeeting.status === 'ENDED' && existingMeeting.attendanceCollectionOpen) {
       return NextResponse.json({
         success: false,
@@ -579,16 +589,6 @@ export async function PUT(req: Request) {
     }
 
     const updateData: any = {};
-
-    // Encerramento explícito e idempotente de uma única sala.
-    // Se a sala já estiver encerrada, não altera coleta complementar nem histórico.
-    if (action === 'end_meeting' && existingMeeting.status === 'ENDED') {
-      return NextResponse.json({
-        success: true,
-        meeting: { id: existingMeeting.id, status: 'ENDED' },
-        message: 'Este DDS já estava encerrado.'
-      });
-    }
     if (action === 'end_meeting') {
       updateData.status = 'ENDED';
       updateData.attendanceCollectionOpen = false;
