@@ -80,6 +80,21 @@ export async function GET(req: Request) {
 
     // Cenário A: Acesso a uma reunião específica por ID
     if (id) {
+      // Consulta mínima usada pelos participantes para detectar o encerramento
+      // sem baixar assinaturas, fotos ou anexos pesados a cada verificação.
+      if (searchParams.get('statusOnly') === 'true') {
+        const meetingStatus = await prisma.meeting.findUnique({
+          where: { id },
+          select: { id: true, status: true, attendanceCollectionOpen: true }
+        });
+        if (!meetingStatus) {
+          return NextResponse.json({ success: false, error: 'Reunião não encontrada' }, { status: 404 });
+        }
+        return NextResponse.json({ success: true, meeting: meetingStatus }, {
+          headers: { 'Cache-Control': 'no-store, max-age=0' }
+        });
+      }
+
       // Se solicitado modo full (para gerar PDF com assinaturas e anexos)
       if (isFull) {
         const sessionUser = await getAuthenticatedUser(req);
@@ -475,12 +490,12 @@ export async function PUT(req: Request) {
     }
 
     if (!meetingId) {
-      // Encerra reuniões ativas do próprio usuário
-      await prisma.meeting.updateMany({
-        where: { status: 'LIVE', organizerId: sessionUser.id },
-        data: { status: 'ENDED' }
-      });
-      return NextResponse.json({ success: true, message: 'DDS encerrado com sucesso' });
+      // Encerramento deve sempre identificar uma sala específica.
+      // Evita que uma chamada sem ID encerre acidentalmente as três salas.
+      return NextResponse.json({
+        success: false,
+        error: 'Informe o ID da sala que deseja encerrar.'
+      }, { status: 400 });
     }
 
     // PROTEÇÃO IDOR: Confirma se a reunião pertence ao organizador autenticado
@@ -496,7 +511,16 @@ export async function PUT(req: Request) {
       return NextResponse.json({ success: false, error: 'Reunião não encontrada' }, { status: 404 });
     }
 
-    const isAuthorized = existingMeeting.organizerId === sessionUser.id || sessionUser.role === 'SUPER_ADMIN';
+    const isCompanyAdminForMeeting = Boolean(
+      sessionUser.role === 'COMPANY_ADMIN' &&
+      sessionUser.companyId &&
+      existingMeeting.companyId &&
+      sessionUser.companyId === existingMeeting.companyId
+    );
+    const isAuthorized =
+      existingMeeting.organizerId === sessionUser.id ||
+      sessionUser.role === 'SUPER_ADMIN' ||
+      isCompanyAdminForMeeting;
     if (!isAuthorized) {
       logSecurityEvent('FORBIDDEN_ACCESS', {
         userId: sessionUser.id,
@@ -555,6 +579,21 @@ export async function PUT(req: Request) {
     }
 
     const updateData: any = {};
+
+    // Encerramento explícito e idempotente de uma única sala.
+    // Se a sala já estiver encerrada, não altera coleta complementar nem histórico.
+    if (action === 'end_meeting' && existingMeeting.status === 'ENDED') {
+      return NextResponse.json({
+        success: true,
+        meeting: { id: existingMeeting.id, status: 'ENDED' },
+        message: 'Este DDS já estava encerrado.'
+      });
+    }
+    if (action === 'end_meeting') {
+      updateData.status = 'ENDED';
+      updateData.attendanceCollectionOpen = false;
+    }
+
     if (status) updateData.status = status;
     if (groupPhoto !== undefined) {
       if (groupPhoto === null || groupPhoto === '') {
