@@ -70,7 +70,9 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
   // Estados gerais
   const [isConnected, setIsConnected] = useState(false);
   const [isLive, setIsLive] = useState(false);
+  const [isMeetingEnded, setIsMeetingEnded] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
+  const meetingEndedRef = useRef(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [permissionBlocked, setPermissionBlocked] = useState(false);
   const [statusText, setStatusText] = useState<string>('Inicializando transmissão...');
@@ -134,6 +136,7 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
       // 2. Conecta ao PeerJS como Host
       setStatusText('Conectando servidor de transmissão...');
       const { default: Peer } = await import('peerjs');
+      if (!mountedRef.current || meetingEndedRef.current) return;
 
       if (peerRef.current) {
         peerRef.current.destroy();
@@ -223,6 +226,10 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
       peerRef.current = peer;
 
       peer.on('open', () => {
+        if (meetingEndedRef.current || !mountedRef.current) {
+          peer.destroy();
+          return;
+        }
         setIsConnected(true);
         connectToHost(peer);
       });
@@ -239,7 +246,7 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
 
   // Chamada única com reconexão limitada: impede loops de ligações P2P duplicadas.
   const connectToHost = (peerInstance: any) => {
-    if (!mountedRef.current || peerInstance?.destroyed || connectedRef.current) return;
+    if (!mountedRef.current || meetingEndedRef.current || peerInstance?.destroyed || connectedRef.current) return;
     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
     setStatusText('Conectando ao técnico de segurança...');
 
@@ -260,7 +267,7 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
     let received = false;
 
     const scheduleRetry = () => {
-      if (!mountedRef.current || peerInstance.destroyed || viewerCallRef.current !== call) return;
+      if (!mountedRef.current || meetingEndedRef.current || peerInstance.destroyed || viewerCallRef.current !== call) return;
       connectedRef.current = false;
       setIsLive(false);
       setStatusText('Aguardando reconexão com o instrutor...');
@@ -293,7 +300,7 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
   };
 
   const handleJoinWithMedia = async (enableVideo = true) => {
-    if (isJoiningMedia || viewerMediaEnabledRef.current) return;
+    if (meetingEndedRef.current || isJoiningMedia || viewerMediaEnabledRef.current) return;
     setIsJoiningMedia(true);
     try {
       const media = await navigator.mediaDevices.getUserMedia({
@@ -334,6 +341,8 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
 
   useEffect(() => {
     mountedRef.current = true;
+    meetingEndedRef.current = false;
+    setIsMeetingEnded(false);
     if (isAdmin) initBroadcaster();
     else initViewer();
 
@@ -499,7 +508,7 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
   };
 
   const handleStartViewerAudio = () => {
-    if (remoteVideoRef.current) {
+    if (remoteVideoRef.current && !meetingEndedRef.current) {
       remoteVideoRef.current.muted = false;
       remoteVideoRef.current.play().then(() => {
         setHasStartedPlayback(true);
@@ -507,6 +516,62 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
       }).catch(() => {});
     }
   };
+
+  // Interrompe imediatamente mídia e reconexões quando o organizador encerra a sala.
+  const stopViewerSession = useCallback(() => {
+    if (meetingEndedRef.current) return;
+    meetingEndedRef.current = true;
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+    reconnectTimerRef.current = null;
+    viewerCallRef.current?.close();
+    viewerCallRef.current = null;
+    activeCallsRef.current.forEach(call => call.close());
+    activeCallsRef.current = [];
+    peerRef.current?.destroy();
+    peerRef.current = null;
+    viewerMediaRef.current?.getTracks().forEach(track => track.stop());
+    viewerMediaRef.current = null;
+    viewerMediaEnabledRef.current = false;
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.pause();
+      remoteVideoRef.current.srcObject = null;
+    }
+    setRemoteParticipants([]);
+    setViewerCount(0);
+    setViewerMicOn(false);
+    setViewerCameraOn(false);
+    setIsConnected(false);
+    setIsLive(false);
+    setIsMeetingEnded(true);
+    setStatusText('DDS encerrado pelo organizador.');
+  }, []);
+
+  // Consulta apenas o status da reunião para não baixar anexos/fotos a cada verificação.
+  useEffect(() => {
+    if (isAdmin || !roomName) return;
+    let isActive = true;
+    const checkMeetingStatus = async () => {
+      try {
+        const response = await fetch(
+          `/api/reuniao?id=${encodeURIComponent(roomName)}&statusOnly=true`,
+          { cache: 'no-store' }
+        );
+        if (!response.ok) return;
+        const result = await response.json();
+        if (isActive && result?.success && result?.meeting?.status === 'ENDED') {
+          stopViewerSession();
+        }
+      } catch {
+        // Falhas temporárias de rede não devem derrubar uma transmissão ativa.
+      }
+    };
+    checkMeetingStatus();
+    const interval = setInterval(checkMeetingStatus, 4000);
+    return () => {
+      isActive = false;
+      clearInterval(interval);
+    };
+  }, [isAdmin, roomName, stopViewerSession]);
 
   return (
     <div 
@@ -523,7 +588,7 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
           <div className="flex items-center gap-2 truncate">
             <span className="text-white text-xs font-bold flex items-center gap-1.5 truncate">
               <Radio size={14} className={`shrink-0 ${isLive ? 'text-red-400 animate-pulse' : 'text-slate-400'}`} />
-              <span className="truncate">{isAdmin ? 'Transmissão Ao Vivo (DDS)' : `DDS Ao Vivo - ${userName || 'Colaborador'}`}</span>
+              <span className="truncate">{isAdmin ? 'Transmissão Ao Vivo (DDS)' : isMeetingEnded ? 'DDS Encerrado pelo Organizador' : `DDS Ao Vivo - ${userName || 'Colaborador'}`}</span>
             </span>
             {isSharingScreen && (
               <span className="hidden sm:inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30 animate-pulse">
@@ -540,6 +605,10 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
             <span className="text-[11px] bg-blue-500/20 text-blue-300 px-2.5 py-1 rounded-xl font-semibold border border-blue-500/30 flex items-center gap-1.5">
               <Eye size={12} className="text-blue-400" />
               <strong>{viewerCount}</strong> <span className="hidden sm:inline">espectador(es)</span>
+            </span>
+          ) : isMeetingEnded ? (
+            <span className="text-[11px] bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-xl font-semibold border border-amber-500/30 flex items-center gap-1">
+              <CheckCircle2 size={12} /> DDS encerrado
             </span>
           ) : (
             <span className="text-[11px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-xl font-semibold border border-emerald-500/30 flex items-center gap-1">
@@ -663,9 +732,11 @@ export default function DdsConferenceRoom({ roomName, userName, isAdmin = false 
                 <div className="p-4 bg-slate-900 border border-slate-800 rounded-3xl animate-pulse">
                   <Radio size={36} className="text-blue-400" />
                 </div>
-                <h4 className="text-white font-bold text-base">Aguardando Início do DDS</h4>
+                <h4 className="text-white font-bold text-base">{isMeetingEnded ? 'Transmissão encerrada' : 'Aguardando Início do DDS'}</h4>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  O Técnico de Segurança está preparando a sala. A transmissão começará automaticamente assim que a câmera ou apresentação for ligada.
+                  {isMeetingEnded
+                    ? 'O organizador encerrou esta sala. A conexão de áudio e vídeo foi finalizada.'
+                    : 'O Técnico de Segurança está preparando a sala. A transmissão começará automaticamente assim que a câmera ou apresentação for ligada.'}
                 </p>
               </div>
             )}
