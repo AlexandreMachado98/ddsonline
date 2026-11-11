@@ -538,7 +538,7 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(215, 235, 225);
-  doc.text('LISTA DE PRESENÇA • REGISTRO INTEGRADO DE AÇÕES DE SAÚDE E SEGURANÇA DO TRABALHO', 14, 22);
+  doc.text('REGISTRO INTEGRADO DE AÇÕES DE SAÚDE E SEGURANÇA DO TRABALHO', 14, 22);
 
   // Logo da Empresa à direita
   renderCompanyLogo(28);
