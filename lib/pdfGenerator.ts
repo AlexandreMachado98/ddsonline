@@ -493,55 +493,118 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
 
   let currentY = 0;
 
-  // Helper to render company logo
-  const renderCompanyLogo = (bannerHeight = 30) => {
+  // --- CABEÇALHO INSTITUCIONAL (FORMULÁRIO CONTROLADO / PADRÃO SGI) ---
+  // Grade com 3 células: logo da empresa | título do documento | controle
+  // (Registro, Emissão e Página). A numeração "Página X de Y" é preenchida
+  // no laço final de rodapé, quando o total de páginas já é conhecido.
+  const headerDate = new Date(meeting.createdAt || Date.now());
+  const headerRegistro = meeting.id
+    ? `DDS-${meeting.id.slice(0, 8).toUpperCase()}`
+    : `DDS-${headerDate.getFullYear()}${String(headerDate.getMonth() + 1).padStart(2, '0')}${String(headerDate.getDate()).padStart(2, '0')}`;
+  const headerEmissao = headerDate.toLocaleDateString('pt-BR');
+  const headerPageSlots: { page: number; x: number; y: number; w: number; h: number }[] = [];
+
+  const drawInstitutionalHeader = (bannerHeight: number, title: string, subtitle: string) => {
+    const hx = 14;
+    const hw = pageWidth - 28;
+    const hy = 6;
+    const hh = bannerHeight - 8;
+    const logoW = 42;
+    const ctrlW = 46;
+    const titleW = hw - logoW - ctrlW;
+
+    // Moldura e divisões
+    doc.setDrawColor(textDark[0], textDark[1], textDark[2]);
+    doc.setLineWidth(0.35);
+    doc.rect(hx, hy, hw, hh, 'S');
+    doc.line(hx + logoW, hy, hx + logoW, hy + hh);
+    doc.line(hx + logoW + titleW, hy, hx + logoW + titleW, hy + hh);
+
+    // Célula 1: logo da empresa (ou a marca DDS ON quando não houver logo)
+    let logoDrawn = false;
     if (typeof window !== 'undefined') {
       try {
         const companyLogo = localStorage.getItem('dds_company_logo');
         if (companyLogo) {
           const props = doc.getImageProperties(companyLogo);
-          const maxW = 50;
-          const maxH = 22;
+          const maxW = logoW - 6;
+          const maxH = hh - 5;
           const ratio = Math.min(maxW / props.width, maxH / props.height);
           const finalW = props.width * ratio;
           const finalH = props.height * ratio;
-          
-          const xPos = pageWidth - 14 - finalW;
-          const yPos = (bannerHeight - finalH) / 2;
-          
-          doc.setFillColor(255, 255, 255);
-          doc.roundedRect(xPos - 3, yPos - 3, finalW + 6, finalH + 6, 2, 2, 'F');
-          doc.addImage(companyLogo, 'PNG', xPos, yPos, finalW, finalH);
+          doc.addImage(
+            companyLogo,
+            'PNG',
+            hx + (logoW - finalW) / 2,
+            hy + (hh - finalH) / 2,
+            finalW,
+            finalH
+          );
+          logoDrawn = true;
         }
       } catch (e) {}
     }
+    if (!logoDrawn) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(15);
+      doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+      doc.text('DDS ON', hx + logoW / 2, hy + hh / 2 + 2, { align: 'center' });
+    }
+
+    // Célula 2: título do documento
+    const cx = hx + logoW + titleW / 2;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+    const titleLine = doc.splitTextToSize(title, titleW - 6)[0] || title;
+    doc.text(titleLine, cx, hy + hh * 0.36, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.3);
+    doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+    const subLines = doc.splitTextToSize(subtitle, titleW - 8).slice(0, 2);
+    doc.text(subLines, cx, hy + hh * 0.36 + 4.2, { align: 'center' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+    doc.text('DDS ON', cx, hy + hh - 2, { align: 'center' });
+
+    // Célula 3: controle do documento
+    const rx = hx + logoW + titleW;
+    const rowH = hh / 3;
+    const rows: [string, string][] = [['Registro', headerRegistro], ['Emissão', headerEmissao], ['Página', '']];
+    rows.forEach(([label, value], i) => {
+      const ry = hy + rowH * i;
+      if (i > 0) doc.line(rx, ry, rx + ctrlW, ry);
+      const baseY = ry + rowH / 2 + 1.1;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5.8);
+      doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+      doc.text(label, rx + 2, baseY);
+      if (value) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.8);
+        doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+        doc.text(value, rx + ctrlW - 2, baseY, { align: 'right' });
+      }
+    });
+
+    headerPageSlots.push({
+      page: (doc as any).internal.getCurrentPageInfo().pageNumber,
+      x: rx + ctrlW - 2,
+      y: hy + rowH * 2 + rowH / 2 + 1.1,
+      w: ctrlW,
+      h: rowH
+    });
   };
 
   // =========================================================================
   // PÁGINA 1: FRENTE - REGISTRO DE PRESENÇA OFICIAL
   // =========================================================================
 
-  // --- HEADER PRINCIPAL / FAIXA INSTITUCIONAL ---
-  doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-  doc.rect(0, 0, pageWidth, 28, 'F');
-  
-  // Linha verde clara de acento institucional
-  doc.setFillColor(74, 163, 122);
-  doc.rect(0, 27, pageWidth, 1, 'F');
-
-  // Identidade DDS ON
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(20);
-  doc.setFont('helvetica', 'bold');
-  doc.text('DDS ON', 14, 16);
-  
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(215, 235, 225);
-  doc.text('REGISTRO INTEGRADO DE AÇÕES DE SAÚDE E SEGURANÇA DO TRABALHO', 14, 22);
-
-  // Logo da Empresa à direita
-  renderCompanyLogo(28);
+  // --- CABEÇALHO INSTITUCIONAL ---
+  drawInstitutionalHeader(28, 'LISTA DE PRESENÇA', 'REGISTRO INTEGRADO DE AÇÕES DE SAÚDE E SEGURANÇA DO TRABALHO');
 
   currentY = 36;
 
@@ -1034,21 +1097,9 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
     doc.addPage();
     let versoY = 0;
 
-    // Header Banner do Verso
-    doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-    doc.rect(0, 0, pageWidth, 30, 'F');
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('DDS ON', 14, 17);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(230, 240, 235);
+    // Cabeçalho institucional do verso
     const versoSubHeader = meeting.classification === 'Campanha' ? 'PROGRAMAÇÃO E DETALHAMENTO DA CAMPANHA' : 'PROGRAMAÇÃO E CONTEÚDO PROGRAMÁTICO DO TREINAMENTO';
-    doc.text(versoSubHeader, 14, 23);
-
-    renderCompanyLogo(30);
+    drawInstitutionalHeader(30, 'CONTEÚDO PROGRAMÁTICO', versoSubHeader);
 
     versoY = 43;
 
@@ -1262,22 +1313,8 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
       doc.addPage();
       let attPageY = 0;
 
-      // Header Banner
-      doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-      doc.rect(0, 0, pageWidth, 28, 'F');
-      doc.setFillColor(74, 163, 122);
-      doc.rect(0, 27, pageWidth, 1, 'F');
-      
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('DDS ON', 14, 16);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(215, 235, 225);
-      doc.text('DOSSIÊ DE EVIDÊNCIAS & MATERIAIS APRESENTADOS', 14, 22);
-
-      renderCompanyLogo(28);
+      // Cabeçalho institucional do sumário de anexos
+      drawInstitutionalHeader(28, 'DOSSIÊ DE EVIDÊNCIAS', 'MATERIAIS APRESENTADOS NO REGISTRO');
 
       attPageY = 38;
 
@@ -1352,20 +1389,8 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
         // Renderiza página de imagem
         doc.addPage();
         
-        // Header Banner
-        doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-        doc.rect(0, 0, pageWidth, 26, 'F');
-        
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${anexoLabel}: ${att.displayName || att.fileName}`, 14, 15);
-        doc.setFontSize(7.5);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(230, 240, 235);
-        doc.text(`Evidência visual apresentada em: ${dateStr}`, 14, 21);
-
-        renderCompanyLogo(26);
+        // Cabeçalho institucional da evidência visual
+        drawInstitutionalHeader(26, `${anexoLabel}: ${att.displayName || att.fileName}`, `EVIDÊNCIA VISUAL APRESENTADA EM: ${dateStr}`);
 
         let imgCardY = 32;
 
@@ -1410,20 +1435,8 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
         // Anexo é PDF: gera Capa/Separador oficial e marca para mesclagem vetorial posterior
         doc.addPage();
         
-        // Banner Superior
-        doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-        doc.rect(0, 0, pageWidth, 30, 'F');
-        
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(18);
-        doc.setFont('helvetica', 'bold');
-        doc.text('DDS ON', 14, 18);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(230, 240, 235);
-        doc.text('DOCUMENTO E PROCEDIMENTO TÉCNICO ANEXO', 14, 24);
-
-        renderCompanyLogo(30);
+        // Cabeçalho institucional da capa do anexo
+        drawInstitutionalHeader(30, 'DOCUMENTO ANEXO', 'DOCUMENTO E PROCEDIMENTO TÉCNICO ANEXO');
 
         let sepY = 55;
 
@@ -1522,6 +1535,14 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     const footY = pageHeight - 20;
+
+    // Preenche "Página X de Y" na célula de controle do cabeçalho institucional
+    for (const slot of headerPageSlots.filter((sl) => sl.page === i)) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.8);
+      doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+      doc.text(`${i} de ${pageCount}`, slot.x, slot.y, { align: 'right' });
+    }
     
     doc.setFontSize(6.5);
     doc.setFont('helvetica', 'normal');
