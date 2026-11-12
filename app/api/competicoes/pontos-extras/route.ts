@@ -12,6 +12,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth';
+import { ensureCompetitionBonusTables } from '@/lib/competitionBonusSchema';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,7 @@ async function readBody(req: Request) {
 export async function POST(req: Request) {
   const user = await getAuthenticatedUser(req);
   if (!user) return json('Sessão inválida.', 401);
+  await ensureCompetitionBonusTables();
   const body = await readBody(req);
   if (!body) return json('Solicitação inválida.', 400);
 
@@ -98,6 +100,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   const user = await getAuthenticatedUser(req);
   if (!user) return json('Sessão inválida.', 401);
+  await ensureCompetitionBonusTables();
   const body = await readBody(req);
   if (!body || typeof body.id !== 'string') return json('Solicitação inválida.', 400);
 
@@ -164,6 +167,7 @@ export async function PATCH(req: Request) {
 export async function DELETE(req: Request) {
   const user = await getAuthenticatedUser(req);
   if (!user) return json('Sessão inválida.', 401);
+  await ensureCompetitionBonusTables();
   const body = await readBody(req);
   if (!body || typeof body.id !== 'string') return json('Solicitação inválida.', 400);
 
