@@ -1,18 +1,246 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Award, CalendarDays, Check, CheckCircle2, Clock3, Crown, Loader2, Pencil, Plus, RefreshCw, RotateCcw, Trophy, Users, X } from 'lucide-react';
+import { CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Crown, Loader2, Pencil, Plus, RefreshCw, RotateCcw, SlidersHorizontal, Star, Trash2, Trophy, Users, X } from 'lucide-react';
 
 type Participant = {
   registration: string; name: string; totalPoints: number;
   ddsParticipations: number; quizParticipations: number; performancePoints: number; speedPoints: number;
+  bonusPoints?: number; bonus?: Record<string, { quantity: number; points: number }>;
+};
+type BonusCriterion = { id: string; name: string; weight: number };
+type BonusEntry = {
+  id: string; criterionId: string; criterionName: string; weight: number;
+  participantRegistration: string; participantName: string;
+  quantity: number; points: number; note?: string | null; createdAt: string;
 };
 type Competition = {
   id: string; name: string; description?: string | null;
   startDate: string; endDate: string; status: 'SCHEDULED' | 'ACTIVE' | 'FINISHED' | 'CANCELLED';
   ddsAttendancePoints: number; quizParticipationPoints: number; quizPerformancePoints: number; quizSpeedPoints: number;
   leaderboard: Participant[];
+  bonusCriteria?: BonusCriterion[];
+  bonusEntries?: BonusEntry[];
 };
+
+async function callApi(url: string, method: string, body: unknown) {
+  const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.success) throw new Error(data.error || 'Não foi possível concluir a operação.');
+  return data;
+}
+
+const BONUS_API = '/api/competicoes/pontos-extras';
+const inputCls = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500';
+
+/** Painel de pesos dos critérios automáticos, critérios extras e lançamentos manuais. */
+function ScoringPanel({ comp, onChanged, onError }: { comp: Competition; onChanged: () => Promise<void>; onError: (msg: string) => void }) {
+  const criteria = comp.bonusCriteria || [];
+  const entries = comp.bonusEntries || [];
+  const locked = comp.status === 'CANCELLED';
+  const [busy, setBusy] = useState(false);
+
+  // Pesos dos critérios automáticos
+  const [weights, setWeights] = useState({
+    ddsAttendancePoints: comp.ddsAttendancePoints, quizParticipationPoints: comp.quizParticipationPoints,
+    quizPerformancePoints: comp.quizPerformancePoints, quizSpeedPoints: comp.quizSpeedPoints
+  });
+  useEffect(() => {
+    setWeights({
+      ddsAttendancePoints: comp.ddsAttendancePoints, quizParticipationPoints: comp.quizParticipationPoints,
+      quizPerformancePoints: comp.quizPerformancePoints, quizSpeedPoints: comp.quizSpeedPoints
+    });
+  }, [comp.ddsAttendancePoints, comp.quizParticipationPoints, comp.quizPerformancePoints, comp.quizSpeedPoints]);
+  const weightsChanged = weights.ddsAttendancePoints !== comp.ddsAttendancePoints || weights.quizParticipationPoints !== comp.quizParticipationPoints ||
+    weights.quizPerformancePoints !== comp.quizPerformancePoints || weights.quizSpeedPoints !== comp.quizSpeedPoints;
+
+  // Critério extra (novo / edição)
+  const [newCriterion, setNewCriterion] = useState({ name: '', weight: 10 });
+  const [editingCriterion, setEditingCriterion] = useState<BonusCriterion | null>(null);
+
+  // Lançamento (novo / edição)
+  const emptyEntry = { id: '', criterionId: '', registration: '', name: '', quantity: 1, note: '' };
+  const [entryForm, setEntryForm] = useState(emptyEntry);
+  const [entryFilter, setEntryFilter] = useState('');
+
+  const knownPeople = new Map<string, string>();
+  for (const p of comp.leaderboard || []) knownPeople.set(p.registration, p.name);
+  for (const e of entries) if (!knownPeople.has(e.participantRegistration)) knownPeople.set(e.participantRegistration, e.participantName);
+
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true); onError('');
+    try { await fn(); await onChanged(); return true; }
+    catch (e: any) { onError(e.message || 'Erro ao salvar.'); return false; }
+    finally { setBusy(false); }
+  };
+
+  const saveWeights = () => run(() => callApi('/api/competicoes', 'PATCH', { id: comp.id, ...weights }));
+
+  const addCriterion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCriterion.name.trim()) { onError('Informe o nome do critério extra.'); return; }
+    if (await run(() => callApi(BONUS_API, 'POST', { kind: 'criterion', competitionId: comp.id, ...newCriterion }))) setNewCriterion({ name: '', weight: 10 });
+  };
+  const saveCriterion = async () => {
+    if (!editingCriterion) return;
+    if (await run(() => callApi(BONUS_API, 'PATCH', { kind: 'criterion', id: editingCriterion.id, name: editingCriterion.name, weight: editingCriterion.weight }))) setEditingCriterion(null);
+  };
+  const deleteCriterion = (c: BonusCriterion) => {
+    const count = entries.filter(e => e.criterionId === c.id).length;
+    if (!window.confirm(`Excluir o critério "${c.name}"?${count ? ` Os ${count} lançamento(s) dele também serão excluídos.` : ''}`)) return;
+    run(() => callApi(BONUS_API, 'DELETE', { kind: 'criterion', id: c.id }));
+  };
+
+  const submitEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const criterionId = entryForm.criterionId || criteria[0]?.id;
+    if (!criterionId) { onError('Cadastre um critério extra antes de lançar pontos.'); return; }
+    if (!entryForm.registration.trim() || !entryForm.name.trim()) { onError('Informe matrícula e nome do colaborador.'); return; }
+    const payload = { kind: 'entry', criterionId, registration: entryForm.registration, name: entryForm.name, quantity: entryForm.quantity, note: entryForm.note };
+    const ok = await run(() => entryForm.id
+      ? callApi(BONUS_API, 'PATCH', { ...payload, id: entryForm.id })
+      : callApi(BONUS_API, 'POST', { ...payload, competitionId: comp.id }));
+    if (ok) setEntryForm({ ...emptyEntry, criterionId });
+  };
+  const editEntry = (entry: BonusEntry) => setEntryForm({
+    id: entry.id, criterionId: entry.criterionId, registration: entry.participantRegistration,
+    name: entry.participantName, quantity: entry.quantity, note: entry.note || ''
+  });
+  const deleteEntry = (entry: BonusEntry) => {
+    if (!window.confirm(`Excluir o lançamento de ${entry.points} ponto(s) para ${entry.participantName}?`)) return;
+    run(() => callApi(BONUS_API, 'DELETE', { kind: 'entry', id: entry.id }));
+  };
+
+  const selectedCriterion = criteria.find(c => c.id === (entryForm.criterionId || criteria[0]?.id));
+  const previewPoints = selectedCriterion ? selectedCriterion.weight * (Number(entryForm.quantity) || 0) : 0;
+  const filteredEntries = entries.filter(e => {
+    const q = entryFilter.trim().toLowerCase();
+    return !q || e.participantName.toLowerCase().includes(q) || e.participantRegistration.toLowerCase().includes(q) || e.criterionName.toLowerCase().includes(q);
+  });
+
+  const weightFields: { key: keyof typeof weights; label: string }[] = [
+    { key: 'ddsAttendancePoints', label: 'Presença em cada DDS' },
+    { key: 'quizParticipationPoints', label: 'Cada questionário respondido' },
+    { key: 'quizPerformancePoints', label: 'Por ponto percentual de desempenho' },
+    { key: 'quizSpeedPoints', label: 'Bônus de velocidade (até 1min30s)' }
+  ];
+
+  return (
+    <div className="border-b border-slate-100 bg-slate-50/60 p-4 sm:p-5 space-y-5">
+      <fieldset disabled={locked || busy} className="space-y-5">
+        {/* Pesos dos critérios automáticos */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h4 className="font-extrabold text-slate-800 text-sm">Peso dos indicadores automáticos</h4>
+            {weightsChanged && <button type="button" onClick={saveWeights} className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-extrabold text-white inline-flex items-center gap-1.5 disabled:opacity-60"><Check size={14}/> Salvar pesos e recalcular</button>}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {weightFields.map(f => <label key={f.key} className="text-xs font-semibold text-slate-600">{f.label}
+              <input type="number" min="0" max="1000" value={weights[f.key]} onChange={e => setWeights(w => ({ ...w, [f.key]: Number(e.target.value) }))} className={`mt-1 ${inputCls}`}/>
+            </label>)}
+          </div>
+        </div>
+
+        {/* Critérios extras */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <h4 className="font-extrabold text-slate-800 text-sm">Critérios de pontuação extra</h4>
+          <p className="text-[11px] text-slate-500 mb-3">Cada critério aparece como uma coluna no ranking. Pontos = quantidade lançada × peso. Ao alterar o peso, todos os lançamentos do critério são recalculados.</p>
+          {criteria.length > 0 && <ul className="divide-y divide-slate-100 mb-3">
+            {criteria.map(c => {
+              const total = entries.filter(e => e.criterionId === c.id).reduce((sum, e) => sum + e.points, 0);
+              return <li key={c.id} className="py-2 flex flex-wrap items-center gap-2">
+                {editingCriterion?.id === c.id ? <>
+                  <input maxLength={80} value={editingCriterion.name} onChange={e => setEditingCriterion({ ...editingCriterion, name: e.target.value })} className={`${inputCls} max-w-xs`} aria-label="Nome do critério"/>
+                  <label className="text-xs font-semibold text-slate-600 inline-flex items-center gap-1">Peso
+                    <input type="number" min="0" max="1000" value={editingCriterion.weight} onChange={e => setEditingCriterion({ ...editingCriterion, weight: Number(e.target.value) })} className={`${inputCls} w-24`}/>
+                  </label>
+                  <button type="button" onClick={saveCriterion} className="rounded-lg bg-emerald-600 p-2 text-white" title="Salvar critério"><Check size={14}/></button>
+                  <button type="button" onClick={() => setEditingCriterion(null)} className="rounded-lg border border-slate-200 p-2 text-slate-600" title="Cancelar"><X size={14}/></button>
+                </> : <>
+                  <span className="font-bold text-slate-800 text-sm">{c.name}</span>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">peso {c.weight}</span>
+                  <span className="text-xs text-slate-500">{total} pts lançados</span>
+                  <span className="ml-auto flex gap-1">
+                    <button type="button" onClick={() => setEditingCriterion(c)} className="rounded-lg border border-slate-200 p-1.5 text-slate-500" title="Editar critério"><Pencil size={13}/></button>
+                    <button type="button" onClick={() => deleteCriterion(c)} className="rounded-lg border border-red-200 p-1.5 text-red-600" title="Excluir critério"><Trash2 size={13}/></button>
+                  </span>
+                </>}
+              </li>;
+            })}
+          </ul>}
+          <form onSubmit={addCriterion} className="flex flex-wrap items-end gap-2">
+            <label className="text-xs font-semibold text-slate-600 flex-1 min-w-[200px]">Novo critério
+              <input maxLength={80} value={newCriterion.name} onChange={e => setNewCriterion(v => ({ ...v, name: e.target.value }))} placeholder="Ex.: Sugestão de melhoria, Relato de quase acidente" className={`mt-1 ${inputCls}`}/>
+            </label>
+            <label className="text-xs font-semibold text-slate-600 w-28">Peso (pontos)
+              <input type="number" min="0" max="1000" value={newCriterion.weight} onChange={e => setNewCriterion(v => ({ ...v, weight: Number(e.target.value) }))} className={`mt-1 ${inputCls}`}/>
+            </label>
+            <button className="rounded-lg bg-amber-600 hover:bg-amber-700 px-3 py-2 text-xs font-extrabold text-white inline-flex items-center gap-1.5 disabled:opacity-60"><Plus size={14}/> Adicionar critério</button>
+          </form>
+        </div>
+
+        {/* Lançamentos */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <h4 className="font-extrabold text-slate-800 text-sm mb-3">{entryForm.id ? 'Editar lançamento' : 'Lançar pontos extras para um colaborador'}</h4>
+          {criteria.length === 0 ? <p className="text-sm text-slate-500">Cadastre ao menos um critério extra para lançar pontos.</p> :
+          <form onSubmit={submitEntry} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+            <label className="text-xs font-semibold text-slate-600 lg:col-span-1">Critério
+              <select value={entryForm.criterionId || criteria[0]?.id} onChange={e => setEntryForm(f => ({ ...f, criterionId: e.target.value }))} className={`mt-1 ${inputCls}`}>
+                {criteria.map(c => <option key={c.id} value={c.id}>{c.name} (peso {c.weight})</option>)}
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-slate-600">Matrícula
+              <input list={`people-reg-${comp.id}`} maxLength={40} value={entryForm.registration} onChange={e => { const registration = e.target.value; setEntryForm(f => ({ ...f, registration, name: knownPeople.get(registration.trim()) || f.name })); }} className={`mt-1 ${inputCls} font-mono`}/>
+              <datalist id={`people-reg-${comp.id}`}>{[...knownPeople.entries()].map(([reg, n]) => <option key={reg} value={reg}>{n}</option>)}</datalist>
+            </label>
+            <label className="text-xs font-semibold text-slate-600 lg:col-span-2">Colaborador
+              <input list={`people-name-${comp.id}`} maxLength={160} value={entryForm.name} onChange={e => { const name = e.target.value; const match = [...knownPeople.entries()].find(([, n]) => n === name); setEntryForm(f => ({ ...f, name, registration: match ? match[0] : f.registration })); }} className={`mt-1 ${inputCls}`}/>
+              <datalist id={`people-name-${comp.id}`}>{[...new Set(knownPeople.values())].map(n => <option key={n} value={n}/>)}</datalist>
+            </label>
+            <label className="text-xs font-semibold text-slate-600">Quantidade
+              <input type="number" min="-1000" max="1000" value={entryForm.quantity} onChange={e => setEntryForm(f => ({ ...f, quantity: Number(e.target.value) }))} className={`mt-1 ${inputCls}`}/>
+            </label>
+            <div className="text-xs font-semibold text-slate-600">Pontos
+              <div className="mt-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-700">{previewPoints}</div>
+            </div>
+            <label className="text-xs font-semibold text-slate-600 sm:col-span-2 lg:col-span-4">Observação (opcional)
+              <input maxLength={500} value={entryForm.note} onChange={e => setEntryForm(f => ({ ...f, note: e.target.value }))} placeholder="Motivo ou evidência do lançamento" className={`mt-1 ${inputCls}`}/>
+            </label>
+            <div className="flex gap-2 sm:col-span-2 lg:col-span-2 justify-end">
+              {entryForm.id && <button type="button" onClick={() => setEntryForm({ ...emptyEntry, criterionId: entryForm.criterionId })} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">Cancelar edição</button>}
+              <button className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-xs font-extrabold text-white inline-flex items-center gap-1.5 disabled:opacity-60">{busy ? <Loader2 size={14} className="animate-spin"/> : entryForm.id ? <Check size={14}/> : <Plus size={14}/>} {entryForm.id ? 'Salvar alterações' : 'Incluir pontos'}</button>
+            </div>
+          </form>}
+          <p className="text-[11px] text-slate-500 mt-2">Use quantidade negativa para descontar pontos (ex.: penalidade).</p>
+
+          {entries.length > 0 && <div className="mt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <h5 className="text-[11px] font-black uppercase tracking-wider text-slate-500">Lançamentos detalhados ({entries.length})</h5>
+              <input value={entryFilter} onChange={e => setEntryFilter(e.target.value)} placeholder="Filtrar por nome, matrícula ou critério" className={`${inputCls} max-w-xs`}/>
+            </div>
+            <div className="overflow-x-auto"><table className="w-full text-left text-sm">
+              <thead><tr className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200"><th className="py-2 pr-3">Data</th><th className="py-2 pr-3">Colaborador</th><th className="py-2 pr-3">Matrícula</th><th className="py-2 pr-3">Critério</th><th className="py-2 pr-3">Cálculo</th><th className="py-2 pr-3">Pontos</th><th className="py-2 pr-3">Observação</th><th className="py-2"></th></tr></thead>
+              <tbody>{filteredEntries.map(e => <tr key={e.id} className={`border-b border-slate-100 last:border-0 ${entryForm.id === e.id ? 'bg-amber-50' : ''}`}>
+                <td className="py-2 pr-3 text-xs text-slate-500 whitespace-nowrap">{new Date(e.createdAt).toLocaleDateString('pt-BR')}</td>
+                <td className="py-2 pr-3 font-semibold text-slate-800">{e.participantName}</td>
+                <td className="py-2 pr-3 font-mono text-slate-600">{e.participantRegistration}</td>
+                <td className="py-2 pr-3">{e.criterionName}</td>
+                <td className="py-2 pr-3 text-xs text-slate-500 whitespace-nowrap">{e.quantity} × {e.weight}</td>
+                <td className={`py-2 pr-3 font-black ${e.points < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{e.points > 0 ? '+' : ''}{e.points}</td>
+                <td className="py-2 pr-3 text-xs text-slate-500">{e.note || '—'}</td>
+                <td className="py-2 text-right whitespace-nowrap">
+                  <button type="button" onClick={() => editEntry(e)} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 mr-1" title="Editar lançamento"><Pencil size={13}/></button>
+                  <button type="button" onClick={() => deleteEntry(e)} className="rounded-lg border border-red-200 p-1.5 text-red-600" title="Excluir lançamento"><Trash2 size={13}/></button>
+                </td>
+              </tr>)}</tbody>
+            </table></div>
+          </div>}
+        </div>
+      </fieldset>
+      {locked && <p className="text-xs text-slate-500">Competição cancelada: a pontuação não pode ser alterada.</p>}
+    </div>
+  );
+}
 
 const statusLabels: Record<string, string> = {
   SCHEDULED: 'Agendada', ACTIVE: 'Em andamento', FINISHED: 'Encerrada', CANCELLED: 'Cancelada'
@@ -34,6 +262,16 @@ export default function CompetitionManager() {
   const [speedPoints, setSpeedPoints] = useState(5);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [scoringOpen, setScoringOpen] = useState<Record<string, boolean>>({});
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+
+  const reload = useCallback(async () => {
+    // Recarrega sem exibir o carregamento de página inteira, preservando painéis abertos.
+    const response = await fetch('/api/competicoes', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.error || 'Não foi possível carregar as competições.');
+    setCompetitions(data.competitions || []);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -101,7 +339,7 @@ export default function CompetitionManager() {
         <div>
           <div className="flex items-center gap-2 text-amber-700 font-black text-xs uppercase tracking-wider"><Trophy size={16}/> Competição de participação</div>
           <h2 className="text-xl font-black text-slate-900 mt-1">Engaje sua equipe e reconheça os destaques</h2>
-          <p className="text-sm text-slate-600 mt-1">Some pontos por presença nos DDS, participação e desempenho nos questionários.</p>
+          <p className="text-sm text-slate-600 mt-1">Some pontos por presença nos DDS, participação e desempenho nos questionários, além de pontos extras lançados manualmente.</p>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={load} className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-sm inline-flex items-center gap-2"><RefreshCw size={15}/> Atualizar</button>
@@ -161,16 +399,79 @@ export default function CompetitionManager() {
           return <section key={comp.id} className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100">
               <div><div className="flex flex-wrap items-center gap-2">{editingId === comp.id ? <form className="flex flex-wrap items-center gap-2" onSubmit={e => { e.preventDefault(); updateCompetition(comp.id, { name: editingName }); }}><input autoFocus maxLength={120} value={editingName} onChange={e => setEditingName(e.target.value)} className="min-w-[220px] rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold" aria-label="Novo nome da competição"/><button disabled={saving || !editingName.trim()} className="rounded-lg bg-emerald-600 p-2 text-white" title="Salvar nome"><Check size={16}/></button><button type="button" onClick={() => { setEditingId(null); setEditingName(''); }} className="rounded-lg border border-slate-200 p-2 text-slate-600" title="Cancelar edição"><X size={16}/></button></form> : <><h3 className="font-black text-slate-900 text-lg">{comp.name}</h3><button type="button" onClick={() => { setEditingId(comp.id); setEditingName(comp.name); }} className="rounded-lg border border-slate-200 p-1.5 text-slate-500" title="Editar nome da competição"><Pencil size={14}/></button></>}<span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${comp.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : comp.status === 'FINISHED' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-700'}`}>{statusLabels[comp.status]}</span></div>{comp.description && <p className="text-sm text-slate-500 mt-1">{comp.description}</p>}<p className="text-xs text-slate-500 mt-2 flex items-center gap-2"><CalendarDays size={13}/>{new Date(comp.startDate).toLocaleDateString('pt-BR')} até {new Date(comp.endDate).toLocaleDateString('pt-BR')}</p></div>
-              <div className="flex flex-wrap gap-2">{comp.status === 'ACTIVE' && <button type="button" onClick={() => finishCompetition(comp.id)} className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white">Encerrar competição</button>}{comp.status === 'FINISHED' && <button type="button" disabled={saving} onClick={() => { if (window.confirm('Deseja reabrir esta competição? Ela voltará para Em andamento e manterá o período e os critérios configurados.')) updateCompetition(comp.id, { status: 'ACTIVE' }); }} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 text-xs font-extrabold text-white inline-flex items-center gap-2 disabled:opacity-60"><RotateCcw size={14}/> Reabrir competição</button>}</div>
+              <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setScoringOpen(o => ({ ...o, [comp.id]: !o[comp.id] }))} className={`rounded-xl border px-4 py-2.5 text-xs font-extrabold inline-flex items-center gap-2 ${scoringOpen[comp.id] ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-700'}`}><SlidersHorizontal size={14}/> Pontos extras e pesos</button>{comp.status === 'ACTIVE' && <button type="button" onClick={() => finishCompetition(comp.id)} className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white">Encerrar competição</button>}{comp.status === 'FINISHED' && <button type="button" disabled={saving} onClick={() => { if (window.confirm('Deseja reabrir esta competição? Ela voltará para Em andamento e manterá o período e os critérios configurados.')) updateCompetition(comp.id, { status: 'ACTIVE' }); }} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 text-xs font-extrabold text-white inline-flex items-center gap-2 disabled:opacity-60"><RotateCcw size={14}/> Reabrir competição</button>}</div>
             </div>
             {winner && <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-3"><Crown className="text-amber-600" size={22}/><div><p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Grande vencedor</p><p className="font-black text-slate-900">{winner.name} · Matrícula {winner.registration} · {winner.totalPoints} pontos</p></div></div>}
+            {scoringOpen[comp.id] && <ScoringPanel comp={comp} onChanged={reload} onError={setError}/>}
             <div className="p-4 sm:p-5">
               <div className="flex items-center gap-2 mb-3 text-xs font-black uppercase tracking-wider text-slate-500"><Users size={14}/> Classificação geral</div>
               {!comp.leaderboard?.length ? <p className="text-sm text-slate-500 py-4">Ainda não há participações pontuadas com matrícula nesta competição.</p> :
-                <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200"><th className="py-2 pr-3">Pos.</th><th className="py-2 pr-3">Colaborador</th><th className="py-2 pr-3">Matrícula</th><th className="py-2 pr-3">DDS</th><th className="py-2 pr-3">Questionários</th><th className="py-2 pr-3">Desempenho</th><th className="py-2 pr-3">Velocidade</th><th className="py-2 text-right">Total</th></tr></thead><tbody>{comp.leaderboard.map((p,i)=><tr key={p.registration} className="border-b border-slate-100 last:border-0"><td className="py-3 pr-3 font-black text-slate-500">{i+1}º</td><td className="py-3 pr-3 font-bold text-slate-800">{p.name}</td><td className="py-3 pr-3 font-mono text-slate-600">{p.registration}</td><td className="py-3 pr-3">{p.ddsParticipations}</td><td className="py-3 pr-3">{p.quizParticipations}</td><td className="py-3 pr-3">{p.performancePoints}</td><td className="py-3 pr-3">{p.speedPoints}</td><td className="py-3 text-right font-black text-emerald-700">{p.totalPoints}</td></tr>)}</tbody></table></div>}
+                <LeaderboardTable comp={comp} expanded={expandedRows} onToggle={key => setExpandedRows(r => ({ ...r, [key]: !r[key] }))}/>}
             </div>
           </section>;
         })}</div>}
     </div>
   );
+}
+
+function LeaderboardTable({ comp, expanded, onToggle }: { comp: Competition; expanded: Record<string, boolean>; onToggle: (key: string) => void }) {
+  const criteria = comp.bonusCriteria || [];
+  const entries = comp.bonusEntries || [];
+  const columnCount = 8 + criteria.length;
+  return (
+    <div className="overflow-x-auto"><table className="w-full text-left text-sm">
+      <thead><tr className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
+        <th className="py-2 pr-3">Pos.</th><th className="py-2 pr-3">Colaborador</th><th className="py-2 pr-3">Matrícula</th>
+        <th className="py-2 pr-3">DDS</th><th className="py-2 pr-3">Questionários</th><th className="py-2 pr-3">Desempenho</th><th className="py-2 pr-3">Velocidade</th>
+        {criteria.map(c => <th key={c.id} className="py-2 pr-3 text-amber-700" title={`Peso ${c.weight} por unidade`}>{c.name}<span className="block text-[9px] font-semibold normal-case tracking-normal text-amber-600">peso {c.weight}</span></th>)}
+        <th className="py-2 text-right">Total</th>
+      </tr></thead>
+      <tbody>{comp.leaderboard.map((p, i) => {
+        const key = comp.id + ':' + p.registration;
+        const personEntries = entries.filter(e => e.participantRegistration === p.registration);
+        const isOpen = !!expanded[key];
+        return <React.Fragment key={p.registration}>
+          <tr className="border-b border-slate-100 last:border-0">
+            <td className="py-3 pr-3 font-black text-slate-500">{i + 1}º</td>
+            <td className="py-3 pr-3 font-bold text-slate-800">
+              <button type="button" onClick={() => onToggle(key)} className="inline-flex items-center gap-1 text-left hover:text-amber-700" title="Ver detalhamento da pontuação">
+                {isOpen ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}{p.name}
+              </button>
+            </td>
+            <td className="py-3 pr-3 font-mono text-slate-600">{p.registration}</td>
+            <td className="py-3 pr-3">{p.ddsParticipations}</td>
+            <td className="py-3 pr-3">{p.quizParticipations}</td>
+            <td className="py-3 pr-3">{p.performancePoints}</td>
+            <td className="py-3 pr-3">{p.speedPoints}</td>
+            {criteria.map(c => {
+              const b = p.bonus?.[c.id];
+              return <td key={c.id} className="py-3 pr-3">{b ? <><span className={`font-bold ${b.points < 0 ? 'text-red-600' : 'text-amber-700'}`}>{b.points}</span><span className="block text-[10px] text-slate-400">{b.quantity} × {c.weight}</span></> : <span className="text-slate-400">0</span>}</td>;
+            })}
+            <td className="py-3 text-right font-black text-emerald-700">{p.totalPoints}</td>
+          </tr>
+          {isOpen && <tr className="bg-slate-50 border-b border-slate-100"><td colSpan={columnCount} className="px-4 py-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
+              <Detail label="Presença em DDS" value={p.ddsParticipations * comp.ddsAttendancePoints} hint={`${p.ddsParticipations} × ${comp.ddsAttendancePoints}`}/>
+              <Detail label="Questionários" value={p.quizParticipations * comp.quizParticipationPoints} hint={`${p.quizParticipations} × ${comp.quizParticipationPoints}`}/>
+              <Detail label="Desempenho" value={p.performancePoints} hint={`peso ${comp.quizPerformancePoints} por %`}/>
+              <Detail label="Velocidade" value={p.speedPoints} hint={`peso ${comp.quizSpeedPoints}`}/>
+              {criteria.map(c => <Detail key={c.id} label={c.name} value={p.bonus?.[c.id]?.points || 0} hint={`${p.bonus?.[c.id]?.quantity || 0} × ${c.weight}`} highlight/>)}
+              <Detail label="Total" value={p.totalPoints} strong/>
+            </div>
+            {personEntries.length > 0 && <ul className="mt-3 space-y-1 text-xs text-slate-600">
+              {personEntries.map(e => <li key={e.id} className="flex flex-wrap gap-2"><Star size={12} className="text-amber-500 mt-0.5"/><span className="text-slate-400">{new Date(e.createdAt).toLocaleDateString('pt-BR')}</span><span className="font-semibold">{e.criterionName}</span><span>{e.quantity} × {e.weight} = <b className={e.points < 0 ? 'text-red-600' : 'text-emerald-700'}>{e.points}</b></span>{e.note && <span className="text-slate-500">— {e.note}</span>}</li>)}
+            </ul>}
+          </td></tr>}
+        </React.Fragment>;
+      })}</tbody>
+    </table></div>
+  );
+}
+
+function Detail({ label, value, hint, highlight, strong }: { label: string; value: number; hint?: string; highlight?: boolean; strong?: boolean }) {
+  return <div className={`rounded-lg border px-3 py-2 ${strong ? 'border-emerald-200 bg-emerald-50' : highlight ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 truncate" title={label}>{label}</div>
+    <div className={`text-base font-black ${strong ? 'text-emerald-700' : value < 0 ? 'text-red-600' : 'text-slate-800'}`}>{value}</div>
+    {hint && <div className="text-[10px] text-slate-400">{hint}</div>}
+  </div>;
 }
