@@ -135,14 +135,29 @@ export async function GET(req: Request) {
     const refreshed = await prisma.competition.findMany({
       where: user.role === 'SUPER_ADMIN' ? {} : { companyId: user.companyId || '__none__' },
       orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
-      include: {
-        events: { orderBy: { createdAt: 'asc' } },
-        bonusCriteria: { orderBy: { createdAt: 'asc' } },
-        bonusEntries: { orderBy: { createdAt: 'desc' } }
-      }
+      include: { events: { orderBy: { createdAt: 'asc' } } }
     });
 
-    const result = refreshed.map((competition: any) => {
+    // Pontos extras são carregados à parte: se as tabelas ainda não existirem no banco
+    // (migração pendente), o ranking continua funcionando sem eles.
+    const competitionIds = refreshed.map((c: any) => c.id);
+    let bonusCriteriaRows: any[] = [];
+    let bonusEntryRows: any[] = [];
+    try {
+      [bonusCriteriaRows, bonusEntryRows] = await Promise.all([
+        prisma.competitionBonusCriterion.findMany({ where: { competitionId: { in: competitionIds } }, orderBy: { createdAt: 'asc' } }),
+        prisma.competitionBonusEntry.findMany({ where: { competitionId: { in: competitionIds } }, orderBy: { createdAt: 'desc' } })
+      ]);
+    } catch (bonusError) {
+      console.error('Pontos extras indisponíveis (verifique a migração 20261112000000_competition_bonus_points):', bonusError);
+    }
+
+    const result = refreshed.map((rawCompetition: any) => {
+      const competition = {
+        ...rawCompetition,
+        bonusCriteria: bonusCriteriaRows.filter(c => c.competitionId === rawCompetition.id),
+        bonusEntries: bonusEntryRows.filter(e => e.competitionId === rawCompetition.id)
+      };
       const participants = new Map<string, any>();
       const emptyParticipant = (registration: string, name: string) => ({
         registration, name, totalPoints: 0,
