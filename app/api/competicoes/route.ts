@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth';
+import { ensureCompetitionBonusTables } from '@/lib/competitionBonusSchema';
 
 export const dynamic = 'force-dynamic';
 
@@ -143,6 +144,7 @@ export async function GET(req: Request) {
     const competitionIds = refreshed.map((c: any) => c.id);
     let bonusCriteriaRows: any[] = [];
     let bonusEntryRows: any[] = [];
+    await ensureCompetitionBonusTables();
     try {
       [bonusCriteriaRows, bonusEntryRows] = await Promise.all([
         prisma.competitionBonusCriterion.findMany({ where: { competitionId: { in: competitionIds } }, orderBy: { createdAt: 'asc' } }),

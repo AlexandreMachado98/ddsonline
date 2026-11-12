@@ -335,15 +335,14 @@ export default function CompetitionManager() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-white p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-amber-700 font-black text-xs uppercase tracking-wider"><Trophy size={16}/> Competição de participação</div>
-          <h2 className="text-xl font-black text-slate-900 mt-1">Engaje sua equipe e reconheça os destaques</h2>
-          <p className="text-sm text-slate-600 mt-1">Some pontos por presença nos DDS, participação e desempenho nos questionários, além de pontos extras lançados manualmente.</p>
+      <div className="rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-white px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Trophy size={16} className="text-amber-600 shrink-0"/>
+          <p className="text-sm text-slate-600 truncate" title="Some pontos por presença nos DDS, participação e desempenho nos questionários, além de pontos extras lançados manualmente."><span className="font-extrabold text-slate-800">Competição de participação</span> · pontos por DDS, questionários e pontos extras</p>
         </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={load} className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-sm inline-flex items-center gap-2"><RefreshCw size={15}/> Atualizar</button>
-          <button type="button" onClick={() => setShowForm(v => !v)} className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-sm inline-flex items-center gap-2"><Plus size={16}/> Nova competição</button>
+        <div className="flex gap-2 shrink-0">
+          <button type="button" onClick={load} className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 font-bold text-xs inline-flex items-center gap-1.5 whitespace-nowrap"><RefreshCw size={13}/> Atualizar</button>
+          <button type="button" onClick={() => setShowForm(v => !v)} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs inline-flex items-center gap-1.5 whitespace-nowrap"><Plus size={14}/> Nova competição</button>
         </div>
       </div>
 
