@@ -18,6 +18,11 @@ export const dynamic = 'force-dynamic';
 const json = (error: string, status: number) =>
   NextResponse.json({ success: false, error }, { status });
 
+// P2021 = tabela inexistente (migração de pontos extras ainda não aplicada no banco).
+const isMissingTable = (e: any) => e?.code === 'P2021';
+const missingTableResponse = () =>
+  json('Pontos extras ainda não habilitados: o banco de dados precisa ser atualizado (migração competition_bonus_points).', 503);
+
 function canManage(user: any, competition: any) {
   return user.role === 'SUPER_ADMIN' ||
     competition.organizerId === user.id ||
@@ -84,6 +89,7 @@ export async function POST(req: Request) {
 
     return json('Tipo de operação inválido.', 400);
   } catch (e) {
+    if (isMissingTable(e)) return missingTableResponse();
     console.error('Erro ao incluir pontos extras:', e);
     return json('Não foi possível salvar os pontos extras.', 500);
   }
@@ -149,6 +155,7 @@ export async function PATCH(req: Request) {
 
     return json('Tipo de operação inválido.', 400);
   } catch (e) {
+    if (isMissingTable(e)) return missingTableResponse();
     console.error('Erro ao editar pontos extras:', e);
     return json('Não foi possível atualizar os pontos extras.', 500);
   }
@@ -179,6 +186,7 @@ export async function DELETE(req: Request) {
     }
     return json('Tipo de operação inválido.', 400);
   } catch (e) {
+    if (isMissingTable(e)) return missingTableResponse();
     console.error('Erro ao excluir pontos extras:', e);
     return json('Não foi possível excluir.', 500);
   }
