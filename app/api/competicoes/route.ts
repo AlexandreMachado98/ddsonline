@@ -100,10 +100,11 @@ async function refreshCompetitionEvents(competition: any) {
     })()
   ];
 
-  await prisma.competitionEvent.deleteMany({ where: { competitionId: competition.id } });
-  if (events.length) {
-    await prisma.competitionEvent.createMany({ data: events });
-  }
+  // Transação + skipDuplicates evitam erro de chave única quando duas requisições recalculam ao mesmo tempo.
+  await prisma.$transaction([
+    prisma.competitionEvent.deleteMany({ where: { competitionId: competition.id } }),
+    ...(events.length ? [prisma.competitionEvent.createMany({ data: events, skipDuplicates: true })] : [])
+  ]);
 }
 
 export async function GET(req: Request) {
@@ -134,17 +135,23 @@ export async function GET(req: Request) {
     const refreshed = await prisma.competition.findMany({
       where: user.role === 'SUPER_ADMIN' ? {} : { companyId: user.companyId || '__none__' },
       orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
-      include: { events: { orderBy: { createdAt: 'asc' } } }
+      include: {
+        events: { orderBy: { createdAt: 'asc' } },
+        bonusCriteria: { orderBy: { createdAt: 'asc' } },
+        bonusEntries: { orderBy: { createdAt: 'desc' } }
+      }
     });
 
     const result = refreshed.map((competition: any) => {
       const participants = new Map<string, any>();
+      const emptyParticipant = (registration: string, name: string) => ({
+        registration, name, totalPoints: 0,
+        ddsParticipations: 0, quizParticipations: 0, performancePoints: 0, speedPoints: 0,
+        bonusPoints: 0, bonus: {} as Record<string, { quantity: number; points: number }>
+      });
       for (const event of competition.events) {
         const key = event.participantRegistration;
-        const current = participants.get(key) || {
-          registration: key, name: event.participantName, totalPoints: 0,
-          ddsParticipations: 0, quizParticipations: 0, performancePoints: 0, speedPoints: 0
-        };
+        const current = participants.get(key) || emptyParticipant(key, event.participantName);
         current.name = event.participantName || current.name;
         current.totalPoints += event.points;
         if (event.type === 'DDS_ATTENDANCE') current.ddsParticipations += 1;
@@ -153,10 +160,36 @@ export async function GET(req: Request) {
         if (event.type === 'QUIZ_SPEED') current.speedPoints += event.points;
         participants.set(key, current);
       }
+      // Pontos extras lançados manualmente: pontos = quantidade × peso atual do critério.
+      const criteriaById = new Map<string, any>(competition.bonusCriteria.map((c: any) => [c.id, c]));
+      const bonusEntries = competition.bonusEntries.flatMap((entry: any) => {
+        const criterion = criteriaById.get(entry.criterionId);
+        if (!criterion) return [];
+        const points = entry.quantity * criterion.weight;
+        const key = entry.participantRegistration;
+        const current = participants.get(key) || emptyParticipant(key, entry.participantName);
+        if (!current.name) current.name = entry.participantName;
+        const slot = current.bonus[criterion.id] || { quantity: 0, points: 0 };
+        slot.quantity += entry.quantity;
+        slot.points += points;
+        current.bonus[criterion.id] = slot;
+        current.bonusPoints += points;
+        current.totalPoints += points;
+        participants.set(key, current);
+        return [{
+          id: entry.id, criterionId: entry.criterionId, criterionName: criterion.name, weight: criterion.weight,
+          participantRegistration: entry.participantRegistration, participantName: entry.participantName,
+          quantity: entry.quantity, points, note: entry.note, createdAt: entry.createdAt
+        }];
+      });
       const leaderboard = [...participants.values()].sort((a, b) =>
         b.totalPoints - a.totalPoints || b.performancePoints - a.performancePoints || b.ddsParticipations - a.ddsParticipations || b.quizParticipations - a.quizParticipations || b.speedPoints - a.speedPoints || a.name.localeCompare(b.name, 'pt-BR')
       );
-      return { ...competition, events: undefined, leaderboard, eventCount: competition.events.length };
+      return {
+        ...competition, events: undefined, leaderboard, eventCount: competition.events.length,
+        bonusCriteria: competition.bonusCriteria.map((c: any) => ({ id: c.id, name: c.name, weight: c.weight })),
+        bonusEntries
+      };
     });
 
     return NextResponse.json({ success: true, competitions: result });
@@ -214,11 +247,20 @@ export async function PATCH(req: Request) {
     if (typeof body.id !== 'string') return json('Solicitação inválida.', 400);
     const hasStatus = body.status !== undefined;
     const hasName = body.name !== undefined;
-    if ((!hasStatus && !hasName) || (hasStatus && !['FINISHED', 'CANCELLED', 'ACTIVE'].includes(body.status))) return json('Informe um nome ou uma situação válida para a competição.', 400);
+    const weightFields = ['ddsAttendancePoints', 'quizParticipationPoints', 'quizPerformancePoints', 'quizSpeedPoints'] as const;
+    const weightChanges: Partial<Record<typeof weightFields[number], number>> = {};
+    for (const field of weightFields) {
+      if (body[field] === undefined) continue;
+      const value = Number(body[field]);
+      if (!Number.isInteger(value) || value < 0 || value > 1000) return json('As pontuações devem ser números inteiros entre 0 e 1000.', 400);
+      weightChanges[field] = value;
+    }
+    const hasWeights = Object.keys(weightChanges).length > 0;
+    if ((!hasStatus && !hasName && !hasWeights) || (hasStatus && !['FINISHED', 'CANCELLED', 'ACTIVE'].includes(body.status))) return json('Informe um nome ou uma situação válida para a competição.', 400);
     const competition = await prisma.competition.findUnique({ where: { id: body.id } });
     if (!competition) return json('Competição não encontrada.', 404);
     if (!canManage(user, competition)) return json('Acesso negado a esta competição.', 403);
-    const data: { status?: 'FINISHED' | 'CANCELLED' | 'ACTIVE'; name?: string } = {};
+    const data: { status?: 'FINISHED' | 'CANCELLED' | 'ACTIVE'; name?: string } & typeof weightChanges = { ...weightChanges };
     if (hasName) {
       if (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 120) return json('O nome deve ter entre 1 e 120 caracteres.', 400);
       data.name = body.name.trim();
@@ -228,6 +270,8 @@ export async function PATCH(req: Request) {
       data.status = body.status;
     }
     const updated = await prisma.competition.update({ where: { id: competition.id }, data });
+    // Recalcula os pontos automáticos com os novos pesos (inclusive em competições encerradas).
+    if (hasWeights && updated.status !== 'CANCELLED') await refreshCompetitionEvents(updated);
     return NextResponse.json({ success: true, competition: updated });
   } catch (error) {
     console.error('Erro ao atualizar competição:', error);

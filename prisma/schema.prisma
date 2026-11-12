@@ -521,6 +521,8 @@ model Competition {
   organizerId              String
   organizer                User               @relation(fields: [organizerId], references: [id], onDelete: Restrict)
   events                   CompetitionEvent[]
+  bonusCriteria            CompetitionBonusCriterion[]
+  bonusEntries             CompetitionBonusEntry[]
   createdAt                DateTime           @default(now())
   updatedAt                DateTime           @updatedAt
 
@@ -543,4 +545,39 @@ model CompetitionEvent {
   @@unique([competitionId, type, sourceId])
   @@index([competitionId, participantRegistration])
   @@index([competitionId, createdAt])
+}
+
+// Critério de pontuação extra definido manualmente pelo organizador (ex.: "Sugestão de melhoria").
+// O peso multiplica a quantidade lançada para cada colaborador.
+model CompetitionBonusCriterion {
+  id            String                  @id @default(uuid())
+  competitionId String
+  competition   Competition             @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  name          String
+  weight        Int                     @default(1)
+  entries       CompetitionBonusEntry[]
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  @@index([competitionId, createdAt])
+}
+
+// Lançamento manual de pontos extras para um colaborador.
+// Pontos = quantity * criterion.weight (recalculado a cada leitura).
+model CompetitionBonusEntry {
+  id                      String                    @id @default(uuid())
+  competitionId           String
+  competition             Competition               @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  criterionId             String
+  criterion               CompetitionBonusCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  participantRegistration String
+  participantName         String
+  quantity                Int                       @default(1)
+  note                    String?
+  createdById             String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+
+  @@index([competitionId, participantRegistration])
+  @@index([criterionId])
 }
