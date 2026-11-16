@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 // app/api/auth/route.ts
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
@@ -62,7 +63,6 @@ export async function POST(req: Request) {
       return response;
     }
 
-    console.log(`[AUTH] Iniciando tentativa de login para o email: ${email}`);
 
     // Validações básicas de entrada
     if (!email || typeof email !== 'string') {
@@ -98,36 +98,57 @@ export async function POST(req: Request) {
         }, { status: 409 });
       }
 
-      // 2. Cria empresa se informada
-      const resolvedCompany = company?.trim() || companyName?.trim() || 'Empresa Padrão';
-      let companyRecord = await prisma.company.findFirst({
+      // 2. Empresa e aprovação. O controle de acesso fica no DDS Master:
+      // - empresa existente + palavra-chave correta → conta ativa na hora;
+      // - qualquer outro caso (sem chave, chave errada, empresa que ainda não existe)
+      //   → conta aguardando aprovação na fila do DDS Master, sem acesso a nada.
+      // Antes, qualquer pessoa entrava direto em qualquer empresa só digitando o nome,
+      // e um nome novo criava a empresa automaticamente.
+      const resolvedCompany = (company?.trim() || companyName?.trim() || '').slice(0, 150);
+      if (!resolvedCompany) {
+        return NextResponse.json({ success: false, error: 'Informe o nome da empresa.' }, { status: 400 });
+      }
+      const companyRecord = await prisma.company.findFirst({
         where: { name: { equals: resolvedCompany, mode: 'insensitive' } }
       });
+      const hashedPassword = await hashPassword(cleanPassword);
+      const userData = {
+        name: name?.trim() || cleanEmail.split('@')[0],
+        email: cleanEmail,
+        password: hashedPassword,
+        position: role?.trim() || 'Técnico em Segurança do Trabalho',
+        role: 'ORGANIZER' as const
+      };
 
-      if (!companyRecord) {
-        companyRecord = await prisma.company.create({
+      const providedKey = typeof secretKey === 'string' ? secretKey.trim().toUpperCase() : '';
+      const companyKey = (companyRecord?.secretKey || '').trim().toUpperCase();
+      const keyMatches = Boolean(companyKey && providedKey) && providedKey.length === companyKey.length &&
+        crypto.timingSafeEqual(Buffer.from(providedKey), Buffer.from(companyKey));
+      const approved = Boolean(companyRecord && keyMatches && companyRecord.autoApproveWithKey && companyRecord.status === 'ACTIVE');
+
+      if (!approved || !companyRecord) {
+        const pendingUser = await prisma.user.create({
           data: {
-            name: resolvedCompany,
-            status: 'ACTIVE',
-            secretKey: secretKey?.trim() || null
+            ...userData,
+            status: 'PENDING_APPROVAL',
+            // Empresa existente: já fica vinculada (o Master só aprova). Empresa nova:
+            // fica sem vínculo e o Master cria a empresa ou vincula na aprovação.
+            company: companyRecord?.name || resolvedCompany,
+            companyId: companyRecord?.id || null
           }
+        });
+        logSecurityEvent('ADMIN_ACTION', { userId: pendingUser.id, reason: `REGISTRATION_PENDING_APPROVAL (${companyRecord ? 'company ' + companyRecord.id : 'new company name'})`, ip });
+        return NextResponse.json({
+          success: true,
+          autoApproved: false,
+          pendingApproval: true,
+          message: 'Cadastro recebido. Seu acesso será liberado após a aprovação.'
         });
       }
 
-      // 3. Hash criptográfico da senha com bcrypt
-      const hashedPassword = await hashPassword(cleanPassword);
-
+      // 3. Conta ativa (empresa existente + palavra-chave correta).
       const newUser = await prisma.user.create({
-        data: {
-          name: name?.trim() || cleanEmail.split('@')[0],
-          email: cleanEmail,
-          password: hashedPassword,
-          role: 'ORGANIZER',
-          status: 'ACTIVE',
-          position: role?.trim() || 'Técnico em Segurança do Trabalho',
-          company: resolvedCompany,
-          companyId: companyRecord.id
-        }
+        data: { ...userData, status: 'ACTIVE', company: companyRecord.name, companyId: companyRecord.id }
       });
 
       // 4. Emissão de Sessão Segura
@@ -185,6 +206,20 @@ export async function POST(req: Request) {
         success: false,
         error: 'E-mail ou senha inválidos.'
       }, { status: 401 });
+    }
+
+    // Cadastro aguardando aprovação do administrador da empresa
+    if (user.status === 'PENDING_APPROVAL') {
+      const pendingPasswordOk = await verifyAndMigratePassword(cleanPassword, user.password, user.id);
+      if (!pendingPasswordOk) {
+        recordAuthFailure(rateKey);
+        return NextResponse.json({ success: false, error: 'E-mail ou senha inválidos.' }, { status: 401 });
+      }
+      logSecurityEvent('LOGIN_FAILED', { userId: user.id, email: cleanEmail, ip, reason: 'PENDING_APPROVAL' });
+      return NextResponse.json({
+        success: false,
+        error: 'Seu cadastro está aguardando aprovação. Fale com o responsável pelo DDS ON na sua empresa para liberar o acesso.'
+      }, { status: 403 });
     }
 
     // Verifica se a conta está bloqueada ou suspensa

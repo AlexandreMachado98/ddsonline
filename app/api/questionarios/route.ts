@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth';
+import { standaloneQuizVisibility, canManageStandaloneQuiz, canReadStandaloneQuiz } from '@/lib/quizAccess';
 import { NextResponse } from 'next/server';
 import type { QuizQuestion } from '@/lib/quizGrading';
 
@@ -52,9 +53,8 @@ export async function GET(req: Request) {
       whereClause.isTemplate = true;
       if (user.role !== 'SUPER_ADMIN') {
         whereClause.OR = [
-          { meetingId: null },
+          ...standaloneQuizVisibility(user),
           { creatorId: user.id },
-          { creatorId: null },
           { meeting: { organizerId: user.id } },
           ...(user.companyId ? [{ meeting: { companyId: user.companyId } }] : [])
         ];
@@ -71,9 +71,9 @@ export async function GET(req: Request) {
       // Mostra todas as avaliações (autônomas/desvinculadas E vinculadas a DDS do usuário)
       if (user.role !== 'SUPER_ADMIN') {
         whereClause.OR = [
-          { meetingId: null }, // Formulários desvinculados/autônomos SEMPRE aparecem!
+          // Avulsos: só os da própria empresa (e modelos da plataforma).
+          ...standaloneQuizVisibility(user),
           { creatorId: user.id },
-          { creatorId: null },
           { meeting: { organizerId: user.id } },
           ...(user.companyId ? [{ meeting: { companyId: user.companyId } }] : [])
         ];
@@ -147,6 +147,14 @@ export async function POST(req: Request) {
       }
     });
     if (!source) return json('Questionário de origem não encontrado.', 404);
+    if (user.role !== 'SUPER_ADMIN' && source.creatorId !== user.id) {
+      if (source.meetingId) {
+        const sourceAccess = await checkMeetingAccess(user, source.meetingId);
+        if (sourceAccess.error) return sourceAccess.error;
+      } else if (!(await canReadStandaloneQuiz(user, source))) {
+        return json('Acesso negado a este questionário.', 403);
+      }
+    }
 
     const newMeetingId = body.meetingId || null;
     if (newMeetingId) {
@@ -261,8 +269,10 @@ export async function PATCH(req: Request) {
     if (quiz.meetingId) {
       const access = await checkMeetingAccess(user, quiz.meetingId);
       if (access.error) return access.error;
+    } else if (!(await canManageStandaloneQuiz(user, quiz))) {
+      // Avulsos: só o criador ou alguém da mesma empresa.
+      return json('Acesso negado a este questionário.', 403);
     }
-    // Para questionários autônomos (meetingId: null), qualquer organizador da plataforma tem autorização para gerenciar
   }
 
   // AÇÃO: Desvincular de DDS (tornar o questionário autônomo diretamente)
@@ -343,6 +353,8 @@ export async function DELETE(req: Request) {
     if (quiz.meetingId) {
       const access = await checkMeetingAccess(user, quiz.meetingId);
       if (access.error) return access.error;
+    } else if (!(await canManageStandaloneQuiz(user, quiz))) {
+      return json('Acesso negado a este questionário.', 403);
     }
   }
 

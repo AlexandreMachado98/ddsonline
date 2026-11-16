@@ -322,8 +322,14 @@ export default function MeetingRoom() {
         body: JSON.stringify({
           meetingId: roomId,
           name: name.trim(),
-          cpf: funcao.trim(),
           registration,
+          // Credencial gerada na assinatura deste aparelho: prova que a saída é do próprio colaborador.
+          ...(() => {
+            try {
+              const stored = JSON.parse(localStorage.getItem('dds_last_attendance') || 'null');
+              return stored && stored.meetingId === roomId ? { attendanceId: stored.attendanceId, attendanceProof: stored.quizProof } : {};
+            } catch { return {}; }
+          })(),
           exitReason: exitReason.trim(),
           exitSignature
         })
