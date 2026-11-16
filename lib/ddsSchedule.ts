@@ -119,3 +119,58 @@ export function normalizeSlug(value: string): string {
 export function isValidSlug(slug: string): boolean {
   return /^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])$/.test(slug) && !slug.includes('--');
 }
+
+// ---------------------------------------------------------------------------
+// Resumo da semana: quem assinou cada tema, quem faltou e a nota do questionário.
+
+export interface SummaryThemeInput {
+  order: number;
+  state: ThemeState;
+  attendees: { registration: string | null; name: string }[];
+  attempts: { registration: string | null; name: string | null; score: number }[];
+}
+
+export interface SummaryCell { signed: boolean; score: number | null }
+export interface SummaryRow { key: string; registration: string | null; name: string; cells: SummaryCell[]; signedCount: number; missedCount: number }
+
+const personKey = (registration: string | null, name: string | null) =>
+  registration && registration.trim() ? 'r:' + registration.trim() : 'n:' + String(name || '').trim().toLocaleLowerCase('pt-BR');
+
+/**
+ * Monta a matriz colaborador × tema. Considera quem assinou ao menos um tema da
+ * semana. "Faltou" só conta temas que já começaram (não bloqueados).
+ */
+export function buildWeekSummary(themes: SummaryThemeInput[]): { rows: SummaryRow[]; signedPerTheme: number[] } {
+  const sorted = [...themes].sort((a, b) => a.order - b.order);
+  const rows = new Map<string, SummaryRow>();
+  const ensure = (registration: string | null, name: string) => {
+    const key = personKey(registration, name);
+    let row = rows.get(key);
+    if (!row) {
+      row = { key, registration: registration?.trim() || null, name: name.trim(), cells: sorted.map(() => ({ signed: false, score: null })), signedCount: 0, missedCount: 0 };
+      rows.set(key, row);
+    }
+    if (name.trim()) row.name = name.trim();
+    return row;
+  };
+
+  sorted.forEach((theme, i) => {
+    for (const a of theme.attendees) ensure(a.registration, a.name).cells[i].signed = true;
+  });
+  sorted.forEach((theme, i) => {
+    for (const attempt of theme.attempts) {
+      const row = rows.get(personKey(attempt.registration, attempt.name));
+      if (!row) continue; // respondeu sem assinatura: não entra na matriz de presença
+      const cell = row.cells[i];
+      if (cell.score === null || attempt.score > cell.score) cell.score = attempt.score;
+    }
+  });
+
+  const result = [...rows.values()].map(row => {
+    row.signedCount = row.cells.filter(c => c.signed).length;
+    row.missedCount = row.cells.filter((c, i) => !c.signed && sorted[i].state !== 'LOCKED').length;
+    return row;
+  }).sort((a, b) => b.missedCount - a.missedCount || a.name.localeCompare(b.name, 'pt-BR'));
+
+  return { rows: result, signedPerTheme: sorted.map((_, i) => result.filter(r => r.cells[i].signed).length) };
+}

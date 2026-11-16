@@ -2,9 +2,10 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  CalendarDays, Check, ChevronDown, ChevronRight, Copy, ExternalLink, Link2, Loader2, Lock, Pencil,
-  Plus, Power, RefreshCw, RotateCcw, Trash2, Users, X
+  CalendarDays, Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Download, ExternalLink, Link2, Loader2, Lock, Pencil,
+  Plus, Power, QrCode, RefreshCw, RotateCcw, Table2, Trash2, Users, X
 } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import {
   THEMES_PER_WEEK, MIN_DURATION_HOURS, MAX_DURATION_HOURS, buildThemeWindows, normalizeSlug,
   pickVisibleWeekIndex, type ThemeState
@@ -14,21 +15,23 @@ type Theme = {
   id: string; order: number; topic: string; objective: string | null; programmaticContent: string | null;
   durationHours: number; opensAt: string; closesAt: string; reopenUntil: string | null;
   state: ThemeState; availableUntil: string | null; meetingId: string | null; signatures: number;
+  quizSourceId: string | null; quizTitle: string | null; quizToken: string | null; quizResponses: number;
 };
+type QuizOption = { id: string; title: string; isTemplate: boolean; questions: number };
 type Week = { id: string; startsAt: string; endsAt: string; themes: Theme[] };
 type Schedule = {
   id: string; slug: string; name: string; farm: string; active: boolean;
   organizerName: string | null; weeks: Week[];
 };
-type ThemeDraft = { id?: string; topic: string; objective: string; programmaticContent: string; durationHours: number; locked?: boolean; state?: ThemeState };
+type ThemeDraft = { id?: string; topic: string; objective: string; programmaticContent: string; durationHours: number; quizSourceId: string; locked?: boolean; state?: ThemeState };
 type WeekDraft = { mode: 'create' | 'edit'; scheduleId: string; weekId?: string; date: string; time: string; startLocked: boolean; themes: ThemeDraft[] };
 
 const API = '/api/dds-semanal';
 const WEEKDAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const inputCls = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 disabled:bg-slate-100 disabled:text-slate-500';
 
-async function callApi(method: string, body?: unknown) {
-  const response = await fetch(API, {
+async function callApi(method: string, body?: unknown, query = '') {
+  const response = await fetch(API + query, {
     method, cache: 'no-store',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined
@@ -185,6 +188,7 @@ function ScheduleCard({ schedule, reload, onError, flash }: { schedule: Schedule
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: schedule.name, farm: schedule.farm, slug: schedule.slug });
   const [busy, setBusy] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const link = `${origin}/dds/${schedule.slug}`;
   const latestEnd = weeksAsc.length ? new Date(weeksAsc[weeksAsc.length - 1].endsAt) : null;
@@ -207,7 +211,7 @@ function ScheduleCard({ schedule, reload, onError, flash }: { schedule: Schedule
       mode: 'create', scheduleId: schedule.id, date: toDateInput(start), time: toTimeInput(start), startLocked: false,
       themes: Array.from({ length: THEMES_PER_WEEK }, (_, i) => {
         const t = source?.themes[i];
-        return { topic: t?.topic || '', objective: t?.objective || '', programmaticContent: t?.programmaticContent || '', durationHours: t?.durationHours || 24 };
+        return { topic: t?.topic || '', objective: t?.objective || '', programmaticContent: t?.programmaticContent || '', durationHours: t?.durationHours || 24, quizSourceId: t?.quizSourceId || '' };
       })
     });
   };
@@ -216,7 +220,7 @@ function ScheduleCard({ schedule, reload, onError, flash }: { schedule: Schedule
     setDraft({
       mode: 'edit', scheduleId: schedule.id, weekId: w.id, date: toDateInput(start), time: toTimeInput(start),
       startLocked: w.themes[0].state !== 'LOCKED',
-      themes: w.themes.map(t => ({ id: t.id, topic: t.topic, objective: t.objective || '', programmaticContent: t.programmaticContent || '', durationHours: t.durationHours, locked: t.state !== 'LOCKED', state: t.state }))
+      themes: w.themes.map(t => ({ id: t.id, topic: t.topic, objective: t.objective || '', programmaticContent: t.programmaticContent || '', durationHours: t.durationHours, quizSourceId: t.quizSourceId || '', locked: t.state !== 'LOCKED', state: t.state }))
     });
   };
 
@@ -248,6 +252,7 @@ function ScheduleCard({ schedule, reload, onError, flash }: { schedule: Schedule
         {!editing && (
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={copyLink} className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-xs font-extrabold text-white inline-flex items-center gap-1.5"><Copy size={14}/> Copiar link fixo</button>
+            <button type="button" onClick={() => setShowQr(v => !v)} className={`rounded-lg border px-3 py-2 text-xs font-bold inline-flex items-center gap-1.5 ${showQr ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-700'}`}><QrCode size={14}/> QR Code</button>
             <a href={`/dds/${schedule.slug}`} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 inline-flex items-center gap-1.5"><ExternalLink size={14}/> Ver como participante</a>
             <button type="button" disabled={busy} onClick={() => {
               if (schedule.active && !window.confirm('Desativar o link? Os participantes não conseguirão abrir os temas até você ativar de novo.')) return;
@@ -256,6 +261,8 @@ function ScheduleCard({ schedule, reload, onError, flash }: { schedule: Schedule
           </div>
         )}
       </div>
+
+      {showQr && !editing && <QrPanel link={link} name={schedule.name} farm={schedule.farm} slug={schedule.slug} onClose={() => setShowQr(false)}/>}
 
       {weeksAsc.length > 0 && (
         <div className="px-4 sm:px-5 pt-4 flex flex-wrap items-center gap-2">
@@ -272,7 +279,7 @@ function ScheduleCard({ schedule, reload, onError, flash }: { schedule: Schedule
       )}
 
       {draft ? (
-        <WeekForm draft={draft} setDraft={setDraft} busy={busy} onCancel={() => setDraft(null)} onSave={async payload => {
+        <WeekForm draft={draft} setDraft={setDraft} busy={busy} onError={onError} onCancel={() => setDraft(null)} onSave={async payload => {
           const ok = await run(() => callApi(draft.mode === 'create' ? 'POST' : 'PATCH', payload), draft.mode === 'create' ? 'Semana cadastrada.' : 'Semana atualizada.');
           if (ok) setDraft(null);
         }}/>
@@ -298,6 +305,8 @@ function WeekTable({ week, busy, run, onEdit, onNext, onDelete }: {
 }) {
   const [reopenId, setReopenId] = useState<string | null>(null);
   const [reopenHours, setReopenHours] = useState(24);
+  const [showSummary, setShowSummary] = useState(false);
+  useEffect(() => { setShowSummary(false); }, [week.id]);
   const notStarted = week.themes.every(t => t.state === 'LOCKED');
   const allClosed = week.themes.every(t => t.state === 'CLOSED');
   const total = week.themes.reduce((sum, t) => sum + t.signatures, 0);
@@ -307,6 +316,7 @@ function WeekTable({ week, busy, run, onEdit, onNext, onDelete }: {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-slate-500 inline-flex items-center gap-1.5"><Users size={13}/> {total} assinatura(s) nesta semana</p>
         <div className="flex flex-wrap gap-2">
+          {!notStarted && <button type="button" onClick={() => setShowSummary(v => !v)} className={`rounded-lg border px-3 py-1.5 text-xs font-bold inline-flex items-center gap-1.5 ${showSummary ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-700'}`}><Table2 size={13}/> Resumo da semana</button>}
           {!allClosed && <button type="button" onClick={onEdit} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 inline-flex items-center gap-1.5"><Pencil size={13}/> Editar semana</button>}
           <button type="button" onClick={onNext} className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-800 inline-flex items-center gap-1.5"><Plus size={13}/> Montar próxima semana</button>
           {notStarted && <button type="button" disabled={busy} onClick={onDelete} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-600 inline-flex items-center gap-1.5"><Trash2 size={13}/> Excluir semana</button>}
@@ -322,7 +332,10 @@ function WeekTable({ week, busy, run, onEdit, onNext, onDelete }: {
             return <React.Fragment key={t.id}>
               <tr className={`border-b border-slate-100 last:border-0 ${t.state === 'OPEN' ? 'bg-emerald-50/60' : t.state === 'REOPENED' ? 'bg-blue-50/60' : ''}`}>
                 <td className="py-2.5 px-3 font-extrabold text-slate-800 whitespace-nowrap">{WEEKDAYS[new Date(t.opensAt).getDay()]}</td>
-                <td className="py-2.5 px-3 font-semibold text-slate-800 min-w-[200px]">{t.topic}</td>
+                <td className="py-2.5 px-3 font-semibold text-slate-800 min-w-[200px]">
+                  {t.topic}
+                  {t.quizTitle && <span className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-slate-500"><ClipboardCheck size={12} className="text-emerald-600 shrink-0"/>{t.quizTitle}{t.state !== 'LOCKED' && t.quizToken ? ` · ${t.quizResponses} resposta(s)` : ''}</span>}
+                </td>
                 <td className="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap tabular-nums">{fmtShort(t.opensAt)}<br/>→ {fmtShort(until)} <span className="text-slate-400">({t.durationHours} h)</span></td>
                 <td className="py-2.5 px-3"><StatePill state={t.state}/></td>
                 <td className="py-2.5 px-3 text-right font-black tabular-nums text-slate-800">{t.state === 'LOCKED' ? '—' : t.signatures}</td>
@@ -347,16 +360,23 @@ function WeekTable({ week, busy, run, onEdit, onNext, onDelete }: {
           })}</tbody>
         </table>
       </div>
+      {showSummary && <WeekSummary weekId={week.id}/>}
       <p className="text-[11px] text-slate-500">Temas encerrados geram a ata automaticamente e aparecem em Histórico &amp; Atas, como qualquer DDS.</p>
     </div>
   );
 }
 
-function WeekForm({ draft, setDraft, busy, onCancel, onSave }: {
+function WeekForm({ draft, setDraft, busy, onCancel, onSave, onError }: {
   draft: WeekDraft; setDraft: React.Dispatch<React.SetStateAction<WeekDraft | null>>; busy: boolean;
-  onCancel: () => void; onSave: (payload: unknown) => Promise<void>;
+  onCancel: () => void; onSave: (payload: unknown) => Promise<void>; onError: (m: string) => void;
 }) {
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [quizOptions, setQuizOptions] = useState<QuizOption[] | null>(null);
+  useEffect(() => {
+    callApi('GET', undefined, '?quizOptions=1').then(d => setQuizOptions(d.quizzes || [])).catch(e => { setQuizOptions([]); onError(e.message); });
+  }, [onError]);
+  const templates = (quizOptions || []).filter(q => q.isTemplate);
+  const standalone = (quizOptions || []).filter(q => !q.isTemplate);
   const startDate = new Date(`${draft.date}T${draft.time || '06:00'}:00`);
   const validStart = !Number.isNaN(startDate.getTime());
   const windows = validStart ? buildThemeWindows(startDate, draft.themes.map(t => Number(t.durationHours) || MIN_DURATION_HOURS)) : [];
@@ -366,7 +386,7 @@ function WeekForm({ draft, setDraft, busy, onCancel, onSave }: {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const themes = draft.themes.map(t => ({ id: t.id, topic: t.topic, objective: t.objective, programmaticContent: t.programmaticContent, durationHours: Number(t.durationHours) }));
+    const themes = draft.themes.map(t => ({ id: t.id, topic: t.topic, objective: t.objective, programmaticContent: t.programmaticContent, durationHours: Number(t.durationHours), quizSourceId: t.quizSourceId || null }));
     const startsAt = startDate.toISOString();
     await onSave(draft.mode === 'create'
       ? { action: 'create_week', scheduleId: draft.scheduleId, startsAt, themes }
@@ -378,7 +398,7 @@ function WeekForm({ draft, setDraft, busy, onCancel, onSave }: {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h4 className="font-black text-slate-900">{draft.mode === 'create' ? 'Montar semana' : 'Editar semana'}</h4>
-          <p className="text-xs text-slate-500">Cada tema abre quando o anterior encerra. Duração mínima de {MIN_DURATION_HOURS} h.</p>
+          <p className="text-xs text-slate-500">Cada tema abre quando o anterior encerra. Duração mínima de {MIN_DURATION_HOURS} h. O questionário escolhido é publicado junto com o tema e aparece para quem assinar.</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <label className="text-xs font-bold text-slate-700">Início do 1º tema
@@ -400,8 +420,17 @@ function WeekForm({ draft, setDraft, busy, onCancel, onSave }: {
                   <p className="text-sm font-extrabold text-slate-800">{w ? WEEKDAYS[w.opensAt.getDay()] : `Tema ${i + 1}`}</p>
                   <p className="text-[11px] text-slate-500 tabular-nums">{w ? <>{fmtShort(w.opensAt)}<br/>→ {fmtShort(w.closesAt)}</> : '—'}</p>
                 </div>
-                <label className="md:col-span-7 text-[11px] font-bold text-slate-600">Tema {i + 1}
+                <label className="md:col-span-4 text-[11px] font-bold text-slate-600">Tema {i + 1}
                   <input id={`wf-topic-${i}`} required maxLength={200} disabled={t.locked} value={t.topic} onChange={e => setTheme(i, { topic: e.target.value })} placeholder="Ex.: Uso correto de EPI" className={`mt-1 ${inputCls}`}/>
+                </label>
+                <label className="md:col-span-3 text-[11px] font-bold text-slate-600">Questionário (opcional)
+                  <select id={`wf-quiz-${i}`} disabled={t.locked} value={t.quizSourceId} onChange={e => setTheme(i, { quizSourceId: e.target.value })} className={`mt-1 ${inputCls}`}>
+                    <option value="">{quizOptions === null ? 'Carregando...' : 'Sem questionário'}</option>
+                    {/* Mantém visível uma escolha que não está mais na lista (ex.: modelo excluído) */}
+                    {t.quizSourceId && quizOptions && !quizOptions.some(q => q.id === t.quizSourceId) && <option value={t.quizSourceId}>Questionário escolhido anteriormente</option>}
+                    {templates.length > 0 && <optgroup label="Modelos">{templates.map(q => <option key={q.id} value={q.id}>{q.title} ({q.questions} perg.)</option>)}</optgroup>}
+                    {standalone.length > 0 && <optgroup label="Questionários avulsos">{standalone.map(q => <option key={q.id} value={q.id}>{q.title} ({q.questions} perg.)</option>)}</optgroup>}
+                  </select>
                 </label>
                 <label className="md:col-span-2 text-[11px] font-bold text-slate-600">Aberto por (h)
                   <input id={`wf-dur-${i}`} type="number" required min={MIN_DURATION_HOURS} max={MAX_DURATION_HOURS} step={1} disabled={t.state === 'CLOSED' || t.state === 'REOPENED'} value={t.durationHours} onChange={e => setTheme(i, { durationHours: Number(e.target.value) })} className={`mt-1 ${inputCls}`}/>
@@ -429,5 +458,150 @@ function WeekForm({ draft, setDraft, busy, onCancel, onSave }: {
         <button disabled={busy || !validStart} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm inline-flex items-center gap-1.5 disabled:opacity-60">{busy ? <Loader2 size={15} className="animate-spin"/> : <Check size={15}/>} {draft.mode === 'create' ? 'Salvar semana' : 'Salvar alterações'}</button>
       </div>
     </form>
+  );
+}
+
+/** QR Code do link fixo, com cartaz pronto para imprimir e colar no mural. */
+function QrPanel({ link, name, farm, slug, onClose }: { link: string; name: string; farm: string; slug: string; onClose: () => void }) {
+  const canvasId = `dds-qr-${slug}`;
+
+  const downloadPoster = () => {
+    const qr = document.getElementById(canvasId) as HTMLCanvasElement | null;
+    if (!qr) return;
+    const W = 1240, H = 1754; // A4 em 150 dpi
+    const poster = document.createElement('canvas');
+    poster.width = W; poster.height = H;
+    const ctx = poster.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, W, 220);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#34d399'; ctx.font = '800 44px Inter, Arial, sans-serif';
+    ctx.fillText('DDS ON', W / 2, 100);
+    ctx.fillStyle = '#e2e8f0'; ctx.font = '600 34px Inter, Arial, sans-serif';
+    ctx.fillText('Diálogo Diário de Segurança', W / 2, 160);
+    ctx.fillStyle = '#0f172a'; ctx.font = '900 76px Inter, Arial, sans-serif';
+    ctx.fillText('DDS da semana', W / 2, 360);
+    ctx.font = '700 48px Inter, Arial, sans-serif';
+    ctx.fillText(name.slice(0, 40), W / 2, 440);
+    ctx.fillStyle = '#475569'; ctx.font = '500 36px Inter, Arial, sans-serif';
+    ctx.fillText(farm.slice(0, 50), W / 2, 500);
+    const size = 760;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(qr, (W - size) / 2, 560, size, size);
+    ctx.fillStyle = '#0f172a'; ctx.font = '800 42px Inter, Arial, sans-serif';
+    ctx.fillText('Aponte a câmera do celular para assinar', W / 2, 1420);
+    ctx.fillStyle = '#475569'; ctx.font = '500 30px Inter, Arial, sans-serif';
+    ctx.fillText('O tema do dia libera automaticamente. O link é o mesmo todas as semanas.', W / 2, 1480);
+    ctx.fillStyle = '#059669'; ctx.font = '600 30px monospace';
+    ctx.fillText(link, W / 2, 1580);
+    const a = document.createElement('a');
+    a.href = poster.toDataURL('image/png');
+    a.download = `cartaz-dds-semanal-${slug}.png`;
+    a.click();
+  };
+
+  return (
+    <div className="mx-4 sm:mx-5 mt-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 flex flex-col sm:flex-row items-center gap-4">
+      <div className="rounded-xl bg-white p-3 border border-slate-200">
+        <QRCodeCanvas id={canvasId} value={link} size={176} marginSize={2} level="M"/>
+      </div>
+      <div className="flex-1 space-y-2 text-center sm:text-left">
+        <p className="font-extrabold text-slate-800">QR Code do link fixo</p>
+        <p className="text-sm text-slate-600">Imprima e cole no mural, no refeitório ou no ponto de encontro. Como o link não muda, o mesmo cartaz serve para todas as semanas.</p>
+        <p className="text-xs font-mono text-emerald-700 break-all">{link}</p>
+        <div className="flex flex-wrap justify-center sm:justify-start gap-2 pt-1">
+          <button type="button" onClick={downloadPoster} className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-xs font-extrabold text-white inline-flex items-center gap-1.5"><Download size={14}/> Baixar cartaz (A4)</button>
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600">Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type SummaryData = {
+  week: { id: string; startsAt: string; endsAt: string; scheduleName: string };
+  themes: { order: number; topic: string; opensAt: string; state: ThemeState; hasQuiz: boolean }[];
+  rows: { key: string; registration: string | null; name: string; cells: { signed: boolean; score: number | null }[]; signedCount: number; missedCount: number }[];
+  signedPerTheme: number[];
+};
+
+/** Resumo da semana: quem assinou cada tema, quem faltou e a nota do questionário, por matrícula. */
+function WeekSummary({ weekId }: { weekId: string }) {
+  const [data, setData] = useState<SummaryData | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setData(null); setError('');
+    callApi('GET', undefined, `?summary=${encodeURIComponent(weekId)}`).then(setData).catch(e => setError(e.message));
+  }, [weekId]);
+
+  if (error) return <p role="alert" className="text-sm font-semibold text-red-600">{error}</p>;
+  if (!data) return <p className="text-sm text-slate-500 inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin"/> Montando o resumo...</p>;
+
+  const started = data.themes.filter(t => t.state !== 'LOCKED').length;
+  const dayLabel = (t: SummaryData['themes'][number]) => WEEKDAYS[new Date(t.opensAt).getDay()].slice(0, 3);
+
+  const downloadCsv = () => {
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const header = ['Colaborador', 'Matrícula', ...data.themes.map(t => `${dayLabel(t)} ${new Date(t.opensAt).toLocaleDateString('pt-BR')} - ${t.topic}`), 'Assinou', 'Faltou'];
+    const lines = data.rows.map(r => [
+      r.name, r.registration || '',
+      ...r.cells.map((c, i) => data.themes[i].state === 'LOCKED' ? '' : c.signed ? (c.score !== null ? `Assinou (nota ${Math.round(c.score)}%)` : 'Assinou') : 'Faltou'),
+      r.signedCount, r.missedCount
+    ]);
+    const csv = '﻿' + [header, ...lines].map(l => l.map(esc).join(';')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `resumo-dds-semanal-${new Date(data.week.startsAt).toISOString().slice(0, 10)}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white">
+      <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="font-extrabold text-slate-800 text-sm">Resumo da semana</p>
+          <p className="text-[11px] text-slate-500">{data.rows.length} colaborador(es) assinaram ao menos um tema · {started} de {data.themes.length} temas já começaram. Faltas contam só temas já iniciados.</p>
+        </div>
+        <button type="button" onClick={downloadCsv} disabled={!data.rows.length} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 inline-flex items-center gap-1.5 disabled:opacity-50"><Download size={13}/> Baixar CSV</button>
+      </div>
+      {data.rows.length === 0 ? <p className="p-4 text-sm text-slate-500">Ainda não há assinaturas nesta semana.</p> : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead><tr className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50">
+              <th className="py-2 px-3">Colaborador</th><th className="py-2 px-3">Matrícula</th>
+              {data.themes.map(t => <th key={t.order} className="py-2 px-2 text-center" title={t.topic}>{dayLabel(t)}</th>)}
+              <th className="py-2 px-3 text-right">Assinou</th><th className="py-2 px-3 text-right">Faltou</th>
+            </tr></thead>
+            <tbody>
+              {data.rows.map(r => (
+                <tr key={r.key} className="border-b border-slate-100 last:border-0">
+                  <td className="py-2 px-3 font-semibold text-slate-800 whitespace-nowrap">{r.name}</td>
+                  <td className="py-2 px-3 font-mono text-slate-600">{r.registration || '—'}</td>
+                  {r.cells.map((c, i) => {
+                    const locked = data.themes[i].state === 'LOCKED';
+                    return <td key={i} className="py-2 px-2 text-center">
+                      {locked ? <span className="text-slate-300">·</span>
+                        : c.signed ? <span className="inline-flex flex-col items-center leading-tight"><Check size={15} className="text-emerald-600"/>{c.score !== null && <span className={`text-[10px] font-bold ${c.score >= 70 ? 'text-emerald-700' : 'text-amber-700'}`}>{Math.round(c.score)}%</span>}</span>
+                        : <X size={15} className="inline text-red-500" aria-label="Faltou"/>}
+                    </td>;
+                  })}
+                  <td className="py-2 px-3 text-right font-bold tabular-nums">{r.signedCount}</td>
+                  <td className={`py-2 px-3 text-right font-black tabular-nums ${r.missedCount ? 'text-red-600' : 'text-slate-400'}`}>{r.missedCount}</td>
+                </tr>
+              ))}
+              <tr className="bg-slate-50 text-xs font-bold text-slate-600">
+                <td className="py-2 px-3" colSpan={2}>Assinaturas por tema</td>
+                {data.signedPerTheme.map((n, i) => <td key={i} className="py-2 px-2 text-center tabular-nums">{data.themes[i].state === 'LOCKED' ? '' : n}</td>)}
+                <td colSpan={2}></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

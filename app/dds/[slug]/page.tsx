@@ -7,13 +7,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { CalendarDays, Clock3, Loader2, Lock, PenTool, RefreshCw } from 'lucide-react';
+import { CalendarDays, ClipboardCheck, Clock3, Loader2, Lock, PenTool, RefreshCw } from 'lucide-react';
 import DdsLogo from '@/components/DdsLogo';
 
 type PublicTheme = {
   id: string; order: number; state: 'LOCKED' | 'OPEN' | 'REOPENED' | 'CLOSED';
   opensAt: string; closesAt: string; availableUntil: string | null;
-  topic: string | null; objective: string | null; meetingId: string | null;
+  topic: string | null; objective: string | null; meetingId: string | null; quizToken: string | null;
 };
 type PublicData = {
   now: string;
@@ -136,8 +136,8 @@ export default function WeeklyDdsPublicPage() {
               </div>
             )}
 
-            {data.reopenedElsewhere.map(t => <ThemeCard key={t.id} theme={t} now={now} reopenedFromOtherWeek/>)}
-            {themes.map(t => <ThemeCard key={t.id} theme={t} now={now} isToday={t.state === 'OPEN'}/>)}
+            {data.reopenedElsewhere.map(t => <ThemeCard key={t.id} slug={slug} theme={t} now={now} reopenedFromOtherWeek/>)}
+            {themes.map(t => <ThemeCard key={t.id} slug={slug} theme={t} now={now} isToday={t.state === 'OPEN'}/>)}
 
             <p className="pt-2 text-center text-[11px] text-slate-400">Os temas liberam e encerram automaticamente. Guarde este link: ele é o mesmo todas as semanas.</p>
           </>
@@ -147,7 +147,7 @@ export default function WeeklyDdsPublicPage() {
   );
 }
 
-function ThemeCard({ theme, now, isToday, reopenedFromOtherWeek }: { theme: PublicTheme; now: number; isToday?: boolean; reopenedFromOtherWeek?: boolean }) {
+function ThemeCard({ slug, theme, now, isToday, reopenedFromOtherWeek }: { slug: string; theme: PublicTheme; now: number; isToday?: boolean; reopenedFromOtherWeek?: boolean }) {
   const day = DAY_TITLE[new Date(theme.opensAt).getDay()];
 
   if (theme.state === 'LOCKED') {
@@ -190,9 +190,17 @@ function ThemeCard({ theme, now, isToday, reopenedFromOtherWeek }: { theme: Publ
       {theme.objective && <p className="text-sm text-slate-600">{theme.objective}</p>}
       <p className="text-xs text-slate-500 inline-flex items-center gap-1.5"><Clock3 size={13}/> Aberto até {fmtLong(until)} · faltam {remaining(until, now)}</p>
       {theme.meetingId ? (
-        <Link href={`/presencial?id=${encodeURIComponent(theme.meetingId)}`} className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-extrabold text-white ${reopened ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
-          <PenTool size={16}/> Abrir tema e assinar presença
-        </Link>
+        <>
+          <Link href={`/presencial?id=${encodeURIComponent(theme.meetingId)}&semana=${encodeURIComponent(slug)}${theme.quizToken ? `&quiz=${encodeURIComponent(theme.quizToken)}` : ''}`} className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-extrabold text-white ${reopened ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+            <PenTool size={16}/> Abrir tema e assinar presença
+          </Link>
+          {theme.quizToken && (
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+              <span className="text-xs text-slate-600 inline-flex items-center gap-1.5"><ClipboardCheck size={14} className="text-emerald-600"/> Este tema tem questionário.</span>
+              <Link href={`/questionario/${encodeURIComponent(theme.quizToken)}`} className="text-xs font-extrabold text-emerald-700 whitespace-nowrap">Já assinei: responder</Link>
+            </div>
+          )}
+        </>
       ) : (
         <p className="rounded-xl bg-slate-100 py-3 text-center text-sm font-semibold text-slate-500 inline-flex w-full items-center justify-center gap-2"><Loader2 size={14} className="animate-spin"/> Preparando o tema...</p>
       )}

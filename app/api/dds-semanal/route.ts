@@ -2,6 +2,8 @@
 // DDS Semanal (link fixo): gestão pelo organizador.
 //
 // GET                         → programações visíveis ao usuário, com semanas e temas
+// GET ?quizOptions=1           → questionários que podem ser usados nos temas (modelos e avulsos)
+// GET ?summary=<weekId>        → resumo da semana (assinaturas e notas por matrícula)
 // POST  { action: 'create_schedule', name, farm, slug }
 // POST  { action: 'create_week', scheduleId, startsAt, themes: [7 × { topic, objective, programmaticContent, durationHours }] }
 // PATCH { action: 'update_schedule', id, name?, farm?, slug?, active? }
@@ -17,7 +19,7 @@ import { ensureDdsScheduleTables } from '@/lib/ddsScheduleTables';
 import { syncScheduleThemes } from '@/lib/ddsScheduleSync';
 import {
   THEMES_PER_WEEK, MAX_REOPEN_HOURS, buildThemeWindows, validateDurations, getThemeState,
-  overlapsAnyWeek, normalizeSlug, isValidSlug
+  overlapsAnyWeek, normalizeSlug, isValidSlug, buildWeekSummary
 } from '@/lib/ddsSchedule';
 
 export const dynamic = 'force-dynamic';
@@ -41,7 +43,7 @@ async function readBody(req: Request) {
   try { return await req.json(); } catch { return null; }
 }
 
-type ThemeInput = { topic: string; objective: string | null; programmaticContent: string | null; durationHours: number };
+type ThemeInput = { topic: string; objective: string | null; programmaticContent: string | null; durationHours: number; quizSourceId: string | null };
 
 function parseThemes(raw: unknown): { themes?: ThemeInput[]; error?: string } {
   if (!Array.isArray(raw) || raw.length !== THEMES_PER_WEEK) return { error: `Informe exatamente ${THEMES_PER_WEEK} temas.` };
@@ -56,13 +58,37 @@ function parseThemes(raw: unknown): { themes?: ThemeInput[]; error?: string } {
       topic,
       objective: text(t.objective, 1000) || null,
       programmaticContent: text(t.programmaticContent, 3000) || null,
-      durationHours: Number(t.durationHours)
+      durationHours: Number(t.durationHours),
+      quizSourceId: typeof t.quizSourceId === 'string' && t.quizSourceId.trim() ? t.quizSourceId.trim() : null
     });
   }
   return { themes };
 }
 
-function serializeSchedule(schedule: any, now: Date) {
+/** Questionários que o usuário pode usar como origem: modelos e avulsos (sem DDS), com perguntas. */
+function quizSourceWhere(user: any) {
+  const source = { OR: [{ isTemplate: true }, { meetingId: null }], questions: { some: {} } };
+  if (user.role === 'SUPER_ADMIN') return source;
+  return {
+    AND: [source, {
+      OR: [
+        { meetingId: null }, { creatorId: user.id }, { creatorId: null },
+        { meeting: { organizerId: user.id } },
+        ...(user.companyId ? [{ meeting: { companyId: user.companyId } }] : [])
+      ]
+    }]
+  };
+}
+
+async function validateQuizSources(user: any, themes: ThemeInput[]): Promise<string | null> {
+  const ids = [...new Set(themes.map(t => t.quizSourceId).filter(Boolean) as string[])];
+  if (!ids.length) return null;
+  const found = await prisma.quiz.findMany({ where: { AND: [{ id: { in: ids } }, quizSourceWhere(user)] }, select: { id: true } });
+  if (found.length !== ids.length) return 'Um dos questionários escolhidos não está disponível (precisa ser modelo ou avulso e ter perguntas).';
+  return null;
+}
+
+function serializeSchedule(schedule: any, now: Date, quizTitles: Map<string, string>) {
   return {
     id: schedule.id, slug: schedule.slug, name: schedule.name, farm: schedule.farm, active: schedule.active,
     organizerId: schedule.organizerId, organizerName: schedule.organizer?.name || null,
@@ -75,7 +101,11 @@ function serializeSchedule(schedule: any, now: Date) {
           programmaticContent: theme.programmaticContent, durationHours: theme.durationHours,
           opensAt: theme.opensAt, closesAt: theme.closesAt, reopenUntil: theme.reopenUntil,
           state, availableUntil, meetingId: theme.meetingId,
-          signatures: theme.meeting?._count?.attendees ?? 0
+          signatures: theme.meeting?._count?.attendees ?? 0,
+          quizSourceId: theme.quizSourceId,
+          quizTitle: theme.meeting?.quizzes?.[0]?.title || (theme.quizSourceId ? quizTitles.get(theme.quizSourceId) || null : null),
+          quizToken: theme.meeting?.quizzes?.[0]?.shareToken || null,
+          quizResponses: theme.meeting?.quizzes?.[0]?._count?.attempts ?? 0
         };
       })
     }))
@@ -86,7 +116,54 @@ export async function GET(req: Request) {
   const user = await getAuthenticatedUser(req);
   if (!user) return json('Sessão inválida.', 401);
   await ensureDdsScheduleTables();
+  const params = new URL(req.url).searchParams;
   try {
+    if (params.get('quizOptions')) {
+      const quizzes = await prisma.quiz.findMany({
+        where: quizSourceWhere(user),
+        orderBy: [{ isTemplate: 'desc' }, { createdAt: 'desc' }],
+        take: 200,
+        select: { id: true, title: true, isTemplate: true, status: true, _count: { select: { questions: true } } }
+      });
+      return NextResponse.json({ success: true, quizzes: quizzes.map(q => ({ id: q.id, title: q.title, isTemplate: q.isTemplate, questions: q._count.questions })) });
+    }
+
+    const summaryWeekId = params.get('summary');
+    if (summaryWeekId) {
+      const week = await prisma.ddsScheduleWeek.findUnique({
+        where: { id: summaryWeekId },
+        include: {
+          schedule: true,
+          themes: {
+            orderBy: { order: 'asc' },
+            include: {
+              meeting: {
+                select: {
+                  attendees: { select: { registration: true, name: true }, orderBy: { createdAt: 'asc' } },
+                  quizzes: { select: { attempts: { select: { participantRegistration: true, participantName: true, score: true } } } }
+                }
+              }
+            }
+          }
+        }
+      });
+      if (!week) return json('Semana não encontrada.', 404);
+      if (!canManage(user, week.schedule)) return json('Acesso negado a esta programação.', 403);
+      const now = new Date();
+      const summary = buildWeekSummary(week.themes.map(t => ({
+        order: t.order,
+        state: getThemeState(t, now).state,
+        attendees: t.meeting?.attendees || [],
+        attempts: (t.meeting?.quizzes || []).flatMap(q => q.attempts.map(a => ({ registration: a.participantRegistration, name: a.participantName, score: a.score })))
+      })));
+      return NextResponse.json({
+        success: true,
+        week: { id: week.id, startsAt: week.startsAt, endsAt: week.endsAt, scheduleName: week.schedule.name },
+        themes: week.themes.map(t => ({ order: t.order, topic: t.topic, opensAt: t.opensAt, state: getThemeState(t, now).state, hasQuiz: Boolean(t.meeting?.quizzes?.length) })),
+        ...summary
+      });
+    }
+
     const where = visibleWhere(user);
     await syncScheduleThemes({ week: { schedule: where } });
     const now = new Date();
@@ -101,13 +178,23 @@ export async function GET(req: Request) {
           include: {
             themes: {
               orderBy: { order: 'asc' },
-              include: { meeting: { select: { _count: { select: { attendees: true } } } } }
+              include: {
+                meeting: {
+                  select: {
+                    _count: { select: { attendees: true } },
+                    quizzes: { orderBy: { createdAt: 'desc' }, take: 1, select: { title: true, shareToken: true, _count: { select: { attempts: true } } } }
+                  }
+                }
+              }
             }
           }
         }
       }
     });
-    return NextResponse.json({ success: true, now, schedules: schedules.map(s => serializeSchedule(s, now)) });
+    const sourceIds = [...new Set(schedules.flatMap(s => s.weeks.flatMap(w => w.themes.map(t => t.quizSourceId))).filter(Boolean) as string[])];
+    const sources = sourceIds.length ? await prisma.quiz.findMany({ where: { id: { in: sourceIds } }, select: { id: true, title: true } }) : [];
+    const quizTitles = new Map(sources.map(q => [q.id, q.title]));
+    return NextResponse.json({ success: true, now, schedules: schedules.map(s => serializeSchedule(s, now, quizTitles)) });
   } catch (error) {
     console.error('Erro ao carregar o DDS Semanal:', error);
     return json('Não foi possível carregar o DDS Semanal.', 500);
@@ -148,6 +235,8 @@ export async function POST(req: Request) {
       if (Number.isNaN(startsAt.getTime())) return json('Informe a data e o horário de início da semana.', 400);
       const { themes, error } = parseThemes(body.themes);
       if (error || !themes) return json(error || 'Temas inválidos.', 400);
+      const quizError = await validateQuizSources(user, themes);
+      if (quizError) return json(quizError, 400);
       const windows = buildThemeWindows(startsAt, themes.map(t => t.durationHours));
       const now = new Date();
       if (windows[0].closesAt.getTime() <= now.getTime()) return json('O primeiro tema já estaria encerrado. Escolha um início mais recente.', 400);
@@ -211,6 +300,8 @@ export async function PATCH(req: Request) {
       const { themes, error } = parseThemes(body.themes);
       if (error || !themes) return json(error || 'Temas inválidos.', 400);
       const states = week.themes.map(t => getThemeState(t, now).state);
+      const quizError = await validateQuizSources(user, themes.filter((_, i) => states[i] === 'LOCKED' && themes[i].quizSourceId !== week.themes[i].quizSourceId));
+      if (quizError) return json(quizError, 400);
 
       let startsAt = week.startsAt;
       if (states[0] === 'LOCKED' && body.startsAt) {
@@ -237,7 +328,7 @@ export async function PATCH(req: Request) {
           where: { id: stored.id },
           data: {
             // Conteúdo só muda em temas que ainda não abriram (o DDS já criado preserva o registro).
-            ...(states[i] === 'LOCKED' ? { topic: themes[i].topic, objective: themes[i].objective, programmaticContent: themes[i].programmaticContent } : {}),
+            ...(states[i] === 'LOCKED' ? { topic: themes[i].topic, objective: themes[i].objective, programmaticContent: themes[i].programmaticContent, quizSourceId: themes[i].quizSourceId } : {}),
             durationHours: durations[i], opensAt: windows[i].opensAt, closesAt: windows[i].closesAt
           }
         }))

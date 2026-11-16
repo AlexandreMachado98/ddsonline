@@ -24,13 +24,20 @@ const STATEMENTS: string[] = [
 
 let ready: Promise<boolean> | null = null;
 
+// Colunas adicionadas depois da criação das tabelas (migrações posteriores).
+const COLUMN_STATEMENTS: string[] = [
+  'ALTER TABLE "DdsScheduleTheme" ADD COLUMN IF NOT EXISTS "quizSourceId" TEXT' // 20261117000000_dds_weekly_quiz
+];
+
 async function apply(): Promise<boolean> {
   const rows = await prisma.$queryRawUnsafe<{ n: number }[]>(
     `SELECT COUNT(*)::int AS n FROM information_schema.tables WHERE table_schema = current_schema() AND table_name IN ('DdsSchedule','DdsScheduleWeek','DdsScheduleTheme')`
   );
-  if (rows[0]?.n === 3) return true;
-  await prisma.$transaction(STATEMENTS.map(sql => prisma.$executeRawUnsafe(sql)));
-  console.info('Tabelas do DDS Semanal criadas automaticamente.');
+  if (rows[0]?.n !== 3) {
+    await prisma.$transaction(STATEMENTS.map(sql => prisma.$executeRawUnsafe(sql)));
+    console.info('Tabelas do DDS Semanal criadas automaticamente.');
+  }
+  await prisma.$transaction(COLUMN_STATEMENTS.map(sql => prisma.$executeRawUnsafe(sql)));
   return true;
 }
 

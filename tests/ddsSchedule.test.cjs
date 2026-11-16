@@ -12,7 +12,7 @@ const moduleObj = { exports: {} };
 vm.runInNewContext(compiled.outputText, { require, console, exports: moduleObj.exports, module: moduleObj, Date }, { filename: 'ddsSchedule.js' });
 const {
   buildThemeWindows, validateDurations, getThemeState, isAvailable,
-  pickVisibleWeekIndex, overlapsAnyWeek, normalizeSlug, isValidSlug
+  pickVisibleWeekIndex, overlapsAnyWeek, normalizeSlug, isValidSlug, buildWeekSummary
 } = moduleObj.exports;
 
 const H = 3600 * 1000;
@@ -95,5 +95,26 @@ assert.equal(isValidSlug('Vistec'), false);
 assert.equal(isValidSlug('-abc'), false);
 assert.equal(isValidSlug('a--b'), false);
 console.log('✓ 8. Link fixo normalizado e validado.');
+
+// 9. Resumo da semana
+const states = ['CLOSED', 'CLOSED', 'OPEN', 'LOCKED', 'LOCKED', 'LOCKED', 'LOCKED'];
+const summary = buildWeekSummary(states.map((state, order) => ({
+  order, state,
+  attendees: order === 0 ? [{ registration: '1234', name: 'Ana' }, { registration: '2222', name: 'Bruno' }]
+    : order === 1 ? [{ registration: '1234', name: 'Ana Souza' }]
+    : order === 2 ? [{ registration: null, name: 'Carla' }] : [],
+  attempts: order === 0 ? [{ registration: '1234', name: 'Ana', score: 60 }, { registration: '1234', name: 'Ana', score: 90 }, { registration: '9999', name: 'Sem assinatura', score: 100 }] : []
+})));
+const byReg = Object.fromEntries(summary.rows.map(r => [r.registration || r.name, r]));
+assert.equal(summary.rows.length, 3, 'quem só respondeu sem assinar não entra');
+assert.equal(byReg['1234'].name, 'Ana Souza', 'usa o nome mais recente');
+assert.equal(byReg['1234'].cells[0].score, 90, 'melhor nota do tema');
+assert.equal(byReg['1234'].signedCount, 2);
+assert.equal(byReg['1234'].missedCount, 1, 'faltou só no tema aberto; bloqueados não contam');
+assert.equal(byReg['2222'].missedCount, 2);
+assert.equal(byReg['Carla'].missedCount, 2, 'sem matrícula usa o nome');
+assert.equal(summary.rows[0].missedCount, 2, 'quem mais faltou aparece primeiro');
+assert.equal(JSON.stringify(summary.signedPerTheme), '[2,1,1,0,0,0,0]');
+console.log('✓ 9. Resumo da semana por matrícula, com faltas e melhor nota.');
 
 console.log('--- Todos os testes do DDS Semanal passaram ---');

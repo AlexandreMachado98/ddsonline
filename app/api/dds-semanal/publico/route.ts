@@ -34,7 +34,12 @@ export async function GET(req: Request) {
     const weeks = await prisma.ddsScheduleWeek.findMany({
       where: { scheduleId: schedule.id },
       orderBy: { startsAt: 'asc' },
-      include: { themes: { orderBy: { order: 'asc' } } }
+      include: {
+        themes: {
+          orderBy: { order: 'asc' },
+          include: { meeting: { select: { quizzes: { where: { status: 'PUBLISHED' }, orderBy: { createdAt: 'desc' }, take: 1, select: { shareToken: true } } } } }
+        }
+      }
     });
 
     const toPublic = (theme: any) => {
@@ -45,7 +50,8 @@ export async function GET(req: Request) {
         opensAt: theme.opensAt, closesAt: theme.closesAt, availableUntil,
         topic: state === 'LOCKED' ? null : theme.topic,
         objective: available ? theme.objective : null,
-        meetingId: available ? theme.meetingId : null
+        meetingId: available ? theme.meetingId : null,
+        quizToken: available ? theme.meeting?.quizzes?.[0]?.shareToken || null : null
       };
     };
 
