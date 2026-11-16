@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { 
   LayoutDashboard, FileText, PlusCircle, Award, 
   Trophy, BookOpen, BarChart3, User, LogOut, 
-  ChevronRight, Shield, X, CheckSquare, CalendarDays, Contact, UserCog
+  ChevronRight, Shield, X, CheckSquare, CalendarDays, Contact
 } from 'lucide-react';
 import DdsLogo from '@/components/DdsLogo';
 import { useAuth } from '@/context/AuthContext';
@@ -107,12 +107,6 @@ export default function Sidebar({ isOpen, onClose, onOpenProfile }: SidebarProps
           href: '/admin/colaboradores',
           icon: Contact,
           active: pathname === '/admin/colaboradores'
-        },
-        {
-          label: 'Usuários da empresa',
-          href: '/admin/usuarios',
-          icon: UserCog,
-          active: pathname === '/admin/usuarios'
         },
         {
           label: 'BI & Analytics SST',

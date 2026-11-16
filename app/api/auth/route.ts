@@ -98,12 +98,17 @@ export async function POST(req: Request) {
         }, { status: 409 });
       }
 
-      // 2. Empresa: criar uma nova ou pedir entrada numa existente.
-      // Entrar numa empresa que já existe exige a palavra-chave da empresa; sem ela,
-      // o cadastro fica aguardando aprovação de um administrador (antes qualquer pessoa
-      // entrava direto em qualquer empresa só digitando o nome).
-      const resolvedCompany = company?.trim() || companyName?.trim() || 'Empresa Padrão';
-      let companyRecord = await prisma.company.findFirst({
+      // 2. Empresa e aprovação. O controle de acesso fica no DDS Master:
+      // - empresa existente + palavra-chave correta → conta ativa na hora;
+      // - qualquer outro caso (sem chave, chave errada, empresa que ainda não existe)
+      //   → conta aguardando aprovação na fila do DDS Master, sem acesso a nada.
+      // Antes, qualquer pessoa entrava direto em qualquer empresa só digitando o nome,
+      // e um nome novo criava a empresa automaticamente.
+      const resolvedCompany = (company?.trim() || companyName?.trim() || '').slice(0, 150);
+      if (!resolvedCompany) {
+        return NextResponse.json({ success: false, error: 'Informe o nome da empresa.' }, { status: 400 });
+      }
+      const companyRecord = await prisma.company.findFirst({
         where: { name: { equals: resolvedCompany, mode: 'insensitive' } }
       });
       const hashedPassword = await hashPassword(cleanPassword);
@@ -112,49 +117,38 @@ export async function POST(req: Request) {
         email: cleanEmail,
         password: hashedPassword,
         position: role?.trim() || 'Técnico em Segurança do Trabalho',
+        role: 'ORGANIZER' as const
       };
 
-      if (companyRecord) {
-        const providedKey = typeof secretKey === 'string' ? secretKey.trim().toUpperCase() : '';
-        const companyKey = (companyRecord.secretKey || '').trim().toUpperCase();
-        const keyMatches = Boolean(companyKey && providedKey) && providedKey.length === companyKey.length &&
-          crypto.timingSafeEqual(Buffer.from(providedKey), Buffer.from(companyKey));
-        const approved = keyMatches && companyRecord.autoApproveWithKey && companyRecord.status === 'ACTIVE';
+      const providedKey = typeof secretKey === 'string' ? secretKey.trim().toUpperCase() : '';
+      const companyKey = (companyRecord?.secretKey || '').trim().toUpperCase();
+      const keyMatches = Boolean(companyKey && providedKey) && providedKey.length === companyKey.length &&
+        crypto.timingSafeEqual(Buffer.from(providedKey), Buffer.from(companyKey));
+      const approved = Boolean(companyRecord && keyMatches && companyRecord.autoApproveWithKey && companyRecord.status === 'ACTIVE');
 
-        if (!approved) {
-          const pendingUser = await prisma.user.create({
-            data: { ...userData, role: 'ORGANIZER', status: 'PENDING_APPROVAL', company: companyRecord.name, companyId: companyRecord.id }
-          });
-          logSecurityEvent('ADMIN_ACTION', { userId: pendingUser.id, reason: `REGISTRATION_PENDING_APPROVAL (company ${companyRecord.id})`, ip });
-          return NextResponse.json({
-            success: true,
-            autoApproved: false,
-            pendingApproval: true,
-            message: 'Cadastro recebido. Um administrador da empresa precisa aprovar seu acesso.'
-          });
-        }
-      }
-
-      const isNewCompany = !companyRecord;
-      if (!companyRecord) {
-        companyRecord = await prisma.company.create({
+      if (!approved || !companyRecord) {
+        const pendingUser = await prisma.user.create({
           data: {
-            name: resolvedCompany,
-            status: 'ACTIVE',
-            secretKey: secretKey?.trim() ? secretKey.trim().toUpperCase() : null
+            ...userData,
+            status: 'PENDING_APPROVAL',
+            // Empresa existente: já fica vinculada (o Master só aprova). Empresa nova:
+            // fica sem vínculo e o Master cria a empresa ou vincula na aprovação.
+            company: companyRecord?.name || resolvedCompany,
+            companyId: companyRecord?.id || null
           }
+        });
+        logSecurityEvent('ADMIN_ACTION', { userId: pendingUser.id, reason: `REGISTRATION_PENDING_APPROVAL (${companyRecord ? 'company ' + companyRecord.id : 'new company name'})`, ip });
+        return NextResponse.json({
+          success: true,
+          autoApproved: false,
+          pendingApproval: true,
+          message: 'Cadastro recebido. Seu acesso será liberado após a aprovação.'
         });
       }
 
-      // 3. Conta ativa: quem cria a empresa vira administrador dela.
+      // 3. Conta ativa (empresa existente + palavra-chave correta).
       const newUser = await prisma.user.create({
-        data: {
-          ...userData,
-          role: isNewCompany ? 'COMPANY_ADMIN' : 'ORGANIZER',
-          status: 'ACTIVE',
-          company: companyRecord.name,
-          companyId: companyRecord.id
-        }
+        data: { ...userData, status: 'ACTIVE', company: companyRecord.name, companyId: companyRecord.id }
       });
 
       // 4. Emissão de Sessão Segura
@@ -224,7 +218,7 @@ export async function POST(req: Request) {
       logSecurityEvent('LOGIN_FAILED', { userId: user.id, email: cleanEmail, ip, reason: 'PENDING_APPROVAL' });
       return NextResponse.json({
         success: false,
-        error: 'Seu cadastro está aguardando a aprovação de um administrador da empresa. Peça a liberação em Usuários da empresa.'
+        error: 'Seu cadastro está aguardando aprovação. Fale com o responsável pelo DDS ON na sua empresa para liberar o acesso.'
       }, { status: 403 });
     }
 
