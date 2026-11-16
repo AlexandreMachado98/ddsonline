@@ -20,6 +20,14 @@ on:
       - 'app/questionario/**'
       - 'tests/quizRanking.test.cjs'
       - 'tests/ddsSchedule.test.cjs'
+      - 'tests/collaboratorRules.test.cjs'
+      - 'lib/collaborator*.ts'
+      - 'app/api/colaboradores/**'
+      - 'app/api/presenca/**'
+      - 'app/presencial/**'
+      - 'app/reuniao/**'
+      - 'app/admin/colaboradores/**'
+      - 'components/Collaborator*.tsx'
       - 'lib/ddsSchedule.ts'
       - 'app/api/dds-semanal/**'
       - 'app/dds/**'
@@ -49,7 +57,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Testes unitários de correção
-        run: node tests/quizGrading.test.cjs && node tests/quizRanking.test.cjs && node tests/ddsSchedule.test.cjs
+        run: node tests/quizGrading.test.cjs && node tests/quizRanking.test.cjs && node tests/ddsSchedule.test.cjs && node tests/collaboratorRules.test.cjs
 
       - name: Verificar build Next.js de produção
         run: npm run build

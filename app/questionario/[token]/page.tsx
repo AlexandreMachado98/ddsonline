@@ -7,6 +7,7 @@ import {
   ShieldCheck, Award, AlertCircle, RefreshCw, UserCheck, User, Trophy, Loader2,
   Clock, Printer, Check, X, FileCheck, Sparkles
 } from 'lucide-react';
+import CollaboratorIdentityFields, { identityBlockMessage, type IdentityStatus } from '@/components/CollaboratorIdentityFields';
 import Link from 'next/link';
 import QuizRankingView from '@/components/QuizRankingView';
 
@@ -52,6 +53,7 @@ function QuestionarioPublicoContent() {
   const [collaboratorName, setCollaboratorName] = useState<string>('');
   const [collaboratorRole, setCollaboratorRole] = useState<string>('');
   const [collaboratorRegistration, setCollaboratorRegistration] = useState('');
+  const [identityStatus, setIdentityStatus] = useState<IdentityStatus>('idle');
   const [entryStage, setEntryStage] = useState<'identity' | 'instructions' | 'quiz'>('identity');
 
   // Respostas { [questionId]: string[] }
@@ -173,6 +175,11 @@ function QuestionarioPublicoContent() {
 
   const handleContinueToInstructions = () => {
     setError(null);
+    const identityMessage = identityBlockMessage(identityStatus);
+    if (identityMessage) {
+      setError(identityMessage);
+      return;
+    }
     if (collaboratorName.trim().split(/\s+/).length < 2) {
       setError('Informe seu nome completo (nome e sobrenome).');
       return;
@@ -667,15 +674,18 @@ function QuestionarioPublicoContent() {
           </div>
           <div><h2 className="text-base font-bold">{quiz?.title}</h2><p className="text-sm text-slate-400 mt-1">Preencha seus dados para registrar corretamente sua avaliação.</p></div>
           {error && <div role="alert" className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm rounded-xl flex gap-2"><AlertCircle size={17} className="shrink-0 mt-0.5" /><span>{error}</span></div>}
-          <div className="space-y-4">
-            <div><label htmlFor="participant-full-name" className="block text-xs font-bold text-slate-300 mb-1.5">Nome completo *</label>
-              <input id="participant-full-name" autoComplete="name" value={collaboratorName} onChange={e => setCollaboratorName(e.target.value)} placeholder="Digite seu nome e sobrenome" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" required /></div>
-            <div><label htmlFor="participant-role" className="block text-xs font-bold text-slate-300 mb-1.5">Função *</label>
-              <input id="participant-role" autoComplete="organization-title" value={collaboratorRole} onChange={e => setCollaboratorRole(e.target.value)} placeholder="Ex.: Motorista, Operador, Mecânico" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" required /></div>
-            <div><label htmlFor="participant-registration" className="block text-xs font-bold text-slate-300 mb-1.5">Matrícula (4 números) *</label>
-              <input id="participant-registration" type="text" inputMode="numeric" pattern="[0-9]{4}" minLength={4} maxLength={4} autoComplete="off" value={collaboratorRegistration} onChange={e => setCollaboratorRegistration(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="Ex.: 0042" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm tracking-widest text-white outline-none focus:border-emerald-500" required />
-              <p className="text-[11px] text-slate-500 mt-1.5">Digite os quatro números da sua matrícula, incluindo zeros à esquerda.</p></div>
-          </div>
+          <CollaboratorIdentityFields
+            registration={collaboratorRegistration}
+            name={collaboratorName}
+            role={collaboratorRole}
+            onRegistrationChange={setCollaboratorRegistration}
+            onNameChange={setCollaboratorName}
+            onRoleChange={setCollaboratorRole}
+            scope={{ quizToken: token }}
+            onStatusChange={setIdentityStatus}
+            inputClassName="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+            labelClassName="block text-xs font-bold text-slate-300 mb-1.5"
+          />
           <button type="button" onClick={handleContinueToInstructions} className="w-full min-h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2 transition-colors">Responder questionário <ArrowRight size={17} /></button>
           <p className="text-[11px] text-slate-500 text-center">Seus dados serão vinculados ao resultado desta avaliação.</p>
         </section>
