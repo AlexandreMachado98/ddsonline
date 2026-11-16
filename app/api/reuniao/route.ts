@@ -2,6 +2,8 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser, logSecurityEvent } from '@/lib/auth';
+import { ensureDdsScheduleTables } from '@/lib/ddsScheduleTables';
+import { syncScheduleThemes } from '@/lib/ddsScheduleSync';
 import { purgeExpiredOperationalData, purgeMeetingOperationalDataImmediate } from '@/lib/retention';
 import { validateBase64Image, validateAttachment } from '@/lib/fileValidation';
 
@@ -208,9 +210,21 @@ export async function GET(req: Request) {
       }, { status: 401 });
     }
 
+    // DDS Semanal (link fixo): mantém os DDS dos temas em dia para o Histórico.
+    // Os DDS de temas semanais não entram no painel ao vivo; são acompanhados na tela própria.
+    const weeklyTablesReady = await ensureDdsScheduleTables();
+    if (weeklyTablesReady) {
+      try {
+        await syncScheduleThemes(sessionUser.role === 'SUPER_ADMIN' ? {} : { week: { schedule: { organizerId: sessionUser.id } } });
+      } catch (weeklyError) {
+        console.error('Falha ao sincronizar o DDS Semanal no painel:', weeklyError);
+      }
+    }
+
     // Definição da query do DDS Ativo com selfies e assinaturas preservadas
     const activeWhere: any = {
       status: 'LIVE',
+      ...(weeklyTablesReady ? { weeklyTheme: { is: null } } : {}),
       ...(sessionUser.role === 'SUPER_ADMIN'
         ? {}
         : sessionUser.role === 'COMPANY_ADMIN' && sessionUser.companyId
@@ -412,12 +426,14 @@ export async function POST(req: Request) {
       }
     }
 
+    const weeklyTablesReady = await ensureDdsScheduleTables();
     // Serializa criações por organizador: duas abas não podem ultrapassar três salas.
     // Nenhuma sala existente é encerrada automaticamente.
     const newMeeting = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${sessionUser.id}))::text AS locked`;
       const activeCount = await tx.meeting.count({
-        where: { organizerId: sessionUser.id, status: 'LIVE' }
+        // DDS de temas do DDS Semanal não contam no limite de salas ao vivo.
+        where: { organizerId: sessionUser.id, status: 'LIVE', ...(weeklyTablesReady ? { weeklyTheme: { is: null } } : {}) }
       });
       if (activeCount >= 3) return null;
       return tx.meeting.create({

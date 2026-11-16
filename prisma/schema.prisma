@@ -34,6 +34,7 @@ model Company {
   meetings           Meeting[]
   actionPlans        ActionPlan[]
   competitions       Competition[]
+  ddsSchedules       DdsSchedule[]
 }
 
 model User {
@@ -53,6 +54,7 @@ model User {
   meetings   Meeting[]
   quizzes    Quiz[]
   organizedCompetitions Competition[]
+  ddsSchedules          DdsSchedule[]
 
   // Relações do Módulo de Planos de Ação
   createdActionPlans          ActionPlan[]                  @relation("ActionPlanCreator")
@@ -95,6 +97,7 @@ model Meeting {
   attachments         MeetingAttachment[]
   quizzes             Quiz[]
   actionPlans         ActionPlan[]
+  weeklyTheme         DdsScheduleTheme? // preenchido quando o DDS foi gerado por um tema do DDS Semanal
 
   @@index([organizerId, status, createdAt(sort: Desc)])
   @@index([companyId])
@@ -580,4 +583,60 @@ model CompetitionBonusEntry {
 
   @@index([competitionId, participantRegistration])
   @@index([criterionId])
+}
+
+// ===================== DDS Semanal (link fixo) =====================
+// Uma programação tem um link fixo (/dds/<slug>) e semanas de 7 temas.
+// Quando um tema abre, o sistema cria um Meeting (DDS) comum para ele; a
+// assinatura, a ata, o histórico, o BI e a competição reaproveitam esse DDS.
+model DdsSchedule {
+  id          String            @id @default(uuid())
+  slug        String            @unique
+  name        String
+  farm        String
+  active      Boolean           @default(true)
+  companyId   String?
+  company     Company?          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  organizerId String
+  organizer   User              @relation(fields: [organizerId], references: [id], onDelete: Restrict)
+  weeks       DdsScheduleWeek[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([organizerId])
+  @@index([companyId])
+}
+
+model DdsScheduleWeek {
+  id         String             @id @default(uuid())
+  scheduleId String
+  schedule   DdsSchedule        @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  startsAt   DateTime           // abertura do 1º tema
+  endsAt     DateTime           // encerramento do 7º tema
+  themes     DdsScheduleTheme[]
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([scheduleId, startsAt])
+}
+
+model DdsScheduleTheme {
+  id                  String          @id @default(uuid())
+  weekId              String
+  week                DdsScheduleWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  order               Int             // 0..6
+  topic               String
+  objective           String?
+  programmaticContent String?
+  durationHours       Int             @default(24) // mínimo 24 h
+  opensAt             DateTime
+  closesAt            DateTime        // = abertura do tema seguinte
+  reopenUntil         DateTime?       // reabertura manual pelo organizador
+  meetingId           String?         @unique
+  meeting             Meeting?        @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@unique([weekId, order])
+  @@index([opensAt])
 }
