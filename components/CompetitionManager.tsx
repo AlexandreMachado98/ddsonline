@@ -33,6 +33,64 @@ async function callApi(url: string, method: string, body: unknown) {
 const BONUS_API = '/api/competicoes/pontos-extras';
 const inputCls = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500';
 
+/** Editor de um lançamento já incluído, exibido na própria linha (lista detalhada e ranking). */
+function EntryInlineEditor({ entry, criteria, onSaved, onCancel, onError }: {
+  entry: BonusEntry; criteria: BonusCriterion[];
+  onSaved: () => Promise<void>; onCancel: () => void; onError: (msg: string) => void;
+}) {
+  const [form, setForm] = useState({
+    criterionId: entry.criterionId, registration: entry.participantRegistration,
+    name: entry.participantName, quantity: entry.quantity, note: entry.note || ''
+  });
+  const [saving, setSaving] = useState(false);
+  const criterion = criteria.find(c => c.id === form.criterionId);
+  const points = (criterion?.weight || 0) * (Number(form.quantity) || 0);
+
+  const save = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!form.registration.trim() || !form.name.trim()) { onError('Informe matrícula e nome do colaborador.'); return; }
+    if (!Number.isInteger(Number(form.quantity)) || Number(form.quantity) === 0) { onError('A quantidade deve ser um número inteiro diferente de zero.'); return; }
+    setSaving(true); onError('');
+    try {
+      await callApi(BONUS_API, 'PATCH', { kind: 'entry', id: entry.id, ...form, quantity: Number(form.quantity) });
+      await onSaved();
+      onCancel();
+    } catch (err: any) { onError(err.message || 'Erro ao salvar o lançamento.'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <form onSubmit={save} onKeyDown={e => { if (e.key === 'Escape') onCancel(); }} className="rounded-xl border-2 border-amber-300 bg-amber-50/70 p-3 grid grid-cols-2 sm:grid-cols-6 lg:grid-cols-12 gap-2 items-end">
+      <label className="col-span-2 sm:col-span-3 lg:col-span-3 text-[11px] font-semibold text-slate-600">Critério
+        <select value={form.criterionId} onChange={e => setForm(f => ({ ...f, criterionId: e.target.value }))} className={`mt-1 ${inputCls}`}>
+          {criteria.map(c => <option key={c.id} value={c.id}>{c.name} (peso {c.weight})</option>)}
+        </select>
+      </label>
+      <label className="col-span-1 sm:col-span-1 lg:col-span-2 text-[11px] font-semibold text-slate-600">Matrícula
+        <input maxLength={40} value={form.registration} onChange={e => setForm(f => ({ ...f, registration: e.target.value }))} className={`mt-1 ${inputCls} font-mono`}/>
+      </label>
+      <label className="col-span-1 sm:col-span-2 lg:col-span-3 text-[11px] font-semibold text-slate-600">Colaborador
+        <input maxLength={160} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={`mt-1 ${inputCls}`}/>
+      </label>
+      <label className="col-span-1 sm:col-span-1 lg:col-span-2 text-[11px] font-semibold text-slate-600">Quantidade
+        <input autoFocus type="number" min="-1000" max="1000" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value === '' ? ('' as any) : Number(e.target.value) }))} className={`mt-1 ${inputCls}`}/>
+      </label>
+      <div className="col-span-1 sm:col-span-1 lg:col-span-2 text-[11px] font-semibold text-slate-600">Pontos
+        <div className={`mt-1 rounded-lg border px-3 py-2 text-sm font-black ${points < 0 ? 'border-red-200 bg-red-50 text-red-600' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+          {points}{points !== entry.points && <span className="ml-1 text-[10px] font-semibold text-slate-400 line-through">{entry.points}</span>}
+        </div>
+      </div>
+      <label className="col-span-2 sm:col-span-4 lg:col-span-8 text-[11px] font-semibold text-slate-600">Observação
+        <input maxLength={500} value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} className={`mt-1 ${inputCls}`}/>
+      </label>
+      <div className="col-span-2 sm:col-span-2 lg:col-span-4 flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600">Cancelar</button>
+        <button disabled={saving} className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-xs font-extrabold text-white inline-flex items-center gap-1.5 disabled:opacity-60">{saving ? <Loader2 size={14} className="animate-spin"/> : <Check size={14}/>} Salvar correção</button>
+      </div>
+    </form>
+  );
+}
+
 /** Painel de pesos dos critérios automáticos, critérios extras e lançamentos manuais. */
 function ScoringPanel({ comp, onChanged, onError }: { comp: Competition; onChanged: () => Promise<void>; onError: (msg: string) => void }) {
   const criteria = comp.bonusCriteria || [];
@@ -62,6 +120,7 @@ function ScoringPanel({ comp, onChanged, onError }: { comp: Competition; onChang
   const emptyEntry = { id: '', criterionId: '', registration: '', name: '', quantity: 1, note: '' };
   const [entryForm, setEntryForm] = useState(emptyEntry);
   const [entryFilter, setEntryFilter] = useState('');
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
 
   const knownPeople = new Map<string, string>();
   for (const p of comp.leaderboard || []) knownPeople.set(p.registration, p.name);
@@ -97,15 +156,9 @@ function ScoringPanel({ comp, onChanged, onError }: { comp: Competition; onChang
     if (!criterionId) { onError('Cadastre um critério extra antes de lançar pontos.'); return; }
     if (!entryForm.registration.trim() || !entryForm.name.trim()) { onError('Informe matrícula e nome do colaborador.'); return; }
     const payload = { kind: 'entry', criterionId, registration: entryForm.registration, name: entryForm.name, quantity: entryForm.quantity, note: entryForm.note };
-    const ok = await run(() => entryForm.id
-      ? callApi(BONUS_API, 'PATCH', { ...payload, id: entryForm.id })
-      : callApi(BONUS_API, 'POST', { ...payload, competitionId: comp.id }));
+    const ok = await run(() => callApi(BONUS_API, 'POST', { ...payload, competitionId: comp.id }));
     if (ok) setEntryForm({ ...emptyEntry, criterionId });
   };
-  const editEntry = (entry: BonusEntry) => setEntryForm({
-    id: entry.id, criterionId: entry.criterionId, registration: entry.participantRegistration,
-    name: entry.participantName, quantity: entry.quantity, note: entry.note || ''
-  });
   const deleteEntry = (entry: BonusEntry) => {
     if (!window.confirm(`Excluir o lançamento de ${entry.points} ponto(s) para ${entry.participantName}?`)) return;
     run(() => callApi(BONUS_API, 'DELETE', { kind: 'entry', id: entry.id }));
@@ -181,7 +234,7 @@ function ScoringPanel({ comp, onChanged, onError }: { comp: Competition; onChang
 
         {/* Lançamentos */}
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h4 className="font-extrabold text-slate-800 text-sm mb-3">{entryForm.id ? 'Editar lançamento' : 'Lançar pontos extras para um colaborador'}</h4>
+          <h4 className="font-extrabold text-slate-800 text-sm mb-3">Lançar pontos extras para um colaborador</h4>
           {criteria.length === 0 ? <p className="text-sm text-slate-500">Cadastre ao menos um critério extra para lançar pontos.</p> :
           <form onSubmit={submitEntry} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
             <label className="text-xs font-semibold text-slate-600 lg:col-span-1">Critério
@@ -207,11 +260,10 @@ function ScoringPanel({ comp, onChanged, onError }: { comp: Competition; onChang
               <input maxLength={500} value={entryForm.note} onChange={e => setEntryForm(f => ({ ...f, note: e.target.value }))} placeholder="Motivo ou evidência do lançamento" className={`mt-1 ${inputCls}`}/>
             </label>
             <div className="flex gap-2 sm:col-span-2 lg:col-span-2 justify-end">
-              {entryForm.id && <button type="button" onClick={() => setEntryForm({ ...emptyEntry, criterionId: entryForm.criterionId })} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">Cancelar edição</button>}
-              <button className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-xs font-extrabold text-white inline-flex items-center gap-1.5 disabled:opacity-60">{busy ? <Loader2 size={14} className="animate-spin"/> : entryForm.id ? <Check size={14}/> : <Plus size={14}/>} {entryForm.id ? 'Salvar alterações' : 'Incluir pontos'}</button>
+              <button className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-xs font-extrabold text-white inline-flex items-center gap-1.5 disabled:opacity-60">{busy ? <Loader2 size={14} className="animate-spin"/> : <Plus size={14}/>} Incluir pontos</button>
             </div>
           </form>}
-          <p className="text-[11px] text-slate-500 mt-2">Use quantidade negativa para descontar pontos (ex.: penalidade).</p>
+          <p className="text-[11px] text-slate-500 mt-2">Use quantidade negativa para descontar pontos (ex.: penalidade). Digitou errado? Clique em <b>Editar</b> no lançamento abaixo ou no detalhamento do colaborador no ranking.</p>
 
           {entries.length > 0 && <div className="mt-4">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -220,7 +272,9 @@ function ScoringPanel({ comp, onChanged, onError }: { comp: Competition; onChang
             </div>
             <div className="overflow-x-auto"><table className="w-full text-left text-sm">
               <thead><tr className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200"><th className="py-2 pr-3">Data</th><th className="py-2 pr-3">Colaborador</th><th className="py-2 pr-3">Matrícula</th><th className="py-2 pr-3">Critério</th><th className="py-2 pr-3">Cálculo</th><th className="py-2 pr-3">Pontos</th><th className="py-2 pr-3">Observação</th><th className="py-2"></th></tr></thead>
-              <tbody>{filteredEntries.map(e => <tr key={e.id} className={`border-b border-slate-100 last:border-0 ${entryForm.id === e.id ? 'bg-amber-50' : ''}`}>
+              <tbody>{filteredEntries.map(e => editingEntryId === e.id ? <tr key={e.id} className="border-b border-slate-100"><td colSpan={8} className="py-2">
+                <EntryInlineEditor entry={e} criteria={criteria} onSaved={onChanged} onCancel={() => setEditingEntryId(null)} onError={onError}/>
+              </td></tr> : <tr key={e.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 cursor-pointer" onDoubleClick={() => !locked && setEditingEntryId(e.id)} title="Clique duas vezes para editar">
                 <td className="py-2 pr-3 text-xs text-slate-500 whitespace-nowrap">{new Date(e.createdAt).toLocaleDateString('pt-BR')}</td>
                 <td className="py-2 pr-3 font-semibold text-slate-800">{e.participantName}</td>
                 <td className="py-2 pr-3 font-mono text-slate-600">{e.participantRegistration}</td>
@@ -229,7 +283,7 @@ function ScoringPanel({ comp, onChanged, onError }: { comp: Competition; onChang
                 <td className={`py-2 pr-3 font-black ${e.points < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{e.points > 0 ? '+' : ''}{e.points}</td>
                 <td className="py-2 pr-3 text-xs text-slate-500">{e.note || '—'}</td>
                 <td className="py-2 text-right whitespace-nowrap">
-                  <button type="button" onClick={() => editEntry(e)} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 mr-1" title="Editar lançamento"><Pencil size={13}/></button>
+                  <button type="button" onClick={() => setEditingEntryId(e.id)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-bold text-slate-600 mr-1 inline-flex items-center gap-1" title="Corrigir lançamento"><Pencil size={13}/> Editar</button>
                   <button type="button" onClick={() => deleteEntry(e)} className="rounded-lg border border-red-200 p-1.5 text-red-600" title="Excluir lançamento"><Trash2 size={13}/></button>
                 </td>
               </tr>)}</tbody>
@@ -405,7 +459,7 @@ export default function CompetitionManager() {
             <div className="p-4 sm:p-5">
               <div className="flex items-center gap-2 mb-3 text-xs font-black uppercase tracking-wider text-slate-500"><Users size={14}/> Classificação geral</div>
               {!comp.leaderboard?.length ? <p className="text-sm text-slate-500 py-4">Ainda não há participações pontuadas com matrícula nesta competição.</p> :
-                <LeaderboardTable comp={comp} expanded={expandedRows} onToggle={key => setExpandedRows(r => ({ ...r, [key]: !r[key] }))}/>}
+                <LeaderboardTable comp={comp} expanded={expandedRows} onToggle={key => setExpandedRows(r => ({ ...r, [key]: !r[key] }))} onChanged={reload} onError={setError}/>}
             </div>
           </section>;
         })}</div>}
@@ -413,7 +467,18 @@ export default function CompetitionManager() {
   );
 }
 
-function LeaderboardTable({ comp, expanded, onToggle }: { comp: Competition; expanded: Record<string, boolean>; onToggle: (key: string) => void }) {
+function LeaderboardTable({ comp, expanded, onToggle, onChanged, onError }: {
+  comp: Competition; expanded: Record<string, boolean>; onToggle: (key: string) => void;
+  onChanged: () => Promise<void>; onError: (msg: string) => void;
+}) {
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const canEdit = comp.status !== 'CANCELLED';
+  const removeEntry = async (e: BonusEntry) => {
+    if (!window.confirm(`Excluir o lançamento de ${e.points} ponto(s) para ${e.participantName}?`)) return;
+    onError('');
+    try { await callApi(BONUS_API, 'DELETE', { kind: 'entry', id: e.id }); await onChanged(); }
+    catch (err: any) { onError(err.message || 'Erro ao excluir o lançamento.'); }
+  };
   const criteria = comp.bonusCriteria || [];
   const entries = comp.bonusEntries || [];
   const columnCount = 8 + criteria.length;
@@ -457,8 +522,15 @@ function LeaderboardTable({ comp, expanded, onToggle }: { comp: Competition; exp
               {criteria.map(c => <Detail key={c.id} label={c.name} value={p.bonus?.[c.id]?.points || 0} hint={`${p.bonus?.[c.id]?.quantity || 0} × ${c.weight}`} highlight/>)}
               <Detail label="Total" value={p.totalPoints} strong/>
             </div>
-            {personEntries.length > 0 && <ul className="mt-3 space-y-1 text-xs text-slate-600">
-              {personEntries.map(e => <li key={e.id} className="flex flex-wrap gap-2"><Star size={12} className="text-amber-500 mt-0.5"/><span className="text-slate-400">{new Date(e.createdAt).toLocaleDateString('pt-BR')}</span><span className="font-semibold">{e.criterionName}</span><span>{e.quantity} × {e.weight} = <b className={e.points < 0 ? 'text-red-600' : 'text-emerald-700'}>{e.points}</b></span>{e.note && <span className="text-slate-500">— {e.note}</span>}</li>)}
+            {personEntries.length > 0 && <ul className="mt-3 space-y-1.5 text-xs text-slate-600">
+              {personEntries.map(e => editingEntryId === e.id
+                ? <li key={e.id}><EntryInlineEditor entry={e} criteria={criteria} onSaved={onChanged} onCancel={() => setEditingEntryId(null)} onError={onError}/></li>
+                : <li key={e.id} className="flex flex-wrap items-center gap-2"><Star size={12} className="text-amber-500"/><span className="text-slate-400">{new Date(e.createdAt).toLocaleDateString('pt-BR')}</span><span className="font-semibold">{e.criterionName}</span><span>{e.quantity} × {e.weight} = <b className={e.points < 0 ? 'text-red-600' : 'text-emerald-700'}>{e.points}</b></span>{e.note && <span className="text-slate-500">— {e.note}</span>}
+                  {canEdit && <span className="ml-auto flex gap-1">
+                    <button type="button" onClick={() => setEditingEntryId(e.id)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 inline-flex items-center gap-1" title="Corrigir lançamento"><Pencil size={12}/> Editar</button>
+                    <button type="button" onClick={() => removeEntry(e)} className="rounded-md border border-red-200 bg-white p-1 text-red-600" title="Excluir lançamento"><Trash2 size={12}/></button>
+                  </span>}
+                </li>)}
             </ul>}
           </td></tr>}
         </React.Fragment>;
