@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { 
   LayoutDashboard, FileText, PlusCircle, Award, 
   Trophy, BookOpen, BarChart3, User, LogOut, 
-  ChevronRight, Shield, X, CheckSquare
+  ChevronRight, Shield, X, CheckSquare, CalendarDays
 } from 'lucide-react';
 import DdsLogo from '@/components/DdsLogo';
 import { useAuth } from '@/context/AuthContext';
@@ -53,6 +53,12 @@ export default function Sidebar({ isOpen, onClose, onOpenProfile }: SidebarProps
           href: '/admin?action=new',
           icon: PlusCircle,
           active: isNovoDds
+        },
+        {
+          label: 'DDS Semanal',
+          href: '/admin/dds-semanal',
+          icon: CalendarDays,
+          active: pathname === '/admin/dds-semanal'
         },
         {
           label: 'Histórico & Atas',

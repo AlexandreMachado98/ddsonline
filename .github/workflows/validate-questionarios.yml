@@ -19,6 +19,12 @@ on:
       - 'lib/quizRanking.ts'
       - 'app/questionario/**'
       - 'tests/quizRanking.test.cjs'
+      - 'tests/ddsSchedule.test.cjs'
+      - 'lib/ddsSchedule.ts'
+      - 'app/api/dds-semanal/**'
+      - 'app/dds/**'
+      - 'app/admin/dds-semanal/**'
+      - 'components/WeeklyDdsManager.tsx'
       - 'prisma/**'
       - '.github/workflows/validate-questionarios.yml'
 jobs:
@@ -43,7 +49,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Testes unitários de correção
-        run: node tests/quizGrading.test.cjs && node tests/quizRanking.test.cjs
+        run: node tests/quizGrading.test.cjs && node tests/quizRanking.test.cjs && node tests/ddsSchedule.test.cjs
 
       - name: Verificar build Next.js de produção
         run: npm run build
