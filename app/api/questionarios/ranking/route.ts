@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth';
+import { canReadStandaloneQuiz } from '@/lib/quizAccess';
 import { computeQuizRanking } from '@/lib/quizRanking';
 
 export const dynamic = 'force-dynamic';
@@ -155,6 +156,9 @@ export async function GET(req: Request) {
         if (!permitted) {
           return NextResponse.json({ success: false, error: 'Acesso negado a este questionário.' }, { status: 403 });
         }
+      } else if (!quiz.meetingId && !(await canReadStandaloneQuiz(user, { creatorId: quiz.creatorId, isTemplate: quiz.isTemplate }))) {
+        // Avulsos: só a própria empresa.
+        return NextResponse.json({ success: false, error: 'Acesso negado a este questionário.' }, { status: 403 });
       }
     }
 

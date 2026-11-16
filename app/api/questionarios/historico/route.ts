@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth';
+import { standaloneQuizVisibility } from '@/lib/quizAccess';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -47,7 +48,7 @@ export async function GET(req: Request) {
       }
     } else {
       where.OR = [
-        { meetingId: null },
+        ...standaloneQuizVisibility(user), // avulsos: só os da própria empresa
         { creatorId: user.id },
         { meeting: { organizerId: user.id } },
         ...(user.companyId ? [{ meeting: { companyId: user.companyId } }] : [])

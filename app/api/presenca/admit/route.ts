@@ -9,7 +9,7 @@ export const revalidate = 0;
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { action, name, cpf, savedSelfie, savedSignature, meetingId, exitReason, exitSignature } = body;
+    const { action, name, cpf, savedSelfie, savedSignature, meetingId, exitReason, exitSignature, registration, attendanceId, attendanceProof } = body;
 
     // --- 1. DELEGAÇÃO SEGURA PARA SAÍDA ---
     if (action === 'register_exit') {
@@ -18,7 +18,9 @@ export async function POST(req: Request) {
         headers: req.headers,
         body: JSON.stringify({
           name,
-          cpf,
+          registration,
+          attendanceId,
+          attendanceProof,
           meetingId,
           exitReason,
           exitSignature
@@ -138,4 +140,4 @@ export async function POST(req: Request) {
     console.error("Erro na API Central de Presença:", message);
     return NextResponse.json({ success: false, error: 'Falha ao processar presença' }, { status: 500 });
   }
-}
+}

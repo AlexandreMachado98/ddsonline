@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 // app/api/auth/route.ts
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
@@ -62,7 +63,6 @@ export async function POST(req: Request) {
       return response;
     }
 
-    console.log(`[AUTH] Iniciando tentativa de login para o email: ${email}`);
 
     // Validações básicas de entrada
     if (!email || typeof email !== 'string') {
@@ -98,34 +98,61 @@ export async function POST(req: Request) {
         }, { status: 409 });
       }
 
-      // 2. Cria empresa se informada
+      // 2. Empresa: criar uma nova ou pedir entrada numa existente.
+      // Entrar numa empresa que já existe exige a palavra-chave da empresa; sem ela,
+      // o cadastro fica aguardando aprovação de um administrador (antes qualquer pessoa
+      // entrava direto em qualquer empresa só digitando o nome).
       const resolvedCompany = company?.trim() || companyName?.trim() || 'Empresa Padrão';
       let companyRecord = await prisma.company.findFirst({
         where: { name: { equals: resolvedCompany, mode: 'insensitive' } }
       });
+      const hashedPassword = await hashPassword(cleanPassword);
+      const userData = {
+        name: name?.trim() || cleanEmail.split('@')[0],
+        email: cleanEmail,
+        password: hashedPassword,
+        position: role?.trim() || 'Técnico em Segurança do Trabalho',
+      };
 
+      if (companyRecord) {
+        const providedKey = typeof secretKey === 'string' ? secretKey.trim().toUpperCase() : '';
+        const companyKey = (companyRecord.secretKey || '').trim().toUpperCase();
+        const keyMatches = Boolean(companyKey && providedKey) && providedKey.length === companyKey.length &&
+          crypto.timingSafeEqual(Buffer.from(providedKey), Buffer.from(companyKey));
+        const approved = keyMatches && companyRecord.autoApproveWithKey && companyRecord.status === 'ACTIVE';
+
+        if (!approved) {
+          const pendingUser = await prisma.user.create({
+            data: { ...userData, role: 'ORGANIZER', status: 'PENDING_APPROVAL', company: companyRecord.name, companyId: companyRecord.id }
+          });
+          logSecurityEvent('ADMIN_ACTION', { userId: pendingUser.id, reason: `REGISTRATION_PENDING_APPROVAL (company ${companyRecord.id})`, ip });
+          return NextResponse.json({
+            success: true,
+            autoApproved: false,
+            pendingApproval: true,
+            message: 'Cadastro recebido. Um administrador da empresa precisa aprovar seu acesso.'
+          });
+        }
+      }
+
+      const isNewCompany = !companyRecord;
       if (!companyRecord) {
         companyRecord = await prisma.company.create({
           data: {
             name: resolvedCompany,
             status: 'ACTIVE',
-            secretKey: secretKey?.trim() || null
+            secretKey: secretKey?.trim() ? secretKey.trim().toUpperCase() : null
           }
         });
       }
 
-      // 3. Hash criptográfico da senha com bcrypt
-      const hashedPassword = await hashPassword(cleanPassword);
-
+      // 3. Conta ativa: quem cria a empresa vira administrador dela.
       const newUser = await prisma.user.create({
         data: {
-          name: name?.trim() || cleanEmail.split('@')[0],
-          email: cleanEmail,
-          password: hashedPassword,
-          role: 'ORGANIZER',
+          ...userData,
+          role: isNewCompany ? 'COMPANY_ADMIN' : 'ORGANIZER',
           status: 'ACTIVE',
-          position: role?.trim() || 'Técnico em Segurança do Trabalho',
-          company: resolvedCompany,
+          company: companyRecord.name,
           companyId: companyRecord.id
         }
       });
@@ -185,6 +212,20 @@ export async function POST(req: Request) {
         success: false,
         error: 'E-mail ou senha inválidos.'
       }, { status: 401 });
+    }
+
+    // Cadastro aguardando aprovação do administrador da empresa
+    if (user.status === 'PENDING_APPROVAL') {
+      const pendingPasswordOk = await verifyAndMigratePassword(cleanPassword, user.password, user.id);
+      if (!pendingPasswordOk) {
+        recordAuthFailure(rateKey);
+        return NextResponse.json({ success: false, error: 'E-mail ou senha inválidos.' }, { status: 401 });
+      }
+      logSecurityEvent('LOGIN_FAILED', { userId: user.id, email: cleanEmail, ip, reason: 'PENDING_APPROVAL' });
+      return NextResponse.json({
+        success: false,
+        error: 'Seu cadastro está aguardando a aprovação de um administrador da empresa. Peça a liberação em Usuários da empresa.'
+      }, { status: 403 });
     }
 
     // Verifica se a conta está bloqueada ou suspensa

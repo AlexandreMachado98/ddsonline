@@ -2,13 +2,14 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { logSecurityEvent } from '@/lib/auth';
 import { validateBase64Image } from '@/lib/fileValidation';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { name, cpf, attendanceId, meetingId, exitReason, exitSignature } = body;
+    const { name, attendanceId, attendanceProof, registration, meetingId, exitReason, exitSignature } = body;
 
     // 1. Validação estrita de identificador do DDS
     if (!meetingId || typeof meetingId !== 'string' || meetingId.trim().length < 5) {
@@ -42,15 +43,15 @@ export async function POST(req: Request) {
 
     // 3. Validação dos dados do participante
     const trimmedName = typeof name === 'string' ? name.trim().slice(0, 100) : '';
-    const trimmedCpf = typeof cpf === 'string' ? cpf.trim().slice(0, 80) : '';
+    const trimmedRegistration = typeof registration === 'string' ? registration.trim() : '';
     const cleanReason = typeof exitReason === 'string' && exitReason.trim().length > 0 
       ? exitReason.trim().slice(0, 500) 
       : 'Saída antecipada justificada';
 
-    if (!attendanceId && !trimmedName) {
+    if (!attendanceId && !(trimmedName && /^\d{4}$/.test(trimmedRegistration))) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Identificação do colaborador necessária para registrar saída.' 
+        error: 'Informe seu nome e sua matrícula para registrar a saída.' 
       }, { status: 400 });
     }
 
@@ -63,27 +64,32 @@ export async function POST(req: Request) {
       sanitizedSignature = exitSignature;
     }
 
-    // 4. Localiza o registro de presença estritamente DENTRO desta reunião
+    // 4. Localiza o registro de presença DENTRO desta reunião e confirma que quem pede a
+    // saída é o próprio colaborador: credencial gerada no celular dele na assinatura,
+    // ou nome + matrícula conferindo. Só o nome não basta (qualquer um poderia registrar
+    // a saída de outra pessoa).
+    const proofMatches = (hash: string | null | undefined) => {
+      if (!hash || typeof attendanceProof !== 'string' || attendanceProof.length < 16) return false;
+      const a = Buffer.from(hash);
+      const b = Buffer.from(createHash('sha256').update(attendanceProof).digest('hex'));
+      return a.length === b.length && timingSafeEqual(a, b);
+    };
+    const sameName = (stored: string) => stored.replace(/\(Saída:.*\)/, '').trim().toLocaleLowerCase('pt-BR') === trimmedName.toLocaleLowerCase('pt-BR');
+
     let attendance = null;
-
     if (attendanceId && typeof attendanceId === 'string') {
-      attendance = await prisma.attendance.findFirst({
-        where: {
-          id: attendanceId.trim(),
-          meetingId: cleanMeetingId
-        }
-      });
+      const candidate = await prisma.attendance.findFirst({ where: { id: attendanceId.trim(), meetingId: cleanMeetingId } });
+      if (candidate && (proofMatches(candidate.quizProofHash) ||
+          (/^\d{4}$/.test(trimmedRegistration) && candidate.registration === trimmedRegistration && sameName(candidate.name)))) {
+        attendance = candidate;
+      }
     }
-
-    if (!attendance && trimmedName) {
-      attendance = await prisma.attendance.findFirst({
-        where: {
-          meetingId: cleanMeetingId,
-          name: { equals: trimmedName, mode: 'insensitive' },
-          ...(trimmedCpf ? { cpf: { equals: trimmedCpf, mode: 'insensitive' } } : {})
-        },
+    if (!attendance && trimmedName && /^\d{4}$/.test(trimmedRegistration)) {
+      const candidates = await prisma.attendance.findMany({
+        where: { meetingId: cleanMeetingId, registration: trimmedRegistration },
         orderBy: { createdAt: 'desc' }
       });
+      attendance = candidates.find(c => sameName(c.name)) || null;
     }
 
     if (!attendance) {
@@ -113,10 +119,11 @@ export async function POST(req: Request) {
       reason: `EXIT_REGISTERED: Attendance ${attendance.id} in Meeting ${cleanMeetingId}`
     });
 
-    return NextResponse.json({ success: true, data: updated });
+    // Devolve só o necessário: nunca foto, assinatura ou credencial.
+    return NextResponse.json({ success: true, data: { id: updated.id, name: updated.name, leftAt: updated.leftAt } });
 
   } catch (error) {
     console.error("Erro interno no registro de saída");
     return NextResponse.json({ success: false, error: 'Erro interno ao processar saída' }, { status: 500 });
   }
-}
+}

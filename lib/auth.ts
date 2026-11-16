@@ -210,7 +210,7 @@ export async function getAuthenticatedUser(req: Request): Promise<SessionUser | 
       }
     });
 
-    if (!user || user.status === 'BLOCKED' || user.status === 'SUSPENDED') {
+    if (!user || user.status === 'BLOCKED' || user.status === 'SUSPENDED' || user.status === 'PENDING_APPROVAL') {
       return null;
     }
 

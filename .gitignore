@@ -44,3 +44,13 @@ next-env.d.ts
 .neon
 *.db
 *.db-journal
+
+# dados locais: nunca versionar bancos ou scripts com dados reais
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+.env
+.env.*
+!.env.example
+test_user.js
