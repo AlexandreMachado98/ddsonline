@@ -37,7 +37,10 @@ export async function GET(req: Request) {
       include: {
         themes: {
           orderBy: { order: 'asc' },
-          include: { meeting: { select: { quizzes: { where: { status: 'PUBLISHED' }, orderBy: { createdAt: 'desc' }, take: 1, select: { shareToken: true } } } } }
+          include: {
+            _count: { select: { attachments: true } },
+            meeting: { select: { quizzes: { where: { status: 'PUBLISHED' }, orderBy: { createdAt: 'desc' }, take: 1, select: { shareToken: true } } } }
+          }
         }
       }
     });
@@ -51,7 +54,8 @@ export async function GET(req: Request) {
         topic: state === 'LOCKED' ? null : theme.topic,
         objective: available ? theme.objective : null,
         meetingId: available ? theme.meetingId : null,
-        quizToken: available ? theme.meeting?.quizzes?.[0]?.shareToken || null : null
+        quizToken: available ? theme.meeting?.quizzes?.[0]?.shareToken || null : null,
+        attachmentCount: available ? theme._count?.attachments ?? 0 : 0
       };
     };
 

@@ -635,9 +635,28 @@ model DdsScheduleTheme {
   quizSourceId        String?         // questionário (modelo ou avulso) copiado para o DDS do tema ao abrir
   meetingId           String?         @unique
   meeting             Meeting?        @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  attachments         DdsScheduleThemeAttachment[]
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
   @@unique([weekId, order])
   @@index([opensAt])
+}
+
+// Imagens e PDFs do tema. São copiados para MeetingAttachment quando o DDS do tema é criado.
+model DdsScheduleThemeAttachment {
+  id          String           @id @default(uuid())
+  themeId     String
+  theme       DdsScheduleTheme @relation(fields: [themeId], references: [id], onDelete: Cascade)
+  fileName    String
+  displayName String?
+  description String?
+  mimeType    String
+  fileSize    Int
+  fileData    String
+  pageCount   Int?             @default(1)
+  order       Int              @default(0)
+  createdAt   DateTime         @default(now())
+
+  @@index([themeId, order])
 }

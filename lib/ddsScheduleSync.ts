@@ -92,6 +92,7 @@ async function syncOne(theme: any, now: Date) {
           }
         });
         await tx.ddsScheduleTheme.update({ where: { id: theme.id }, data: { meetingId: meeting.id } });
+        await copyThemeAttachmentsToMeeting(tx, theme.id, meeting.id);
         if (theme.quizSourceId) await cloneQuizForMeeting(tx, theme.quizSourceId, meeting.id, schedule.organizerId);
       });
       return;
@@ -117,6 +118,22 @@ async function syncOne(theme: any, now: Date) {
   if (state === 'CLOSED' && theme.meeting && (theme.meeting.status === 'LIVE' || theme.meeting.attendanceCollectionOpen)) {
     await finalizeMeeting(theme.meeting.id, theme.closesAt);
   }
+}
+
+/**
+ * Copia as imagens/PDFs do tema para o DDS do tema, substituindo as que houver.
+ * A tela de assinatura (/presencial) já exibe os anexos do DDS com ampliação.
+ */
+export async function copyThemeAttachmentsToMeeting(tx: any, themeId: string, meetingId: string) {
+  const attachments = await tx.ddsScheduleThemeAttachment.findMany({ where: { themeId }, orderBy: { order: 'asc' } });
+  await tx.meetingAttachment.deleteMany({ where: { meetingId } });
+  if (!attachments.length) return;
+  await tx.meetingAttachment.createMany({
+    data: attachments.map((a: any) => ({
+      meetingId, fileName: a.fileName, displayName: a.displayName, description: a.description,
+      mimeType: a.mimeType, fileSize: a.fileSize, fileData: a.fileData, pageCount: a.pageCount, order: a.order
+    }))
+  });
 }
 
 /**

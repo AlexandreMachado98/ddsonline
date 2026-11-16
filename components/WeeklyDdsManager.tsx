@@ -3,9 +3,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays, Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Download, ExternalLink, Link2, Loader2, Lock, Pencil,
-  Plus, Power, QrCode, RefreshCw, RotateCcw, Table2, Trash2, Users, X
+  Image as ImageIcon, Plus, Power, QrCode, RefreshCw, RotateCcw, Table2, Trash2, Users, X
 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
+import AttachmentManager, { type DdsAttachment } from '@/components/AttachmentManager';
 import {
   THEMES_PER_WEEK, MIN_DURATION_HOURS, MAX_DURATION_HOURS, buildThemeWindows, normalizeSlug,
   pickVisibleWeekIndex, type ThemeState
@@ -16,6 +17,7 @@ type Theme = {
   durationHours: number; opensAt: string; closesAt: string; reopenUntil: string | null;
   state: ThemeState; availableUntil: string | null; meetingId: string | null; signatures: number;
   quizSourceId: string | null; quizTitle: string | null; quizToken: string | null; quizResponses: number;
+  attachmentCount: number;
 };
 type QuizOption = { id: string; title: string; isTemplate: boolean; questions: number };
 type Week = { id: string; startsAt: string; endsAt: string; themes: Theme[] };
@@ -23,7 +25,14 @@ type Schedule = {
   id: string; slug: string; name: string; farm: string; active: boolean;
   organizerName: string | null; weeks: Week[];
 };
-type ThemeDraft = { id?: string; topic: string; objective: string; programmaticContent: string; durationHours: number; quizSourceId: string; locked?: boolean; state?: ThemeState };
+type ThemeDraft = {
+  id?: string; topic: string; objective: string; programmaticContent: string; durationHours: number; quizSourceId: string;
+  locked?: boolean; state?: ThemeState;
+  // Imagens: em "Montar semana" ficam no rascunho e são enviadas após salvar; ao copiar
+  // de outra semana, as imagens do tema de origem são copiadas no servidor se não forem alteradas.
+  attachments?: DdsAttachment[] | null; attachmentsDirty?: boolean; copyFromThemeId?: string; attachmentCount?: number;
+};
+type PendingUpload = { order: number; attachments: DdsAttachment[] };
 type WeekDraft = { mode: 'create' | 'edit'; scheduleId: string; weekId?: string; date: string; time: string; startLocked: boolean; themes: ThemeDraft[] };
 
 const API = '/api/dds-semanal';
@@ -206,12 +215,16 @@ function ScheduleCard({ schedule, reload, onError, flash }: { schedule: Schedule
   };
 
   const openCreate = (source?: Week) => {
-    const start = latestEnd && latestEnd > new Date() ? latestEnd : nextMondayAt6();
+    // O formulário trabalha em minutos: arredonda para cima para não sobrepor a semana anterior.
+    const start = latestEnd && latestEnd > new Date() ? new Date(Math.ceil(latestEnd.getTime() / 60000) * 60000) : nextMondayAt6();
     setDraft({
       mode: 'create', scheduleId: schedule.id, date: toDateInput(start), time: toTimeInput(start), startLocked: false,
       themes: Array.from({ length: THEMES_PER_WEEK }, (_, i) => {
         const t = source?.themes[i];
-        return { topic: t?.topic || '', objective: t?.objective || '', programmaticContent: t?.programmaticContent || '', durationHours: t?.durationHours || 24, quizSourceId: t?.quizSourceId || '' };
+        return {
+          topic: t?.topic || '', objective: t?.objective || '', programmaticContent: t?.programmaticContent || '', durationHours: t?.durationHours || 24, quizSourceId: t?.quizSourceId || '',
+          attachments: t && t.attachmentCount > 0 ? null : [], copyFromThemeId: t && t.attachmentCount > 0 ? t.id : undefined, attachmentCount: t?.attachmentCount || 0
+        };
       })
     });
   };
@@ -220,7 +233,7 @@ function ScheduleCard({ schedule, reload, onError, flash }: { schedule: Schedule
     setDraft({
       mode: 'edit', scheduleId: schedule.id, weekId: w.id, date: toDateInput(start), time: toTimeInput(start),
       startLocked: w.themes[0].state !== 'LOCKED',
-      themes: w.themes.map(t => ({ id: t.id, topic: t.topic, objective: t.objective || '', programmaticContent: t.programmaticContent || '', durationHours: t.durationHours, quizSourceId: t.quizSourceId || '', locked: t.state !== 'LOCKED', state: t.state }))
+      themes: w.themes.map(t => ({ id: t.id, topic: t.topic, objective: t.objective || '', programmaticContent: t.programmaticContent || '', durationHours: t.durationHours, quizSourceId: t.quizSourceId || '', locked: t.state !== 'LOCKED', state: t.state, attachmentCount: t.attachmentCount }))
     });
   };
 
@@ -279,12 +292,24 @@ function ScheduleCard({ schedule, reload, onError, flash }: { schedule: Schedule
       )}
 
       {draft ? (
-        <WeekForm draft={draft} setDraft={setDraft} busy={busy} onError={onError} onCancel={() => setDraft(null)} onSave={async payload => {
-          const ok = await run(() => callApi(draft.mode === 'create' ? 'POST' : 'PATCH', payload), draft.mode === 'create' ? 'Semana cadastrada.' : 'Semana atualizada.');
+        <WeekForm draft={draft} setDraft={setDraft} busy={busy} onError={onError} onCancel={() => setDraft(null)} onSave={async (payload, uploads) => {
+          const ok = await run(async () => {
+            const res = await callApi(draft.mode === 'create' ? 'POST' : 'PATCH', payload);
+            // Imagens dos temas novos vão em requisições separadas (uma por tema) para não estourar o limite de envio.
+            for (const upload of uploads) {
+              const themeId = res.week?.themes?.find((t: { order: number; id: string }) => t.order === upload.order)?.id;
+              if (!themeId) continue;
+              try {
+                await callApi('PATCH', { action: 'set_theme_attachments', themeId, attachments: upload.attachments });
+              } catch (e: any) {
+                throw new Error(`A semana foi salva, mas as imagens do tema ${upload.order + 1} não foram enviadas (${e.message}). Adicione-as pelo botão Imagens do tema.`);
+              }
+            }
+          }, draft.mode === 'create' ? 'Semana cadastrada.' : 'Semana atualizada.');
           if (ok) setDraft(null);
         }}/>
       ) : week ? (
-        <WeekTable week={week} busy={busy} run={run}
+        <WeekTable week={week} busy={busy} run={run} onError={onError} reload={reload}
           onEdit={() => openEdit(week)}
           onNext={() => openCreate(weeksAsc[weeksAsc.length - 1])}
           onDelete={() => { if (window.confirm('Excluir esta semana? Ela ainda não começou, então nenhum registro será perdido.')) run(() => callApi('DELETE', { weekId: week.id }), 'Semana excluída.').then(() => setSelectedWeekId(null)); }}
@@ -299,11 +324,12 @@ function ScheduleCard({ schedule, reload, onError, flash }: { schedule: Schedule
   );
 }
 
-function WeekTable({ week, busy, run, onEdit, onNext, onDelete }: {
+function WeekTable({ week, busy, run, onEdit, onNext, onDelete, onError, reload }: {
   week: Week; busy: boolean; run: (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
-  onEdit: () => void; onNext: () => void; onDelete: () => void;
+  onEdit: () => void; onNext: () => void; onDelete: () => void; onError: (m: string) => void; reload: () => Promise<void>;
 }) {
   const [reopenId, setReopenId] = useState<string | null>(null);
+  const [imagesId, setImagesId] = useState<string | null>(null);
   const [reopenHours, setReopenHours] = useState(24);
   const [showSummary, setShowSummary] = useState(false);
   useEffect(() => { setShowSummary(false); }, [week.id]);
@@ -335,15 +361,20 @@ function WeekTable({ week, busy, run, onEdit, onNext, onDelete }: {
                 <td className="py-2.5 px-3 font-semibold text-slate-800 min-w-[200px]">
                   {t.topic}
                   {t.quizTitle && <span className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-slate-500"><ClipboardCheck size={12} className="text-emerald-600 shrink-0"/>{t.quizTitle}{t.state !== 'LOCKED' && t.quizToken ? ` · ${t.quizResponses} resposta(s)` : ''}</span>}
+                  {t.attachmentCount > 0 && <span className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-slate-500"><ImageIcon size={12} className="text-emerald-600 shrink-0"/>{t.attachmentCount === 1 ? '1 imagem' : `${t.attachmentCount} imagens`}</span>}
                 </td>
                 <td className="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap tabular-nums">{fmtShort(t.opensAt)}<br/>→ {fmtShort(until)} <span className="text-slate-400">({t.durationHours} h)</span></td>
                 <td className="py-2.5 px-3"><StatePill state={t.state}/></td>
                 <td className="py-2.5 px-3 text-right font-black tabular-nums text-slate-800">{t.state === 'LOCKED' ? '—' : t.signatures}</td>
-                <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                <td className="py-2.5 px-3 text-right whitespace-nowrap space-x-1.5">
+                  <button type="button" onClick={() => setImagesId(imagesId === t.id ? null : t.id)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold inline-flex items-center gap-1 ${imagesId === t.id ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-700'}`}><ImageIcon size={12}/> Imagens</button>
                   {t.state === 'CLOSED' && <button type="button" onClick={() => { setReopenId(reopenId === t.id ? null : t.id); setReopenHours(24); }} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-extrabold text-amber-800 inline-flex items-center gap-1"><RotateCcw size={12}/> Reabrir</button>}
                   {t.state === 'REOPENED' && <button type="button" disabled={busy} onClick={() => run(() => callApi('PATCH', { action: 'close_theme', themeId: t.id }), 'Reabertura encerrada. A ata foi atualizada.')} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700">Encerrar</button>}
                 </td>
               </tr>
+              {imagesId === t.id && <tr className="bg-slate-50 border-b border-slate-200"><td colSpan={6} className="px-3 py-3">
+                <ThemeAttachmentsEditor themeId={t.id} topic={t.topic} readOnly={t.state === 'CLOSED' || t.state === 'REOPENED'} isOpen={t.state === 'OPEN'} onError={onError} onSaved={reload}/>
+              </td></tr>}
               {reopenId === t.id && <tr className="bg-blue-50 border-b border-blue-100"><td colSpan={6} className="px-3 py-3">
                 <div className="flex flex-wrap items-end gap-3">
                   <p className="text-sm text-slate-700 flex-1 min-w-[220px]"><b>Reabrir &quot;{t.topic}&quot;</b><br/><span className="text-xs text-slate-500">O tema volta a aceitar assinaturas junto com o tema do dia e encerra sozinho no prazo. A ata é atualizada no encerramento.</span></p>
@@ -368,7 +399,7 @@ function WeekTable({ week, busy, run, onEdit, onNext, onDelete }: {
 
 function WeekForm({ draft, setDraft, busy, onCancel, onSave, onError }: {
   draft: WeekDraft; setDraft: React.Dispatch<React.SetStateAction<WeekDraft | null>>; busy: boolean;
-  onCancel: () => void; onSave: (payload: unknown) => Promise<void>; onError: (m: string) => void;
+  onCancel: () => void; onSave: (payload: unknown, uploads: PendingUpload[]) => Promise<void>; onError: (m: string) => void;
 }) {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [quizOptions, setQuizOptions] = useState<QuizOption[] | null>(null);
@@ -384,13 +415,31 @@ function WeekForm({ draft, setDraft, busy, onCancel, onSave, onError }: {
   const setTheme = (i: number, patch: Partial<ThemeDraft>) =>
     setDraft(d => d ? { ...d, themes: d.themes.map((t, j) => j === i ? { ...t, ...patch } : t) } : d);
 
+  // Ao abrir o "Conteúdo" de um tema copiado, carrega as imagens da semana de origem para revisão.
+  useEffect(() => {
+    if (expanded === null || draft.mode !== 'create') return;
+    const t = draft.themes[expanded];
+    if (!t || t.attachments !== null || !t.copyFromThemeId) return;
+    const i = expanded;
+    callApi('GET', undefined, `?themeAttachments=${encodeURIComponent(t.copyFromThemeId)}`)
+      .then(d => setTheme(i, { attachments: (d.attachments || []).map((a: DdsAttachment) => ({ ...a, id: undefined })) }))
+      .catch(e => { onError(e.message); setTheme(i, { attachments: [], copyFromThemeId: undefined }); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, draft.mode]);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const themes = draft.themes.map(t => ({ id: t.id, topic: t.topic, objective: t.objective, programmaticContent: t.programmaticContent, durationHours: Number(t.durationHours), quizSourceId: t.quizSourceId || null }));
+    const themes = draft.themes.map(t => ({
+      id: t.id, topic: t.topic, objective: t.objective, programmaticContent: t.programmaticContent, durationHours: Number(t.durationHours), quizSourceId: t.quizSourceId || null,
+      copyAttachmentsFromThemeId: draft.mode === 'create' && t.copyFromThemeId && !t.attachmentsDirty ? t.copyFromThemeId : undefined
+    }));
+    const uploads: PendingUpload[] = draft.mode === 'create'
+      ? draft.themes.map((t, order) => ({ order, attachments: t.attachments || [] })).filter((u, order) => draft.themes[order].attachmentsDirty && u.attachments.length > 0)
+      : [];
     const startsAt = startDate.toISOString();
     await onSave(draft.mode === 'create'
       ? { action: 'create_week', scheduleId: draft.scheduleId, startsAt, themes }
-      : { action: 'update_week', weekId: draft.weekId, startsAt, themes });
+      : { action: 'update_week', weekId: draft.weekId, startsAt, themes }, uploads);
   };
 
   return (
@@ -398,7 +447,7 @@ function WeekForm({ draft, setDraft, busy, onCancel, onSave, onError }: {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h4 className="font-black text-slate-900">{draft.mode === 'create' ? 'Montar semana' : 'Editar semana'}</h4>
-          <p className="text-xs text-slate-500">Cada tema abre quando o anterior encerra. Duração mínima de {MIN_DURATION_HOURS} h. O questionário escolhido é publicado junto com o tema e aparece para quem assinar.</p>
+          <p className="text-xs text-slate-500">Cada tema abre quando o anterior encerra. Duração mínima de {MIN_DURATION_HOURS} h. O questionário escolhido é publicado junto com o tema e aparece para quem assinar. Em <b>Conteúdo</b> você adiciona as imagens do tema.</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <label className="text-xs font-bold text-slate-700">Início do 1º tema
@@ -435,7 +484,7 @@ function WeekForm({ draft, setDraft, busy, onCancel, onSave, onError }: {
                 <label className="md:col-span-2 text-[11px] font-bold text-slate-600">Aberto por (h)
                   <input id={`wf-dur-${i}`} type="number" required min={MIN_DURATION_HOURS} max={MAX_DURATION_HOURS} step={1} disabled={t.state === 'CLOSED' || t.state === 'REOPENED'} value={t.durationHours} onChange={e => setTheme(i, { durationHours: Number(e.target.value) })} className={`mt-1 ${inputCls}`}/>
                 </label>
-                <button type="button" onClick={() => setExpanded(expanded === i ? null : i)} className="md:col-span-1 rounded-lg border border-slate-200 px-2 py-2 text-xs font-bold text-slate-600 inline-flex items-center justify-center gap-1" title="Objetivo e conteúdo programático">{expanded === i ? <ChevronDown size={14}/> : <ChevronRight size={14}/>} Conteúdo</button>
+                <button type="button" onClick={() => setExpanded(expanded === i ? null : i)} className="md:col-span-1 rounded-lg border border-slate-200 px-2 py-2 text-xs font-bold text-slate-600 inline-flex items-center justify-center gap-1" title="Objetivo, conteúdo programático e imagens">{expanded === i ? <ChevronDown size={14}/> : <ChevronRight size={14}/>} Conteúdo{(t.attachments?.length ?? t.attachmentCount ?? 0) > 0 ? <span className="ml-0.5 inline-flex items-center gap-0.5 text-emerald-700"><ImageIcon size={11}/>{t.attachments?.length ?? t.attachmentCount}</span> : null}</button>
               </div>
               {t.locked && <p className="mt-1 text-[11px] font-semibold text-slate-500 inline-flex items-center gap-1"><Lock size={11}/> {t.state === 'OPEN' ? 'Tema aberto: só a duração pode mudar (para estender ou antecipar o encerramento).' : 'Tema encerrado: fica como foi publicado.'}</p>}
               {expanded === i && (
@@ -446,6 +495,15 @@ function WeekForm({ draft, setDraft, busy, onCancel, onSave, onError }: {
                   <label className="text-[11px] font-bold text-slate-600">Conteúdo programático
                     <textarea id={`wf-cont-${i}`} rows={3} maxLength={3000} disabled={t.locked} value={t.programmaticContent} onChange={e => setTheme(i, { programmaticContent: e.target.value })} className={`mt-1 ${inputCls}`}/>
                   </label>
+                  <div className="md:col-span-2 rounded-xl bg-slate-900 p-3">
+                    {draft.mode === 'create' ? (
+                      t.attachments === null
+                        ? <p className="text-xs text-slate-300 inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin"/> Carregando as imagens da semana anterior...</p>
+                        : <AttachmentManager attachments={t.attachments || []} onChange={updated => setTheme(i, { attachments: updated, attachmentsDirty: true })}/>
+                    ) : t.id ? (
+                      <ThemeAttachmentsEditor themeId={t.id} topic={t.topic} readOnly={t.state === 'CLOSED' || t.state === 'REOPENED'} isOpen={t.state === 'OPEN'} onError={onError} dark/>
+                    ) : null}
+                  </div>
                 </div>
               )}
             </div>
@@ -601,6 +659,60 @@ function WeekSummary({ weekId }: { weekId: string }) {
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Imagens e PDFs de um tema já salvo. Mostrados aos colaboradores na tela de assinatura. */
+function ThemeAttachmentsEditor({ themeId, topic, readOnly, isOpen, onError, onSaved, dark }: {
+  themeId: string; topic: string; readOnly: boolean; isOpen: boolean;
+  onError: (m: string) => void; onSaved?: () => Promise<void>; dark?: boolean;
+}) {
+  const [items, setItems] = useState<DdsAttachment[] | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setItems(null); setDirty(false);
+    callApi('GET', undefined, `?themeAttachments=${encodeURIComponent(themeId)}`)
+      .then(d => setItems(d.attachments || []))
+      .catch(e => { onError(e.message); setItems([]); });
+  }, [themeId, onError]);
+
+  const save = async () => {
+    if (!items) return;
+    setSaving(true); onError('');
+    try {
+      // Imagens já salvas vão sem o conteúdo: o servidor reaproveita o que está no banco.
+      const attachments = items.map(a => ({ ...a, fileData: a.id ? undefined : a.fileData, uploadStatus: undefined, errorMessage: undefined }));
+      await callApi('PATCH', { action: 'set_theme_attachments', themeId, attachments });
+      const fresh = await callApi('GET', undefined, `?themeAttachments=${encodeURIComponent(themeId)}`);
+      setItems(fresh.attachments || []);
+      setDirty(false); setSaved(true); setTimeout(() => setSaved(false), 3000);
+      if (onSaved) await onSaved();
+    } catch (e: any) {
+      onError(e.message || 'Não foi possível salvar as imagens.');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className={dark ? '' : 'rounded-xl bg-slate-900 p-3'}>
+      {items === null ? (
+        <p className="text-xs text-slate-300 inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin"/> Carregando imagens de &quot;{topic}&quot;...</p>
+      ) : (
+        <>
+          <AttachmentManager attachments={items} readOnly={readOnly} onChange={updated => { setItems(updated); setDirty(true); }}/>
+          {!readOnly && (
+            <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+              <span className="text-[11px] text-slate-300 mr-auto">{isOpen ? 'Tema aberto: ao salvar, os colaboradores já veem as novas imagens.' : 'As imagens aparecem para os colaboradores quando o tema abrir.'}</span>
+              {saved && <span className="text-xs font-bold text-emerald-400 inline-flex items-center gap-1"><Check size={13}/> Imagens salvas</span>}
+              <button type="button" disabled={!dirty || saving} onClick={save} className="rounded-lg bg-emerald-500 hover:bg-emerald-400 px-3 py-2 text-xs font-extrabold text-slate-950 inline-flex items-center gap-1.5 disabled:opacity-40">{saving ? <Loader2 size={13} className="animate-spin"/> : <Check size={13}/>} Salvar imagens</button>
+            </div>
+          )}
+          {readOnly && <p className="mt-2 text-[11px] text-slate-400">Tema encerrado: as imagens ficam como foram publicadas na ata.</p>}
+        </>
       )}
     </div>
   );
