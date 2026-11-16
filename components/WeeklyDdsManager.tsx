@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays, Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Download, ExternalLink, Link2, Loader2, Lock, Pencil,
-  Image as ImageIcon, Plus, Power, QrCode, RefreshCw, RotateCcw, Table2, Trash2, Users, X
+  FileDown, Image as ImageIcon, Plus, Power, QrCode, RefreshCw, RotateCcw, Table2, Trash2, Users, X
 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import AttachmentManager, { type DdsAttachment } from '@/components/AttachmentManager';
@@ -355,6 +355,15 @@ function WeekTable({ week, busy, run, onEdit, onNext, onDelete, onError, reload 
 }) {
   const [reopenId, setReopenId] = useState<string | null>(null);
   const [imagesId, setImagesId] = useState<string | null>(null);
+  const [signaturesId, setSignaturesId] = useState<string | null>(null);
+  const [pdfBusyId, setPdfBusyId] = useState<string | null>(null);
+  const downloadPdf = async (t: Theme) => {
+    if (!t.meetingId) return;
+    setPdfBusyId(t.id); onError('');
+    try { await downloadThemeAttendancePdf(t.meetingId); }
+    catch (e: any) { onError(e.message || 'Não foi possível gerar o PDF.'); }
+    finally { setPdfBusyId(null); }
+  };
   const [reopenHours, setReopenHours] = useState(24);
   const [showSummary, setShowSummary] = useState(false);
   useEffect(() => { setShowSummary(false); }, [week.id]);
@@ -391,12 +400,18 @@ function WeekTable({ week, busy, run, onEdit, onNext, onDelete, onError, reload 
                 <td className="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap tabular-nums">{fmtShort(t.opensAt)}<br/>→ {fmtShort(until)} <span className="text-slate-400">({t.durationHours} h)</span></td>
                 <td className="py-2.5 px-3"><StatePill state={t.state}/></td>
                 <td className="py-2.5 px-3 text-right font-black tabular-nums text-slate-800">{t.state === 'LOCKED' ? '—' : t.signatures}</td>
-                <td className="py-2.5 px-3 text-right whitespace-nowrap space-x-1.5">
-                  <button type="button" onClick={() => setImagesId(imagesId === t.id ? null : t.id)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold inline-flex items-center gap-1 ${imagesId === t.id ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-700'}`}><ImageIcon size={12}/> Imagens</button>
+                <td className="py-2.5 px-3"><div className="flex flex-wrap justify-end gap-1.5 min-w-[150px]">
+                  {t.state !== 'LOCKED' && <button type="button" onClick={() => setSignaturesId(signaturesId === t.id ? null : t.id)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold inline-flex items-center gap-1 ${signaturesId === t.id ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-700'}`}><Users size={12}/> Assinaturas</button>}
+                  {t.meetingId && t.signatures > 0 && <button type="button" disabled={pdfBusyId === t.id} onClick={() => downloadPdf(t)} title={t.state === 'OPEN' || t.state === 'REOPENED' ? 'Baixar lista parcial (tema ainda aberto)' : 'Baixar ata / lista de presença'} aria-label="Baixar lista de presença em PDF" className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-bold text-slate-700 inline-flex items-center gap-1 disabled:opacity-60">{pdfBusyId === t.id ? <Loader2 size={13} className="animate-spin"/> : <FileDown size={13}/>}</button>}
+                  <button type="button" onClick={() => setImagesId(imagesId === t.id ? null : t.id)} title="Imagens do tema" aria-label="Imagens do tema" className={`rounded-lg border px-2 py-1.5 text-xs font-bold inline-flex items-center gap-1 ${imagesId === t.id ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-700'}`}><ImageIcon size={13}/>{t.attachmentCount > 0 ? t.attachmentCount : ''}</button>
                   {t.state === 'CLOSED' && <button type="button" onClick={() => { setReopenId(reopenId === t.id ? null : t.id); setReopenHours(24); }} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-extrabold text-amber-800 inline-flex items-center gap-1"><RotateCcw size={12}/> Reabrir</button>}
                   {t.state === 'REOPENED' && <button type="button" disabled={busy} onClick={() => run(() => callApi('PATCH', { action: 'close_theme', themeId: t.id }), 'Reabertura encerrada. A ata foi atualizada.')} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700">Encerrar</button>}
-                </td>
+                </div></td>
               </tr>
+              {signaturesId === t.id && <tr className="bg-white border-b border-slate-200"><td colSpan={6} className="px-3 py-3">
+                <LiveSignatures themeId={t.id} topic={t.topic} onError={onError} onDownloadPdf={() => downloadPdf(t)} pdfBusy={pdfBusyId === t.id}
+                  onCountChange={n => { if (n !== t.signatures) reload(); }}/>
+              </td></tr>}
               {imagesId === t.id && <tr className="bg-slate-50 border-b border-slate-200"><td colSpan={6} className="px-3 py-3">
                 <ThemeAttachmentsEditor themeId={t.id} topic={t.topic} readOnly={t.state === 'CLOSED' || t.state === 'REOPENED'} isOpen={t.state === 'OPEN'} onError={onError} onSaved={reload}/>
               </td></tr>}
@@ -738,6 +753,131 @@ function ThemeAttachmentsEditor({ themeId, topic, readOnly, isOpen, onError, onS
           )}
           {readOnly && <p className="mt-2 text-[11px] text-slate-400">Tema encerrado: as imagens ficam como foram publicadas na ata.</p>}
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Gera a ata / lista de presença do DDS do tema com o mesmo gerador do Histórico.
+ * Com o tema aberto, sai a lista parcial (sem horário de encerramento).
+ */
+async function downloadThemeAttendancePdf(meetingId: string) {
+  const res = await fetch(`/api/reuniao?id=${encodeURIComponent(meetingId)}&full=true`, { cache: 'no-store' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success || !data.meeting) throw new Error(data.error || 'Não foi possível carregar a lista de presença.');
+  const m = data.meeting;
+  if (!m.attendees?.length) throw new Error('Este tema ainda não tem assinaturas.');
+  const { generateDdsPdf } = await import('@/lib/pdfGenerator');
+  await generateDdsPdf({
+    id: m.id, topic: m.topic, farm: m.farm, type: m.type, classification: m.classification,
+    instructorName: m.instructorName, endedAt: m.endedAt, organizer: m.organizer,
+    objective: m.objective, programmaticContent: m.programmaticContent, groupPhoto: m.groupPhoto,
+    createdAt: m.createdAt, attendees: m.attendees, attachments: m.attachments || [], documentHash: m.documentHash
+  });
+}
+
+type LiveSignature = { id: string; name: string; role: string; registration: string | null; createdAt: string; hasSelfie: boolean; quizScore: number | null };
+
+/** Lista de assinaturas do tema, atualizada a cada 10 s enquanto o tema aceita assinaturas. */
+function LiveSignatures({ themeId, topic, onError, onDownloadPdf, pdfBusy, onCountChange }: {
+  themeId: string; topic: string; onError: (m: string) => void; onDownloadPdf: () => void; pdfBusy: boolean;
+  onCountChange?: (count: number) => void;
+}) {
+  const [data, setData] = useState<{ state: ThemeState; availableUntil: string | null; meetingId: string | null; signatures: LiveSignature[] } | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
+  const [openPhoto, setOpenPhoto] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<Record<string, { selfie: string | null; signature: string | null } | 'loading'>>({});
+  const [filter, setFilter] = useState('');
+  const known = React.useRef<Set<string> | null>(null);
+  // Mantém a contagem da tabela principal em dia sem recriar o carregamento a cada render.
+  const onCountChangeRef = React.useRef(onCountChange);
+  onCountChangeRef.current = onCountChange;
+
+  const load = useCallback(async () => {
+    try {
+      const d = await callApi('GET', undefined, `?signatures=${encodeURIComponent(themeId)}`);
+      const ids = new Set<string>(d.signatures.map((s: LiveSignature) => s.id));
+      if (known.current) setNewIds(new Set([...ids].filter(id => !known.current!.has(id))));
+      known.current = ids;
+      setData(d); setUpdatedAt(new Date());
+      onCountChangeRef.current?.(d.signatures.length);
+    } catch (e: any) { onError(e.message); }
+  }, [themeId, onError]);
+
+  useEffect(() => { known.current = null; setData(null); load(); }, [load]);
+  const live = data?.state === 'OPEN' || data?.state === 'REOPENED';
+  useEffect(() => {
+    if (!live) return;
+    const timer = setInterval(() => { if (!document.hidden) load(); }, 10000);
+    return () => clearInterval(timer);
+  }, [live, load]);
+
+  const togglePhoto = async (id: string) => {
+    if (openPhoto === id) { setOpenPhoto(null); return; }
+    setOpenPhoto(id);
+    if (photos[id]) return;
+    setPhotos(p => ({ ...p, [id]: 'loading' }));
+    try {
+      const d = await callApi('GET', undefined, `?attendance=${encodeURIComponent(id)}`);
+      setPhotos(p => ({ ...p, [id]: { selfie: d.selfie, signature: d.signature } }));
+    } catch (e: any) { onError(e.message); setPhotos(p => { const n = { ...p }; delete n[id]; return n; }); }
+  };
+
+  if (!data) return <p className="text-sm text-slate-500 inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin"/> Carregando assinaturas de &quot;{topic}&quot;...</p>;
+
+  const q = filter.trim().toLowerCase();
+  const rows = data.signatures.filter(s => !q || s.name.toLowerCase().includes(q) || (s.registration || '').includes(q) || (s.role || '').toLowerCase().includes(q));
+  const time = (v: string) => { const d = new Date(v); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {live
+            ? <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-black uppercase text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"/> Ao vivo</span>
+            : <span className="rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-[10px] font-black uppercase text-slate-500">Encerrado</span>}
+          <p className="font-extrabold text-slate-800 text-sm">{data.signatures.length} assinatura(s)</p>
+          {updatedAt && <span className="text-[11px] text-slate-400">{live ? 'atualiza a cada 10 s · ' : ''}atualizado às {pad(updatedAt.getHours())}:{pad(updatedAt.getMinutes())}:{pad(updatedAt.getSeconds())}</span>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {data.signatures.length > 5 && <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Buscar nome, função ou matrícula" className={`${inputCls} w-56`}/>}
+          <button type="button" onClick={load} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 inline-flex items-center gap-1.5"><RefreshCw size={12}/> Atualizar</button>
+          <button type="button" disabled={pdfBusy || !data.signatures.length} onClick={onDownloadPdf} className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-extrabold text-white inline-flex items-center gap-1.5 disabled:opacity-50">{pdfBusy ? <Loader2 size={12} className="animate-spin"/> : <FileDown size={12}/>} {live ? 'Baixar lista parcial (PDF)' : 'Baixar lista de presença (PDF)'}</button>
+        </div>
+      </div>
+      {data.signatures.length === 0 ? (
+        <p className="text-sm text-slate-500">{live ? 'Ninguém assinou ainda. A lista se atualiza sozinha.' : 'Este tema não recebeu assinaturas.'}</p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <table className="w-full text-left text-sm">
+            <thead><tr className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50">
+              <th className="py-2 px-3">#</th><th className="py-2 px-3">Horário</th><th className="py-2 px-3">Colaborador</th><th className="py-2 px-3">Função</th><th className="py-2 px-3">Matrícula</th><th className="py-2 px-3">Questionário</th><th className="py-2 px-3"></th>
+            </tr></thead>
+            <tbody>{rows.map(s => (
+              <React.Fragment key={s.id}>
+                <tr className={`border-b border-slate-100 last:border-0 ${newIds.has(s.id) ? 'bg-emerald-50' : ''}`}>
+                  <td className="py-2 px-3 text-slate-400 tabular-nums">{data.signatures.length - data.signatures.indexOf(s)}</td>
+                  <td className="py-2 px-3 text-xs text-slate-500 tabular-nums whitespace-nowrap">{time(s.createdAt)}</td>
+                  <td className="py-2 px-3 font-semibold text-slate-800">{s.name}{newIds.has(s.id) && <span className="ml-2 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white">novo</span>}</td>
+                  <td className="py-2 px-3 text-slate-600">{s.role}</td>
+                  <td className="py-2 px-3 font-mono text-slate-600">{s.registration || '—'}</td>
+                  <td className="py-2 px-3">{s.quizScore === null ? <span className="text-slate-400 text-xs">—</span> : <span className={`text-xs font-bold ${s.quizScore >= 70 ? 'text-emerald-700' : 'text-amber-700'}`}>{Math.round(s.quizScore)}%</span>}</td>
+                  <td className="py-2 px-3 text-right">{s.hasSelfie && <button type="button" onClick={() => togglePhoto(s.id)} className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-600">{openPhoto === s.id ? 'Ocultar' : 'Foto e assinatura'}</button>}</td>
+                </tr>
+                {openPhoto === s.id && <tr className="bg-slate-50 border-b border-slate-100"><td colSpan={7} className="px-3 py-3">
+                  {photos[s.id] === 'loading' || !photos[s.id]
+                    ? <span className="text-xs text-slate-500 inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin"/> Carregando...</span>
+                    : <div className="flex flex-wrap gap-4 items-end">
+                        {(photos[s.id] as any).selfie && <figure className="space-y-1"><img src={(photos[s.id] as any).selfie} alt={`Foto de ${s.name}`} className="h-36 w-36 rounded-xl object-cover border border-slate-200"/><figcaption className="text-[10px] text-slate-500 text-center">Foto</figcaption></figure>}
+                        {(photos[s.id] as any).signature && <figure className="space-y-1"><img src={(photos[s.id] as any).signature} alt={`Assinatura de ${s.name}`} className="h-24 max-w-[260px] rounded-xl bg-white object-contain border border-slate-200 p-2"/><figcaption className="text-[10px] text-slate-500 text-center">Assinatura</figcaption></figure>}
+                      </div>}
+                </td></tr>}
+              </React.Fragment>
+            ))}</tbody>
+          </table>
+        </div>
       )}
     </div>
   );

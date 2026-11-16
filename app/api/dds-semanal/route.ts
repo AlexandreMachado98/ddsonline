@@ -5,6 +5,8 @@
 // GET ?quizOptions=1           → questionários que podem ser usados nos temas (modelos e avulsos)
 // GET ?summary=<weekId>        → resumo da semana (assinaturas e notas por matrícula)
 // GET ?themeAttachments=<id>   → imagens/PDFs de um tema, com conteúdo
+// GET ?signatures=<themeId>    → assinaturas do tema (lista leve, para acompanhar ao vivo)
+// GET ?attendance=<id>         → foto e assinatura de uma presença (sob demanda)
 // PATCH { action: 'add_theme_attachment', themeId, attachment }        (uma imagem por envio)
 // PATCH { action: 'set_theme_attachments', themeId, attachments: [...] }  (ordem, legendas e remoções)
 // POST  { action: 'create_schedule', name, farm, slug }
@@ -131,6 +133,57 @@ export async function GET(req: Request) {
         select: { id: true, title: true, isTemplate: true, status: true, _count: { select: { questions: true } } }
       });
       return NextResponse.json({ success: true, quizzes: quizzes.map(q => ({ id: q.id, title: q.title, isTemplate: q.isTemplate, questions: q._count.questions })) });
+    }
+
+    const signaturesThemeId = params.get('signatures');
+    if (signaturesThemeId) {
+      const theme = await prisma.ddsScheduleTheme.findUnique({
+        where: { id: signaturesThemeId },
+        include: { week: { include: { schedule: true } } }
+      });
+      if (!theme) return json('Tema não encontrado.', 404);
+      if (!canManage(user, theme.week.schedule)) return json('Acesso negado a esta programação.', 403);
+      // Mantém o DDS do tema em dia (abre/encerra conforme o horário) antes de listar.
+      await syncScheduleThemes({ id: theme.id });
+      const fresh = await prisma.ddsScheduleTheme.findUnique({ where: { id: theme.id }, select: { meetingId: true, opensAt: true, closesAt: true, reopenUntil: true } });
+      const now = new Date();
+      const { state, availableUntil } = getThemeState(fresh!, now);
+      if (!fresh?.meetingId) {
+        return NextResponse.json({ success: true, now, state, availableUntil, meetingId: null, signatures: [] }, { headers: { 'Cache-Control': 'no-store' } });
+      }
+      const attendees = await prisma.attendance.findMany({
+        where: { meetingId: fresh.meetingId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, name: true, cpf: true, registration: true, createdAt: true,
+          quizAttempts: { select: { score: true }, orderBy: { score: 'desc' }, take: 1 }
+        }
+      });
+      // Presença com foto/assinatura: consulta só a existência, sem baixar as imagens.
+      const withImages = await prisma.attendance.findMany({
+        where: { meetingId: fresh.meetingId, NOT: { selfie: '' } },
+        select: { id: true }
+      });
+      const hasSelfie = new Set(withImages.map(a => a.id));
+      return NextResponse.json({
+        success: true, now, state, availableUntil, meetingId: fresh.meetingId,
+        signatures: attendees.map(a => ({
+          id: a.id, name: a.name, role: a.cpf, registration: a.registration, createdAt: a.createdAt,
+          hasSelfie: hasSelfie.has(a.id), quizScore: a.quizAttempts[0]?.score ?? null
+        }))
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+
+    const attendanceId = params.get('attendance');
+    if (attendanceId) {
+      const attendance = await prisma.attendance.findUnique({
+        where: { id: attendanceId },
+        select: { id: true, selfie: true, signature: true, meeting: { select: { weeklyTheme: { select: { week: { select: { schedule: true } } } } } } }
+      });
+      const schedule = attendance?.meeting?.weeklyTheme?.week?.schedule;
+      if (!attendance || !schedule) return json('Assinatura não encontrada.', 404);
+      if (!canManage(user, schedule)) return json('Acesso negado a esta programação.', 403);
+      return NextResponse.json({ success: true, selfie: attendance.selfie || null, signature: attendance.signature || null }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
     const attachmentsThemeId = params.get('themeAttachments');
