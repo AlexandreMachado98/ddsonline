@@ -7,13 +7,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { CalendarDays, ClipboardCheck, Clock3, Loader2, Lock, PenTool, RefreshCw } from 'lucide-react';
+import { CalendarDays, ClipboardCheck, Clock3, Image as ImageIcon, Loader2, Lock, PenTool, RefreshCw } from 'lucide-react';
 import DdsLogo from '@/components/DdsLogo';
 
 type PublicTheme = {
   id: string; order: number; state: 'LOCKED' | 'OPEN' | 'REOPENED' | 'CLOSED';
   opensAt: string; closesAt: string; availableUntil: string | null;
   topic: string | null; objective: string | null; meetingId: string | null; quizToken: string | null;
+  attachmentCount: number;
 };
 type PublicData = {
   now: string;
@@ -188,6 +189,7 @@ function ThemeCard({ slug, theme, now, isToday, reopenedFromOtherWeek }: { slug:
       </div>
       <h2 className="text-lg font-black text-slate-900 leading-snug">{theme.topic}</h2>
       {theme.objective && <p className="text-sm text-slate-600">{theme.objective}</p>}
+      {theme.attachmentCount > 0 && <p className="text-xs font-semibold text-slate-600 inline-flex items-center gap-1.5"><ImageIcon size={13} className="text-emerald-600"/> {theme.attachmentCount === 1 ? '1 imagem do tema' : `${theme.attachmentCount} imagens do tema`} para ver ao abrir</p>}
       <p className="text-xs text-slate-500 inline-flex items-center gap-1.5"><Clock3 size={13}/> Aberto até {fmtLong(until)} · faltam {remaining(until, now)}</p>
       {theme.meetingId ? (
         <>

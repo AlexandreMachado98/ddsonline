@@ -4,6 +4,9 @@
 // GET                         → programações visíveis ao usuário, com semanas e temas
 // GET ?quizOptions=1           → questionários que podem ser usados nos temas (modelos e avulsos)
 // GET ?summary=<weekId>        → resumo da semana (assinaturas e notas por matrícula)
+// GET ?themeAttachments=<id>   → imagens/PDFs de um tema, com conteúdo
+// PATCH { action: 'add_theme_attachment', themeId, attachment }        (uma imagem por envio)
+// PATCH { action: 'set_theme_attachments', themeId, attachments: [...] }  (ordem, legendas e remoções)
 // POST  { action: 'create_schedule', name, farm, slug }
 // POST  { action: 'create_week', scheduleId, startsAt, themes: [7 × { topic, objective, programmaticContent, durationHours }] }
 // PATCH { action: 'update_schedule', id, name?, farm?, slug?, active? }
@@ -16,7 +19,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { ensureDdsScheduleTables } from '@/lib/ddsScheduleTables';
-import { syncScheduleThemes } from '@/lib/ddsScheduleSync';
+import { syncScheduleThemes, copyThemeAttachmentsToMeeting } from '@/lib/ddsScheduleSync';
+import { validateAttachment } from '@/lib/fileValidation';
 import {
   THEMES_PER_WEEK, MAX_REOPEN_HOURS, buildThemeWindows, validateDurations, getThemeState,
   overlapsAnyWeek, normalizeSlug, isValidSlug, buildWeekSummary
@@ -105,7 +109,8 @@ function serializeSchedule(schedule: any, now: Date, quizTitles: Map<string, str
           quizSourceId: theme.quizSourceId,
           quizTitle: theme.meeting?.quizzes?.[0]?.title || (theme.quizSourceId ? quizTitles.get(theme.quizSourceId) || null : null),
           quizToken: theme.meeting?.quizzes?.[0]?.shareToken || null,
-          quizResponses: theme.meeting?.quizzes?.[0]?._count?.attempts ?? 0
+          quizResponses: theme.meeting?.quizzes?.[0]?._count?.attempts ?? 0,
+          attachmentCount: theme._count?.attachments ?? 0
         };
       })
     }))
@@ -126,6 +131,17 @@ export async function GET(req: Request) {
         select: { id: true, title: true, isTemplate: true, status: true, _count: { select: { questions: true } } }
       });
       return NextResponse.json({ success: true, quizzes: quizzes.map(q => ({ id: q.id, title: q.title, isTemplate: q.isTemplate, questions: q._count.questions })) });
+    }
+
+    const attachmentsThemeId = params.get('themeAttachments');
+    if (attachmentsThemeId) {
+      const theme = await prisma.ddsScheduleTheme.findUnique({
+        where: { id: attachmentsThemeId },
+        include: { week: { include: { schedule: true } }, attachments: { orderBy: { order: 'asc' } } }
+      });
+      if (!theme) return json('Tema não encontrado.', 404);
+      if (!canManage(user, theme.week.schedule)) return json('Acesso negado a esta programação.', 403);
+      return NextResponse.json({ success: true, attachments: theme.attachments });
     }
 
     const summaryWeekId = params.get('summary');
@@ -179,6 +195,7 @@ export async function GET(req: Request) {
             themes: {
               orderBy: { order: 'asc' },
               include: {
+                _count: { select: { attachments: true } },
                 meeting: {
                   select: {
                     _count: { select: { attendees: true } },
@@ -246,8 +263,23 @@ export async function POST(req: Request) {
         data: {
           scheduleId: schedule.id, startsAt, endsAt,
           themes: { create: themes.map((t, i) => ({ ...t, order: i, opensAt: windows[i].opensAt, closesAt: windows[i].closesAt })) }
-        }
+        },
+        include: { themes: { orderBy: { order: 'asc' }, select: { id: true, order: true } } }
       });
+      // "Montar próxima semana": copia as imagens dos temas de origem (da mesma programação).
+      const copyFrom = (Array.isArray(body.themes) ? body.themes : []).map((t: any) => typeof t?.copyAttachmentsFromThemeId === 'string' ? t.copyAttachmentsFromThemeId : null);
+      const sourceIds = [...new Set(copyFrom.filter(Boolean) as string[])];
+      if (sourceIds.length) {
+        const sources = await prisma.ddsScheduleThemeAttachment.findMany({
+          where: { themeId: { in: sourceIds }, theme: { week: { scheduleId: schedule.id } } },
+          orderBy: { order: 'asc' }
+        });
+        const data = week.themes.flatMap(t => sources.filter(a => a.themeId === copyFrom[t.order]).map(a => ({
+          themeId: t.id, fileName: a.fileName, displayName: a.displayName, description: a.description,
+          mimeType: a.mimeType, fileSize: a.fileSize, fileData: a.fileData, pageCount: a.pageCount, order: a.order
+        })));
+        if (data.length) await prisma.ddsScheduleThemeAttachment.createMany({ data });
+      }
       await syncScheduleThemes({ weekId: week.id });
       return NextResponse.json({ success: true, week }, { status: 201 });
     }
@@ -335,6 +367,90 @@ export async function PATCH(req: Request) {
       ]);
       await syncScheduleThemes({ weekId: week.id });
       return NextResponse.json({ success: true });
+    }
+
+    if (body.action === 'add_theme_attachment') {
+      // Uma imagem por requisição: fotos de celular comprimidas ficam bem abaixo do limite
+      // de envio da hospedagem (~4,5 MB), mesmo quando o tema tem várias imagens.
+      const theme = await prisma.ddsScheduleTheme.findUnique({
+        where: { id: String(body.themeId || '') },
+        include: { week: { include: { schedule: true } }, _count: { select: { attachments: true } } }
+      });
+      if (!theme) return json('Tema não encontrado.', 404);
+      if (!canManage(user, theme.week.schedule)) return json('Acesso negado a esta programação.', 403);
+      const { state } = getThemeState(theme, now);
+      if (state === 'CLOSED' || state === 'REOPENED') return json('Este tema já foi encerrado: as imagens ficam como foram publicadas na ata.', 400);
+      if (theme._count.attachments >= 10) return json('Cada tema aceita no máximo 10 imagens ou PDFs.', 400);
+      const att = body.attachment || {};
+      const fileData = typeof att.fileData === 'string' ? att.fileData : '';
+      const check = validateAttachment({ ...att, fileData });
+      if (!check.valid) return json(check.error || 'Arquivo inválido.', 400);
+      const created = await prisma.ddsScheduleThemeAttachment.create({
+        data: {
+          themeId: theme.id,
+          fileName: String(att.fileName || 'imagem').slice(0, 100),
+          displayName: String(att.displayName || att.fileName || 'Imagem').slice(0, 100),
+          description: att.description ? String(att.description).slice(0, 500).trim() : null,
+          mimeType: check.detectedMime || String(att.mimeType || 'image/jpeg').slice(0, 50),
+          fileSize: Number(att.fileSize) || Math.round(fileData.length * 0.75),
+          fileData,
+          pageCount: Number(att.pageCount) || 1,
+          order: theme._count.attachments
+        },
+        select: { id: true }
+      });
+      return NextResponse.json({ success: true, attachment: created });
+    }
+
+    if (body.action === 'set_theme_attachments') {
+      const theme = await prisma.ddsScheduleTheme.findUnique({
+        where: { id: String(body.themeId || '') },
+        include: { week: { include: { schedule: true } }, attachments: { select: { id: true, fileData: true } } }
+      });
+      if (!theme) return json('Tema não encontrado.', 404);
+      if (!canManage(user, theme.week.schedule)) return json('Acesso negado a esta programação.', 403);
+      const { state } = getThemeState(theme, now);
+      if (state === 'CLOSED' || state === 'REOPENED') return json('Este tema já foi encerrado: as imagens ficam como foram publicadas na ata.', 400);
+      if (!Array.isArray(body.attachments)) return json('Lista de imagens inválida.', 400);
+      if (body.attachments.length > 10) return json('Cada tema aceita no máximo 10 imagens ou PDFs.', 400);
+
+      // Imagens já salvas vêm sem o conteúdo e são atualizadas no lugar (o id não muda);
+      // as que não estão na lista são removidas; itens novos com conteúdo são criados.
+      const existing = new Map(theme.attachments.map(a => [a.id, a.fileData]));
+      type Meta = { fileName: string; displayName: string; description: string | null; order: number };
+      type Item = { id: string; data: Meta } | { id: null; data: Meta & { fileData: string; mimeType: string; fileSize: number; pageCount: number } };
+      const items: Item[] = [];
+      for (let idx = 0; idx < body.attachments.length; idx++) {
+        const att = body.attachments[idx] || {};
+        const keepId = typeof att.id === 'string' && existing.has(att.id) ? att.id : null;
+        const fileData = typeof att.fileData === 'string' && att.fileData ? att.fileData : (keepId ? existing.get(keepId) || '' : '');
+        const check = validateAttachment({ ...att, fileData });
+        if (!check.valid) return json(`Arquivo ${idx + 1}: ${check.error}`, 400);
+        const meta = {
+          fileName: String(att.fileName || `imagem_${idx + 1}`).slice(0, 100),
+          displayName: String(att.displayName || att.fileName || `Imagem ${idx + 1}`).slice(0, 100),
+          description: att.description ? String(att.description).slice(0, 500).trim() : null,
+          order: idx
+        };
+        items.push(keepId
+          ? { id: keepId, data: meta }
+          : { id: null, data: { ...meta, fileData, mimeType: check.detectedMime || String(att.mimeType || 'image/jpeg').slice(0, 50), fileSize: Number(att.fileSize) || Math.round(fileData.length * 0.75), pageCount: Number(att.pageCount) || 1 } });
+      }
+      const keptIds = items.flatMap(i => i.id !== null ? [i.id] : []);
+
+      await prisma.$transaction(async tx => {
+        await tx.ddsScheduleThemeAttachment.deleteMany({ where: { themeId: theme.id, id: { notIn: keptIds } } });
+        for (const item of items) {
+          if (item.id !== null) {
+            await tx.ddsScheduleThemeAttachment.update({ where: { id: item.id }, data: item.data });
+          } else {
+            await tx.ddsScheduleThemeAttachment.create({ data: { ...item.data, themeId: theme.id } });
+          }
+        }
+        // Tema aberto: atualiza também o DDS que os participantes estão vendo.
+        if (theme.meetingId) await copyThemeAttachmentsToMeeting(tx, theme.id, theme.meetingId);
+      }, { timeout: 20000 });
+      return NextResponse.json({ success: true, count: items.length });
     }
 
     if (body.action === 'reopen_theme' || body.action === 'close_theme') {

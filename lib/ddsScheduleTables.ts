@@ -24,9 +24,13 @@ const STATEMENTS: string[] = [
 
 let ready: Promise<boolean> | null = null;
 
-// Colunas adicionadas depois da criação das tabelas (migrações posteriores).
+// Estruturas adicionadas depois da criação das tabelas (migrações posteriores). Todas idempotentes.
 const COLUMN_STATEMENTS: string[] = [
-  'ALTER TABLE "DdsScheduleTheme" ADD COLUMN IF NOT EXISTS "quizSourceId" TEXT' // 20261117000000_dds_weekly_quiz
+  'ALTER TABLE "DdsScheduleTheme" ADD COLUMN IF NOT EXISTS "quizSourceId" TEXT', // 20261117000000_dds_weekly_quiz
+  // 20261118000000_dds_weekly_theme_attachments
+  "CREATE TABLE IF NOT EXISTS \"DdsScheduleThemeAttachment\" (\n    \"id\" TEXT NOT NULL,\n    \"themeId\" TEXT NOT NULL,\n    \"fileName\" TEXT NOT NULL,\n    \"displayName\" TEXT,\n    \"description\" TEXT,\n    \"mimeType\" TEXT NOT NULL,\n    \"fileSize\" INTEGER NOT NULL,\n    \"fileData\" TEXT NOT NULL,\n    \"pageCount\" INTEGER DEFAULT 1,\n    \"order\" INTEGER NOT NULL DEFAULT 0,\n    \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    CONSTRAINT \"DdsScheduleThemeAttachment_pkey\" PRIMARY KEY (\"id\")\n)",
+  "CREATE INDEX IF NOT EXISTS \"DdsScheduleThemeAttachment_themeId_order_idx\" ON \"DdsScheduleThemeAttachment\"(\"themeId\", \"order\")",
+  "DO $$ BEGIN\n  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'DdsScheduleThemeAttachment_themeId_fkey') THEN\n    ALTER TABLE \"DdsScheduleThemeAttachment\" ADD CONSTRAINT \"DdsScheduleThemeAttachment_themeId_fkey\" FOREIGN KEY (\"themeId\") REFERENCES \"DdsScheduleTheme\"(\"id\") ON DELETE CASCADE ON UPDATE CASCADE;\n  END IF;\nEND $$"
 ];
 
 async function apply(): Promise<boolean> {
