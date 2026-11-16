@@ -50,6 +50,31 @@ async function callApi(method: string, body?: unknown, query = '') {
   return data;
 }
 
+/**
+ * Salva as imagens de um tema em etapas, para cada envio ficar pequeno:
+ * 1) remove as excluídas (mantendo as já salvas, sem reenviar o conteúdo);
+ * 2) envia cada imagem nova numa requisição própria;
+ * 3) grava a ordem final, legendas e nomes.
+ */
+async function saveThemeAttachments(themeId: string, items: DdsAttachment[], onProgress?: (done: number, total: number) => void) {
+  const clean = (a: DdsAttachment) => ({ ...a, fileData: undefined, uploadStatus: undefined, errorMessage: undefined });
+  const kept = items.filter(a => a.id);
+  const fresh = items.filter(a => !a.id);
+  if (fresh.length) await callApi('PATCH', { action: 'set_theme_attachments', themeId, attachments: kept.map(clean) });
+  const ids = new Map<DdsAttachment, string>();
+  for (let i = 0; i < fresh.length; i++) {
+    onProgress?.(i, fresh.length);
+    const a = fresh[i];
+    const res = await callApi('PATCH', { action: 'add_theme_attachment', themeId, attachment: { ...a, uploadStatus: undefined, errorMessage: undefined } });
+    ids.set(a, res.attachment.id);
+  }
+  onProgress?.(fresh.length, fresh.length);
+  await callApi('PATCH', { action: 'set_theme_attachments', themeId, attachments: items.map(a => clean({ ...a, id: a.id || ids.get(a) })) });
+}
+
+// Limite de PDF por arquivo: cada envio para a hospedagem aceita cerca de 4,5 MB.
+const MAX_THEME_PDF_MB = 4;
+
 const pad = (n: number) => String(n).padStart(2, '0');
 const fmtShort = (value: string | Date) => {
   const d = new Date(value);
@@ -300,7 +325,7 @@ function ScheduleCard({ schedule, reload, onError, flash }: { schedule: Schedule
               const themeId = res.week?.themes?.find((t: { order: number; id: string }) => t.order === upload.order)?.id;
               if (!themeId) continue;
               try {
-                await callApi('PATCH', { action: 'set_theme_attachments', themeId, attachments: upload.attachments });
+                await saveThemeAttachments(themeId, upload.attachments);
               } catch (e: any) {
                 throw new Error(`A semana foi salva, mas as imagens do tema ${upload.order + 1} não foram enviadas (${e.message}). Adicione-as pelo botão Imagens do tema.`);
               }
@@ -499,7 +524,7 @@ function WeekForm({ draft, setDraft, busy, onCancel, onSave, onError }: {
                     {draft.mode === 'create' ? (
                       t.attachments === null
                         ? <p className="text-xs text-slate-300 inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin"/> Carregando as imagens da semana anterior...</p>
-                        : <AttachmentManager attachments={t.attachments || []} onChange={updated => setTheme(i, { attachments: updated, attachmentsDirty: true })}/>
+                        : <AttachmentManager attachments={t.attachments || []} maxPdfSizeMb={MAX_THEME_PDF_MB} onChange={updated => setTheme(i, { attachments: updated, attachmentsDirty: true })}/>
                     ) : t.id ? (
                       <ThemeAttachmentsEditor themeId={t.id} topic={t.topic} readOnly={t.state === 'CLOSED' || t.state === 'REOPENED'} isOpen={t.state === 'OPEN'} onError={onError} dark/>
                     ) : null}
@@ -673,6 +698,7 @@ function ThemeAttachmentsEditor({ themeId, topic, readOnly, isOpen, onError, onS
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [progress, setProgress] = useState('');
 
   useEffect(() => {
     setItems(null); setDirty(false);
@@ -685,16 +711,14 @@ function ThemeAttachmentsEditor({ themeId, topic, readOnly, isOpen, onError, onS
     if (!items) return;
     setSaving(true); onError('');
     try {
-      // Imagens já salvas vão sem o conteúdo: o servidor reaproveita o que está no banco.
-      const attachments = items.map(a => ({ ...a, fileData: a.id ? undefined : a.fileData, uploadStatus: undefined, errorMessage: undefined }));
-      await callApi('PATCH', { action: 'set_theme_attachments', themeId, attachments });
+      await saveThemeAttachments(themeId, items, (done, total) => setProgress(total > 1 && done < total ? `Enviando imagem ${done + 1} de ${total}...` : ''));
       const fresh = await callApi('GET', undefined, `?themeAttachments=${encodeURIComponent(themeId)}`);
       setItems(fresh.attachments || []);
       setDirty(false); setSaved(true); setTimeout(() => setSaved(false), 3000);
       if (onSaved) await onSaved();
     } catch (e: any) {
       onError(e.message || 'Não foi possível salvar as imagens.');
-    } finally { setSaving(false); }
+    } finally { setSaving(false); setProgress(''); }
   };
 
   return (
@@ -703,10 +727,11 @@ function ThemeAttachmentsEditor({ themeId, topic, readOnly, isOpen, onError, onS
         <p className="text-xs text-slate-300 inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin"/> Carregando imagens de &quot;{topic}&quot;...</p>
       ) : (
         <>
-          <AttachmentManager attachments={items} readOnly={readOnly} onChange={updated => { setItems(updated); setDirty(true); }}/>
+          <AttachmentManager attachments={items} readOnly={readOnly} maxPdfSizeMb={MAX_THEME_PDF_MB} onChange={updated => { setItems(updated); setDirty(true); }}/>
           {!readOnly && (
             <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
               <span className="text-[11px] text-slate-300 mr-auto">{isOpen ? 'Tema aberto: ao salvar, os colaboradores já veem as novas imagens.' : 'As imagens aparecem para os colaboradores quando o tema abrir.'}</span>
+              {progress && <span className="text-xs font-bold text-slate-300">{progress}</span>}
               {saved && <span className="text-xs font-bold text-emerald-400 inline-flex items-center gap-1"><Check size={13}/> Imagens salvas</span>}
               <button type="button" disabled={!dirty || saving} onClick={save} className="rounded-lg bg-emerald-500 hover:bg-emerald-400 px-3 py-2 text-xs font-extrabold text-slate-950 inline-flex items-center gap-1.5 disabled:opacity-40">{saving ? <Loader2 size={13} className="animate-spin"/> : <Check size={13}/>} Salvar imagens</button>
             </div>
