@@ -25,6 +25,9 @@ function PresencialContent() {
   const router = useRouter();
   const toast = useToast();
   const queryMeetingId = searchParams.get('id');
+  // Vindo do link fixo do DDS Semanal: questionário do tema e volta para a lista de temas.
+  const weeklyQuizToken = /^[0-9a-f-]{36}$/i.test(searchParams.get('quiz') || '') ? searchParams.get('quiz') : null;
+  const weeklySlug = /^[a-z0-9-]{3,60}$/.test(searchParams.get('semana') || '') ? searchParams.get('semana') : null;
 
   // Estados do DDS
   const [meeting, setMeeting] = useState<any>(null);
@@ -425,6 +428,20 @@ function PresencialContent() {
           </div>
 
           <div className="space-y-2 pt-2">
+            {weeklyQuizToken && !isOfflineSubmitted && (
+              <Link href={`/questionario/${weeklyQuizToken}`} className="block">
+                <span className="w-full py-3.5 bg-white hover:bg-emerald-50 text-slate-950 font-black text-sm rounded-2xl transition-colors shadow-lg flex items-center justify-center gap-2 min-h-[44px]">
+                  Responder questionário do tema
+                </span>
+              </Link>
+            )}
+            {weeklySlug && (
+              <Link href={`/dds/${weeklySlug}`} className="block">
+                <span className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-2xl transition-colors border border-slate-700 min-h-[44px] flex items-center justify-center">
+                  Voltar aos temas da semana
+                </span>
+              </Link>
+            )}
             <button
               type="button"
               onClick={handleRegisterAnother}

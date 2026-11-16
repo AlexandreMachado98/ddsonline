@@ -632,6 +632,7 @@ model DdsScheduleTheme {
   opensAt             DateTime
   closesAt            DateTime        // = abertura do tema seguinte
   reopenUntil         DateTime?       // reabertura manual pelo organizador
+  quizSourceId        String?         // questionário (modelo ou avulso) copiado para o DDS do tema ao abrir
   meetingId           String?         @unique
   meeting             Meeting?        @relation(fields: [meetingId], references: [id], onDelete: SetNull)
   createdAt           DateTime        @default(now())

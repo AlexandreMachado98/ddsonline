@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     const quiz = await prisma.quiz.findUnique({
       where: { shareToken: token },
       include: {
-        meeting: { select: { id: true, status: true } },
+        meeting: { select: { id: true, status: true, attendanceCollectionOpen: true, inviteExpiresAt: true } },
         questions: { orderBy: { position: 'asc' }, include: { options: { orderBy: { position: 'asc' } } } }
       }
     });
@@ -35,7 +35,11 @@ export async function POST(req: Request) {
 
     // Se o questionário for atrelado a um DDS, verifica se o DDS ainda está ativo
     if (quiz.meetingId && quiz.meeting && quiz.meeting.status !== 'LIVE') {
-      return failure('Este DDS já foi finalizado. Avaliação encerrada.', 403);
+      // Exceção: tema do DDS Semanal reaberto pelo organizador continua aceitando respostas no prazo.
+      const reopenedWeeklyTheme = quiz.meeting.attendanceCollectionOpen &&
+        (!quiz.meeting.inviteExpiresAt || quiz.meeting.inviteExpiresAt > new Date()) &&
+        await prisma.ddsScheduleTheme.findUnique({ where: { meetingId: quiz.meeting.id }, select: { id: true } }).catch(() => null);
+      if (!reopenedWeeklyTheme) return failure('Este DDS já foi finalizado. Avaliação encerrada.', 403);
     }
 
     let finalAttendanceId: string | null = null;

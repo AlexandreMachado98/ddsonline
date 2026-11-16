@@ -92,6 +92,7 @@ async function syncOne(theme: any, now: Date) {
           }
         });
         await tx.ddsScheduleTheme.update({ where: { id: theme.id }, data: { meetingId: meeting.id } });
+        if (theme.quizSourceId) await cloneQuizForMeeting(tx, theme.quizSourceId, meeting.id, schedule.organizerId);
       });
       return;
     }
@@ -116,6 +117,39 @@ async function syncOne(theme: any, now: Date) {
   if (state === 'CLOSED' && theme.meeting && (theme.meeting.status === 'LIVE' || theme.meeting.attendanceCollectionOpen)) {
     await finalizeMeeting(theme.meeting.id, theme.closesAt);
   }
+}
+
+/**
+ * Publica uma cópia do questionário escolhido para o tema, ligada ao DDS do tema.
+ * Mesmo formato da ação "clonar" de /api/questionarios. Se o questionário de
+ * origem tiver sido excluído ou estiver vazio, o tema abre sem questionário.
+ */
+async function cloneQuizForMeeting(tx: any, sourceQuizId: string, meetingId: string, creatorId: string) {
+  const source = await tx.quiz.findUnique({
+    where: { id: sourceQuizId },
+    include: { questions: { orderBy: { position: 'asc' }, include: { options: { orderBy: { position: 'asc' } } } } }
+  });
+  if (!source || source.questions.length === 0) return;
+  await tx.quiz.create({
+    data: {
+      meetingId, creatorId,
+      title: source.title,
+      passingScore: source.passingScore,
+      criticalBelow: source.criticalBelow,
+      excellentFrom: source.excellentFrom,
+      showRanking: source.showRanking,
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+      templateId: source.templateId || source.id,
+      isTemplate: false,
+      questions: {
+        create: source.questions.map((q: any, qPos: number) => ({
+          text: q.text, type: q.type, weight: q.weight, position: qPos, explanation: q.explanation,
+          options: { create: q.options.map((o: any, oPos: number) => ({ text: o.text, isCorrect: o.isCorrect, position: oPos })) }
+        }))
+      }
+    }
+  });
 }
 
 /** Encerra o DDS do tema e gera a ata com hash, como o botão "Encerrar" do painel. */
