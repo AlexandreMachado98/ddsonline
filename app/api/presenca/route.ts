@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { logSecurityEvent } from '@/lib/auth';
 import { validateBase64Image } from '@/lib/fileValidation';
+import { companyIdForMeeting, resolveIdentity } from '@/lib/collaborators';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,8 +30,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Identificador do DDS não informado ou inválido.' }, { status: 400 });
     }
 
-    const trimmedName = name.trim().slice(0, 100);
-    const trimmedCpf = cpf.trim().slice(0, 80);
+    let trimmedName = name.trim().slice(0, 100);
+    let trimmedCpf = cpf.trim().slice(0, 80);
     const trimmedRegistration = registration.trim();
 
     // 2. Busca a reunião específica para vincular com precisão
@@ -58,6 +59,15 @@ export async function POST(req: Request) {
     if (meeting.inviteExpiresAt && new Date() > new Date(meeting.inviteExpiresAt)) {
       return NextResponse.json({ success: false, error: 'O link deste DDS expirou.' }, { status: 403 });
     }
+
+    // 4.1 Cadastro de colaboradores: matrícula cadastrada grava sempre o nome e a função do
+    // cadastro (vale também para assinaturas feitas sem internet e sincronizadas depois).
+    const identity = await resolveIdentity(await companyIdForMeeting(meeting), trimmedRegistration, { name: trimmedName, role: trimmedCpf });
+    if (!identity.ok) {
+      return NextResponse.json({ success: false, error: identity.error, code: 'UNREGISTERED' }, { status: 403 });
+    }
+    trimmedName = identity.name.slice(0, 100);
+    trimmedCpf = identity.role.slice(0, 80);
 
     // 5. Validação de formato e tamanho de imagens por Magic Bytes (Selfie e Assinatura)
     let sanitizedSelfie = '';

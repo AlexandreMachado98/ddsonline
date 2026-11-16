@@ -15,6 +15,7 @@ import DdsLogo from '@/components/DdsLogo';
 import AttachmentManager from '@/components/AttachmentManager';
 import OfflineSyncBadge from '@/components/OfflineSyncBadge';
 import { useToast } from '@/components/Toast';
+import CollaboratorIdentityFields, { identityBlockMessage, type IdentityStatus } from '@/components/CollaboratorIdentityFields';
 import { 
   saveOfflineAttendance, 
   cacheMeetingData, 
@@ -45,6 +46,7 @@ export default function MeetingRoom() {
   const [name, setName] = useState('');
   const [funcao, setFuncao] = useState('');
   const [registration, setRegistration] = useState('');
+  const [identityStatus, setIdentityStatus] = useState<IdentityStatus>('idle');
   const [savedSelfie, setSavedSelfie] = useState<string | null>(null);
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -186,6 +188,12 @@ export default function MeetingRoom() {
   const handleAdmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+
+    const identityMessage = identityBlockMessage(identityStatus);
+    if (identityMessage) {
+      toast.warning('Identificação', identityMessage);
+      return;
+    }
 
     if (!name.trim()) {
       toast.warning('Campo Obrigatório', 'Por favor, informe seu nome completo.');
@@ -650,55 +658,16 @@ export default function MeetingRoom() {
             </span>
           </div>
 
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
-              <input 
-                type="text" 
-                value={name} 
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="Ex: João da Silva"
-                autoComplete="name"
-                autoCapitalize="words"
-                spellCheck={false}
-                enterKeyHint="next"
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-base sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[48px]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Matrícula (4 dígitos) *</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]{4}"
-                maxLength={4}
-                value={registration}
-                onChange={(e) => handleRegistrationChange(e.target.value)}
-                placeholder="Ex: 1234"
-                autoComplete="off"
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-base sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[48px]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Função / Cargo</label>
-              <div className="relative flex items-center">
-                <input 
-                  type="text" 
-                  value={funcao} 
-                  onChange={(e) => handleFuncaoChange(e.target.value)}
-                  placeholder="Ex: Operador de Máquina"
-                  autoComplete="organization-title"
-                  autoCapitalize="sentences"
-                  enterKeyHint="done"
-                  className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl px-4 py-3 text-base sm:text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[48px]"
-                />
-                {funcao.trim().length > 1 && (
-                  <Check size={18} className="absolute right-3.5 text-emerald-400 pointer-events-none" />
-                )}
-              </div>
-            </div>
-          </div>
+          <CollaboratorIdentityFields
+            registration={registration}
+            name={name}
+            role={funcao}
+            onRegistrationChange={handleRegistrationChange}
+            onNameChange={handleNameChange}
+            onRoleChange={handleFuncaoChange}
+            scope={{ meetingId: roomId }}
+            onStatusChange={setIdentityStatus}
+          />
         </section>
 
         {/* PASSO 2: FOTO FACIAL DE COMPROVAÇÃO */}

@@ -35,6 +35,8 @@ model Company {
   actionPlans        ActionPlan[]
   competitions       Competition[]
   ddsSchedules       DdsSchedule[]
+  collaborators      Collaborator[]
+  collaboratorSettings CollaboratorSettings?
 }
 
 model User {
@@ -659,4 +661,30 @@ model DdsScheduleThemeAttachment {
   createdAt   DateTime         @default(now())
 
   @@index([themeId, order])
+}
+
+// ===================== Cadastro de colaboradores =====================
+// Matrícula, nome e função cadastrados pelo organizador, por empresa. Na assinatura,
+// o colaborador digita a matrícula e o nome/função vêm daqui. As assinaturas guardam
+// uma cópia dos dados, então editar ou excluir aqui não altera listas já fechadas.
+model Collaborator {
+  id           String   @id @default(uuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  registration String   // 4 dígitos
+  name         String
+  role         String
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([companyId, registration])
+  @@index([companyId, name])
+}
+
+model CollaboratorSettings {
+  companyId         String   @id
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  allowUnregistered Boolean  @default(true) // aceitar matrícula que não está no cadastro
+  updatedAt         DateTime @updatedAt
 }

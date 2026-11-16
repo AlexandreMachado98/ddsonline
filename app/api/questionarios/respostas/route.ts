@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { gradeQuiz, type QuizAnswer, type QuizQuestion } from '@/lib/quizGrading';
+import { companyIdForQuiz, resolveIdentity } from '@/lib/collaborators';
 import { createHash, timingSafeEqual } from 'node:crypto';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
     const quiz = await prisma.quiz.findUnique({
       where: { shareToken: token },
       include: {
-        meeting: { select: { id: true, status: true, attendanceCollectionOpen: true, inviteExpiresAt: true } },
+        meeting: { select: { id: true, status: true, attendanceCollectionOpen: true, inviteExpiresAt: true, companyId: true, organizerId: true } },
         questions: { orderBy: { position: 'asc' }, include: { options: { orderBy: { position: 'asc' } } } }
       }
     });
@@ -80,6 +81,12 @@ export async function POST(req: Request) {
       return failure('A matrícula deve conter exatamente 4 números.', 400);
     }
 
+    // Cadastro de colaboradores: matrícula cadastrada usa o nome e a função do cadastro.
+    const identity = await resolveIdentity(await companyIdForQuiz(quiz), participantRegistration, { name: finalParticipantName.trim(), role: participantDoc.trim() });
+    if (!identity.ok) return failure(identity.error, 403);
+    finalParticipantName = identity.name;
+    const finalParticipantDoc = identity.role;
+
     if (answers.length !== quiz.questions.length) return failure('Responda todas as perguntas.', 400);
 
     const questions: QuizQuestion[] = quiz.questions.map(q => ({
@@ -108,7 +115,7 @@ export async function POST(req: Request) {
           quizId: quiz.id,
           attendanceId: finalAttendanceId,
           participantName: finalParticipantName,
-          participantDoc: participantDoc.trim(),
+          participantDoc: finalParticipantDoc,
           participantRegistration,
           score: result.score,
           earnedPoints: result.earnedPoints,
@@ -158,7 +165,7 @@ export async function POST(req: Request) {
           passed: result.passed,
           level: result.level,
           participantName: finalParticipantName,
-          participantRole: typeof participantDoc === 'string' ? participantDoc.trim() : null,
+          participantRole: finalParticipantDoc,
           timeSpentSeconds,
           questions: feedbackBreakdown
         }
