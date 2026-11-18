@@ -273,7 +273,7 @@ export default function DdsReportPreviewModal({
         {/* PÁGINA 1: FRENTE - REGISTRO DE PRESENÇA                             */}
         {/* =================================================================== */}
         <div 
-          className={`w-full max-w-[210mm] bg-white text-slate-900 shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 transition-all flex flex-col ${
+          className={`w-full max-w-[210mm] bg-white text-slate-900 shadow-2xl rounded-2xl sm:rounded-3xl overflow-visible border border-slate-200 transition-all flex flex-col ${
             viewMode === 'A4_PAGES' ? 'min-h-[297mm]' : ''
           }`}
         >
@@ -511,7 +511,7 @@ export default function DdsReportPreviewModal({
         {/* =================================================================== */}
         {shouldRenderVerso && (
           <div 
-            className={`w-full max-w-[210mm] bg-white text-slate-900 shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 transition-all flex flex-col ${
+            className={`w-full max-w-[210mm] bg-white text-slate-900 shadow-2xl rounded-2xl sm:rounded-3xl overflow-visible border border-slate-200 transition-all flex flex-col ${
               viewMode === 'A4_PAGES' ? 'min-h-[297mm]' : ''
             }`}
           >
@@ -634,7 +634,7 @@ export default function DdsReportPreviewModal({
             {/* Índice Geral de Evidências (exibido apenas quando houver mais de 2 anexos para evitar desperdício de página) */}
             {attachmentsList.length > 2 && (
               <div 
-                className={`w-full max-w-[210mm] bg-white text-slate-900 shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 transition-all flex flex-col ${
+                className={`w-full max-w-[210mm] bg-white text-slate-900 shadow-2xl rounded-2xl sm:rounded-3xl overflow-visible border border-slate-200 transition-all flex flex-col ${
                   viewMode === 'A4_PAGES' ? 'min-h-[297mm]' : ''
                 }`}
               >
@@ -726,7 +726,7 @@ export default function DdsReportPreviewModal({
               return (
                 <div 
                   key={idx}
-                  className={`w-full max-w-[210mm] bg-white text-slate-900 shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 transition-all flex flex-col ${
+                  className={`w-full max-w-[210mm] bg-white text-slate-900 shadow-2xl rounded-2xl sm:rounded-3xl overflow-visible border border-slate-200 transition-all flex flex-col ${
                     viewMode === 'A4_PAGES' ? 'min-h-[297mm]' : ''
                   }`}
                 >

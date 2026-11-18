@@ -1103,6 +1103,28 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
 
     versoY = 43;
 
+    // Cabeçalho repetido para páginas de continuação, mantendo o texto dentro
+    // da área imprimível em vez de desenhá-lo além do limite da folha.
+    const startVersoContinuationPage = (sectionTitle: string) => {
+      doc.addPage();
+      doc.setFillColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+      doc.rect(0, 0, pageWidth, 28, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DDS ON', 14, 16);
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(215, 235, 225);
+      doc.text('CONTEÚDO DO DDS - CONTINUAÇÃO', 14, 22);
+      renderCompanyLogo(28);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+      doc.text(sectionTitle, 14, 40);
+      return 48;
+    };
+
     // Título Principal do Verso
     doc.setTextColor(textDark[0], textDark[1], textDark[2]);
     doc.setFontSize(15);
@@ -1185,6 +1207,9 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
       { baseFontSize: 7.8, lineHeight: 4.2, dryRun: true }
     );
     const vObjBlockH = Math.max(18, 12 + vObjDry.totalHeight + 3);
+    if (versoY + vObjBlockH > pageHeight - 25) {
+      versoY = startVersoContinuationPage('1. OBJETIVO E CONTEÚDO PROGRAMÁTICO');
+    }
 
     doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
     doc.roundedRect(14, versoY, fullWidth, vObjBlockH, 2, 2, 'F');
@@ -1226,6 +1251,9 @@ export async function generateDdsPdf(meeting: MeetingData): Promise<void> {
       { baseFontSize: 7.8, lineHeight: 4.2, dryRun: true }
     );
     const vContentBlockH = Math.max(36, 12 + vContentDry.totalHeight + 3);
+    if (versoY + vContentBlockH > pageHeight - 25) {
+      versoY = startVersoContinuationPage('2. CONTEÚDO PROGRAMÁTICO - CONTINUAÇÃO');
+    }
 
     doc.setFillColor(lightGreenBg[0], lightGreenBg[1], lightGreenBg[2]);
     doc.roundedRect(14, versoY, fullWidth, vContentBlockH, 2, 2, 'F');
