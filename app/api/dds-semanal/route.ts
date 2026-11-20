@@ -160,16 +160,19 @@ export async function GET(req: Request) {
         }
       });
       // Presença com foto/assinatura: consulta só a existência, sem baixar as imagens.
-      const withImages = await prisma.attendance.findMany({
-        where: { meetingId: fresh.meetingId, NOT: { selfie: '' } },
-        select: { id: true }
-      });
-      const hasSelfie = new Set(withImages.map(a => a.id));
+      // A selfie pode estar desligada para a empresa (ou já apagada após 48 h): a assinatura
+      // continua disponível para conferência.
+      const [withSelfie, withSignature] = await Promise.all([
+        prisma.attendance.findMany({ where: { meetingId: fresh.meetingId, NOT: { selfie: '' } }, select: { id: true } }),
+        prisma.attendance.findMany({ where: { meetingId: fresh.meetingId, NOT: { signature: '' } }, select: { id: true } })
+      ]);
+      const hasSelfie = new Set(withSelfie.map(a => a.id));
+      const hasSignature = new Set(withSignature.map(a => a.id));
       return NextResponse.json({
         success: true, now, state, availableUntil, meetingId: fresh.meetingId,
         signatures: attendees.map(a => ({
           id: a.id, name: a.name, role: a.cpf, registration: a.registration, createdAt: a.createdAt,
-          hasSelfie: hasSelfie.has(a.id), quizScore: a.quizAttempts[0]?.score ?? null
+          hasSelfie: hasSelfie.has(a.id), hasSignature: hasSignature.has(a.id), quizScore: a.quizAttempts[0]?.score ?? null
         }))
       }, { headers: { 'Cache-Control': 'no-store' } });
     }

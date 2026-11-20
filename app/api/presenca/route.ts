@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { logSecurityEvent } from '@/lib/auth';
 import { validateBase64Image } from '@/lib/fileValidation';
 import { companyIdForMeeting, resolveIdentity } from '@/lib/collaborators';
+import { companyRequiresSelfie } from '@/lib/selfiePolicy';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,7 +63,8 @@ export async function POST(req: Request) {
 
     // 4.1 Cadastro de colaboradores: matrícula cadastrada grava sempre o nome e a função do
     // cadastro (vale também para assinaturas feitas sem internet e sincronizadas depois).
-    const identity = await resolveIdentity(await companyIdForMeeting(meeting), trimmedRegistration, { name: trimmedName, role: trimmedCpf });
+    const companyId = await companyIdForMeeting(meeting);
+    const identity = await resolveIdentity(companyId, trimmedRegistration, { name: trimmedName, role: trimmedCpf });
     if (!identity.ok) {
       return NextResponse.json({ success: false, error: identity.error, code: 'UNREGISTERED' }, { status: 403 });
     }
@@ -70,8 +72,11 @@ export async function POST(req: Request) {
     trimmedCpf = identity.role.slice(0, 80);
 
     // 5. Validação de formato e tamanho de imagens por Magic Bytes (Selfie e Assinatura)
+    // Empresa com selfie desligada no DDS Master: a foto do rosto nunca é gravada,
+    // mesmo que um aparelho antigo (ou a fila offline) ainda envie uma.
+    const selfieEnabled = await companyRequiresSelfie(companyId);
     let sanitizedSelfie = '';
-    if (typeof savedSelfie === 'string' && savedSelfie.trim().length > 0) {
+    if (selfieEnabled && typeof savedSelfie === 'string' && savedSelfie.trim().length > 0) {
       const selfieValidation = validateBase64Image(savedSelfie, 1.5 * 1024 * 1024); // Máximo 1.5MB
       if (!selfieValidation.valid) {
         return NextResponse.json({ success: false, error: selfieValidation.error || 'Formato de foto inválido.' }, { status: 400 });

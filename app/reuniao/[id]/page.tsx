@@ -38,6 +38,9 @@ export default function MeetingRoom() {
   const [attendanceCollectionOpen, setAttendanceCollectionOpen] = useState(false);
   const [meetingType, setMeetingType] = useState<'PRESENTIAL' | 'REMOTE'>('REMOTE');
   const [organizerInfo, setOrganizerInfo] = useState<any>(null);
+  // Selfie por empresa (DDS Master): desligada = presença só com dados e assinatura.
+  const [requireSelfie, setRequireSelfie] = useState(true);
+  const [selfieRetentionHours, setSelfieRetentionHours] = useState(48);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isLoadingMeeting, setIsLoadingMeeting] = useState(true);
   const [meetingNotFound, setMeetingNotFound] = useState(false);
@@ -112,6 +115,8 @@ export default function MeetingRoom() {
           setClassification(data.meeting.classification || 'DDS');
           if (data.meeting.type) setMeetingType(data.meeting.type);
           if (data.meeting.organizer) setOrganizerInfo(data.meeting.organizer);
+          setRequireSelfie(data.meeting.requireSelfie !== false);
+          if (typeof data.meeting.selfieRetentionHours === 'number') setSelfieRetentionHours(data.meeting.selfieRetentionHours);
           if (data.meeting.attachments) setAttachments(data.meeting.attachments);
           cacheMeetingData(data.meeting);
 
@@ -210,7 +215,7 @@ export default function MeetingRoom() {
       return;
     }
 
-    if (!savedSelfie) {
+    if (requireSelfie && !savedSelfie) {
       toast.warning('Foto Facial Pendente', 'Por favor, tire sua foto facial ou selecione do aparelho.');
       return;
     }
@@ -229,7 +234,7 @@ export default function MeetingRoom() {
           name: name.trim(),
           cpf: funcao.trim(),
           registration,
-          savedSelfie,
+          savedSelfie: requireSelfie ? savedSelfie || '' : '',
           savedSignature,
           meetingId: roomId
         });
@@ -253,7 +258,7 @@ export default function MeetingRoom() {
           name: name.trim(),
           cpf: funcao.trim(),
           registration,
-          savedSelfie,
+          savedSelfie: requireSelfie ? savedSelfie || '' : '',
           savedSignature,
           meetingId: roomId
         })
@@ -286,7 +291,7 @@ export default function MeetingRoom() {
           name: name.trim(),
           cpf: funcao.trim(),
           registration,
-          savedSelfie,
+          savedSelfie: requireSelfie ? savedSelfie || '' : '',
           savedSignature,
           meetingId: roomId
         });
@@ -487,7 +492,7 @@ export default function MeetingRoom() {
                 {objective && <p className="text-slate-400 break-words">Objetivo: <strong className="text-emerald-400 break-words">{objective}</strong></p>}
                 {programmaticContent && <p className="text-slate-400 break-words whitespace-pre-line">Conteúdo: <strong className="text-teal-300 break-words">{programmaticContent}</strong></p>}
                 <p className="text-slate-400">Data/Hora: <strong className="text-white">{new Date().toLocaleString('pt-BR')}</strong></p>
-                <p className="text-slate-400">Status: <strong className="text-emerald-400">Foto e Assinatura Registradas com Sucesso</strong></p>
+                <p className="text-slate-400">Status: <strong className="text-emerald-400">{requireSelfie ? 'Foto e Assinatura Registradas com Sucesso' : 'Assinatura Registrada com Sucesso'}</strong></p>
               </div>
 
               <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2 max-w-md mx-auto">
@@ -638,7 +643,9 @@ export default function MeetingRoom() {
             <Radio size={18} className="animate-pulse" />
           </div>
           <p className="leading-relaxed text-[11px]">
-            Preencha seus dados, tire a foto facial e assine na tela para registrar sua presença no DDS.
+            {requireSelfie
+              ? 'Preencha seus dados, tire a foto facial e assine na tela para registrar sua presença no DDS.'
+              : 'Preencha seus dados e assine na tela para registrar sua presença no DDS.'}
           </p>
         </div>
 
@@ -676,7 +683,8 @@ export default function MeetingRoom() {
           />
         </section>
 
-        {/* PASSO 2: FOTO FACIAL DE COMPROVAÇÃO */}
+        {/* PASSO 2: FOTO FACIAL DE COMPROVAÇÃO (só quando a empresa pede selfie) */}
+        {requireSelfie && (
         <section className="bg-slate-900/90 backdrop-blur-md p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-xl space-y-3.5">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -693,14 +701,15 @@ export default function MeetingRoom() {
             )}
           </div>
 
-          <SelfieCapture onConfirm={(selfie) => setSavedSelfie(selfie)} />
+          <SelfieCapture onConfirm={(selfie) => setSavedSelfie(selfie)} retentionHours={selfieRetentionHours} />
         </section>
+        )}
 
         {/* PASSO 3: ASSINATURA DIGITAL TOUCH */}
         <section className="bg-slate-900/90 backdrop-blur-md p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-xl space-y-3.5">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <PenTool size={16} className="text-emerald-400" /> 3. Assinatura Digital
+              <PenTool size={16} className="text-emerald-400" /> {requireSelfie ? 3 : 2}. Assinatura Digital
             </h2>
             {savedSignature ? (
               <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md flex items-center gap-1">
@@ -723,7 +732,7 @@ export default function MeetingRoom() {
             Registro de Presença e Privacidade (LGPD)
           </p>
           <p>
-            Seus dados (nome, cargo, foto simples de presença e assinatura) são coletados para a formalização da lista de presença do DDS pelo seu empregador (Art. 7º, II da LGPD c/c NRs do MTE). As mídias permanecem em nuvem apenas temporariamente durante a consolidação da ata em PDF.
+            Seus dados (nome, cargo{requireSelfie ? ', foto simples de presença' : ''} e assinatura) são coletados para a formalização da lista de presença do DDS pelo seu empregador (Art. 7º, II da LGPD c/c NRs do MTE).{requireSelfie ? ` A foto do rosto é apagada ${selfieRetentionHours} h após o encerramento do DDS.` : ''}
           </p>
           <p className="text-[10px] text-slate-500">
             Ao confirmar, você atesta sua participação e declara ciência do{' '}

@@ -4,7 +4,9 @@ import prisma from '@/lib/prisma';
 import { getAuthenticatedUser, logSecurityEvent } from '@/lib/auth';
 import { ensureDdsScheduleTables } from '@/lib/ddsScheduleTables';
 import { syncScheduleThemes } from '@/lib/ddsScheduleSync';
-import { purgeExpiredOperationalData, purgeMeetingOperationalDataImmediate } from '@/lib/retention';
+import { DDS_RETENTION_HOURS, purgeExpiredSelfiesThrottled, purgeMeetingOperationalDataImmediate } from '@/lib/retention';
+import { companyIdForMeeting } from '@/lib/collaborators';
+import { companyRequiresSelfie, requireSelfieByCompany } from '@/lib/selfiePolicy';
 import { validateBase64Image, validateAttachment } from '@/lib/fileValidation';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +46,12 @@ async function ensureDbColumns() {
   } catch (e) {
     console.error("ensureDbColumns error:", e);
   }
+}
+
+/** Acrescenta a cada DDS ao vivo se a empresa pede selfie (tela presencial aberta pelo organizador). */
+async function withSelfiePolicy<T extends { companyId?: string | null }>(meetings: T[]): Promise<(T & { requireSelfie: boolean; selfieRetentionHours: number })[]> {
+  const policy = await requireSelfieByCompany(meetings.map(m => m.companyId));
+  return meetings.map(m => ({ ...m, requireSelfie: m.companyId ? policy.get(m.companyId) ?? true : true, selfieRetentionHours: DDS_RETENTION_HOURS }));
 }
 
 // 1. GET: Busca reunião por ID específico ou busca reunião e histórico do organizador autenticado
@@ -195,7 +203,12 @@ export async function GET(req: Request) {
         }
       });
 
-      return NextResponse.json({ success: true, meeting });
+      // Tela do colaborador: diz se a empresa pede selfie e por quanto tempo ela fica guardada.
+      const requireSelfie = meeting ? await companyRequiresSelfie(await companyIdForMeeting(meeting)) : true;
+      return NextResponse.json({
+        success: true,
+        meeting: meeting ? { ...meeting, requireSelfie, selfieRetentionHours: DDS_RETENTION_HOURS } : meeting
+      });
     }
 
     // Cenário B: Painel Admin do Organizador buscando suas reuniões e histórico
@@ -209,6 +222,9 @@ export async function GET(req: Request) {
         history: [] 
       }, { status: 401 });
     }
+
+    // Apaga as selfies de DDS encerrados há mais de 48 h (no máximo a cada 30 min por instância).
+    await purgeExpiredSelfiesThrottled();
 
     // DDS Semanal (link fixo): mantém os DDS dos temas em dia para o Histórico.
     // Os DDS de temas semanais não entram no painel ao vivo; são acompanhados na tela própria.
@@ -286,7 +302,7 @@ export async function GET(req: Request) {
 
     // Se o cliente pediu apenas o DDS ativo (polling leve a cada 20s)
     if (activeOnly) {
-      const activeMeetings = await activeMeetingPromise;
+      const activeMeetings = await withSelfiePolicy(await activeMeetingPromise);
       return NextResponse.json({ success: true, meeting: activeMeetings[0] || null, activeMeetings });
     }
 
@@ -365,7 +381,7 @@ export async function GET(req: Request) {
 
     // Execução paralela ultrarrápida no banco
     const [activeMeetings, history] = await Promise.all([
-      activeMeetingPromise,
+      activeMeetingPromise.then(withSelfiePolicy),
       historyPromise
     ]);
 
