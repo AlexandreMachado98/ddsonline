@@ -183,3 +183,49 @@ export async function purgeMeetingOperationalDataImmediate(meetingId: string, or
     return false;
   }
 }
+
+/**
+ * Apaga as selfies de presença dos DDS encerrados há mais de DDS_RETENTION_HOURS (48 h).
+ *
+ * Só as selfies: a ata em PDF não fica guardada no servidor, ela é montada na hora a partir
+ * dos dados do DDS. Por isso nomes, funções, horários, assinaturas, foto do grupo e anexos
+ * continuam no banco, e a ata baixada depois sai igual, só sem a coluna da foto do rosto.
+ * O documentHash não usa as imagens no cálculo, então segue válido.
+ * Exige DDS encerrado com documentHash (lista fechada); coleta complementar aberta fica de fora.
+ */
+export async function purgeExpiredSelfies(retentionHours = DDS_RETENTION_HOURS): Promise<number> {
+  const cutoff = new Date(Date.now() - retentionHours * 60 * 60 * 1000);
+  const { count } = await prisma.attendance.updateMany({
+    where: {
+      selfie: { not: '' },
+      meeting: { status: 'ENDED', endedAt: { lte: cutoff }, documentHash: { not: null } }
+    },
+    data: { selfie: '' }
+  });
+  if (count > 0) {
+    logSecurityEvent('ADMIN_ACTION', {
+      reason: `SELFIE_RETENTION_PURGE: ${count} selfies apagadas (DDS encerrados há mais de ${retentionHours}h)`
+    });
+  }
+  return count;
+}
+
+// Limpeza oportunista: roda no máximo a cada 30 min por instância do servidor,
+// disparada pelo painel do organizador e pela tarefa diária da Vercel (/api/cron/purga).
+const SELFIE_PURGE_INTERVAL_MS = 30 * 60 * 1000;
+let lastSelfiePurge = 0;
+let runningSelfiePurge: Promise<number> | null = null;
+
+export function purgeExpiredSelfiesThrottled(force = false): Promise<number> {
+  if (runningSelfiePurge) return runningSelfiePurge;
+  if (!force && Date.now() - lastSelfiePurge < SELFIE_PURGE_INTERVAL_MS) return Promise.resolve(0);
+  lastSelfiePurge = Date.now();
+  runningSelfiePurge = purgeExpiredSelfies()
+    .catch(error => {
+      console.error('Falha na limpeza automática de selfies:', error);
+      lastSelfiePurge = 0;
+      return 0;
+    })
+    .finally(() => { runningSelfiePurge = null; });
+  return runningSelfiePurge;
+}

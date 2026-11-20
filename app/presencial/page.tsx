@@ -32,6 +32,9 @@ function PresencialContent() {
 
   // Estados do DDS
   const [meeting, setMeeting] = useState<any>(null);
+  // Selfie por empresa (DDS Master): desligada = presença só com dados e assinatura.
+  const requireSelfie = meeting?.requireSelfie !== false;
+  const selfieRetentionHours = typeof meeting?.selfieRetentionHours === 'number' ? meeting.selfieRetentionHours : 48;
   const [topic, setTopic] = useState('DDS Presencial');
   const [farm, setFarm] = useState('');
   const [objective, setObjective] = useState('');
@@ -220,7 +223,7 @@ function PresencialContent() {
       return;
     }
 
-    if (!savedSelfie) {
+    if (requireSelfie && !savedSelfie) {
       toast.warning('Foto Facial Pendente', 'Por favor, tire sua foto facial ou envie uma foto.');
       return;
     }
@@ -239,7 +242,7 @@ function PresencialContent() {
           name: name.trim(),
           cpf: funcao.trim(),
           registration,
-          savedSelfie,
+          savedSelfie: requireSelfie ? savedSelfie || '' : '',
           savedSignature,
           meetingId: meetingId || 'presencial'
         });
@@ -264,7 +267,7 @@ function PresencialContent() {
           name: name.trim(),
           cpf: funcao.trim(),
           registration,
-          savedSelfie,
+          savedSelfie: requireSelfie ? savedSelfie || '' : '',
           savedSignature,
           meetingId: meetingId || 'presencial'
         })
@@ -286,7 +289,7 @@ function PresencialContent() {
             }));
           }
         } catch {}
-        toast.success('Presença Presencial Confirmada!', 'Seus dados e foto facial foram registrados com sucesso.');
+        toast.success('Presença Presencial Confirmada!', requireSelfie ? 'Seus dados e foto facial foram registrados com sucesso.' : 'Seus dados e sua assinatura foram registrados com sucesso.');
       } else {
         toast.error('Erro ao Registrar', data.error || 'Não foi possível registrar a presença.');
       }
@@ -297,7 +300,7 @@ function PresencialContent() {
           name: name.trim(),
           cpf: funcao.trim(),
           registration,
-          savedSelfie,
+          savedSelfie: requireSelfie ? savedSelfie || '' : '',
           savedSignature,
           meetingId: meetingId || 'presencial'
         });
@@ -409,7 +412,7 @@ function PresencialContent() {
               {isOfflineSubmitted ? 'Presença Gravada no Aparelho!' : 'Presença Confirmada!'}
             </h2>
             <p className="text-xs text-slate-300">
-              Obrigado, <strong className="text-white">{name}</strong>. Sua assinatura e foto facial foram salvas para o DDS de hoje.
+              Obrigado, <strong className="text-white">{name}</strong>. {requireSelfie ? 'Sua assinatura e foto facial foram salvas para o DDS de hoje.' : 'Sua assinatura foi salva para o DDS de hoje.'}
             </p>
           </div>
 
@@ -540,7 +543,9 @@ function PresencialContent() {
             <CheckCircle2 size={18} />
           </div>
           <p className="leading-relaxed text-[11px]">
-            Preencha seus dados, tire a foto facial e assine abaixo para validar sua presença presencial.
+            {requireSelfie
+              ? 'Preencha seus dados, tire a foto facial e assine abaixo para validar sua presença presencial.'
+              : 'Preencha seus dados e assine abaixo para validar sua presença presencial.'}
           </p>
         </div>
 
@@ -580,7 +585,8 @@ function PresencialContent() {
           />
         </section>
 
-        {/* PASSO 2: FOTO FACIAL DE PRESENÇA */}
+        {/* PASSO 2: FOTO FACIAL DE PRESENÇA (só quando a empresa pede selfie) */}
+        {requireSelfie && (
         <section className="bg-slate-900/90 backdrop-blur-md p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-xl space-y-3.5">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -597,14 +603,15 @@ function PresencialContent() {
             )}
           </div>
 
-          <SelfieCapture onConfirm={(selfie) => setSavedSelfie(selfie)} />
+          <SelfieCapture onConfirm={(selfie) => setSavedSelfie(selfie)} retentionHours={selfieRetentionHours} />
         </section>
+        )}
 
         {/* PASSO 3: ASSINATURA DIGITAL TOUCH */}
         <section className="bg-slate-900/90 backdrop-blur-md p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-xl space-y-3.5">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <PenTool size={16} className="text-emerald-400" /> 3. Assinatura Digital
+              <PenTool size={16} className="text-emerald-400" /> {requireSelfie ? 3 : 2}. Assinatura Digital
             </h2>
             {savedSignature ? (
               <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md flex items-center gap-1">
@@ -627,7 +634,7 @@ function PresencialContent() {
             Registro de Presença e Privacidade (LGPD)
           </p>
           <p>
-            Seus dados (nome, cargo, foto simples de presença e assinatura) são coletados para a formalização da lista de presença do DDS pelo seu empregador (Art. 7º, II da LGPD c/c NRs do MTE). As mídias permanecem em nuvem apenas temporariamente durante a consolidação da ata em PDF.
+            Seus dados (nome, cargo{requireSelfie ? ', foto simples de presença' : ''} e assinatura) são coletados para a formalização da lista de presença do DDS pelo seu empregador (Art. 7º, II da LGPD c/c NRs do MTE).{requireSelfie ? ` A foto do rosto é apagada ${selfieRetentionHours} h após o encerramento do DDS.` : ''}
           </p>
           <p className="text-[10px] text-slate-500">
             Ao confirmar, você atesta sua participação e declara ciência do{' '}

@@ -2,13 +2,21 @@
 
 import React, { useRef, useState, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, RefreshCw, Check, Upload, AlertCircle, SwitchCamera, Image as ImageIcon } from 'lucide-react';
+import { Camera, RefreshCw, Check, Upload, AlertCircle, SwitchCamera, ShieldCheck } from 'lucide-react';
 
 interface SelfieCaptureProps {
   onConfirm: (imageSrc: string | null) => void;
+  /** Horas que a foto fica guardada depois do encerramento do DDS (aviso de consentimento). */
+  retentionHours?: number;
 }
 
-export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
+/** Texto do aviso: "48 h", "3 dias"... */
+export function retentionLabel(hours: number): string {
+  if (hours >= 72 && hours % 24 === 0) return `${hours / 24} dias`;
+  return `${hours} h`;
+}
+
+export default function SelfieCapture({ onConfirm, retentionHours = 48 }: SelfieCaptureProps) {
   const webcamRef = useRef<Webcam>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -145,6 +153,14 @@ export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
         )}
       </div>
 
+      {/* Aviso de consentimento (LGPD): finalidade e prazo de guarda da foto */}
+      <p className="w-full max-w-[280px] flex items-start gap-1.5 rounded-2xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-[11px] leading-snug text-slate-300">
+        <ShieldCheck size={14} className="mt-px shrink-0 text-emerald-400" aria-hidden="true" />
+        <span>
+          Sua foto é usada só para comprovar presença neste DDS e é apagada em {retentionLabel(retentionHours)} após o encerramento.
+        </span>
+      </p>
+
       {/* Input oculto para upload de arquivo fallback */}
       <input
         type="file"
@@ -180,7 +196,7 @@ export default function SelfieCapture({ onConfirm }: SelfieCaptureProps) {
         ) : (
           <div className="w-full space-y-2 animate-in fade-in duration-200">
             <div className="bg-emerald-500/15 border border-emerald-500/30 p-2.5 rounded-2xl text-[11px] text-emerald-300 font-bold flex items-center justify-center gap-1.5 shadow-sm">
-              <Check size={16} className="text-emerald-400" /> Foto Biometria Registrada
+              <Check size={16} className="text-emerald-400" /> Foto de presença registrada
             </div>
             <button
               type="button"

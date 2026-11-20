@@ -138,7 +138,7 @@ export default function PrivacidadePage() {
                   <FileText size={15} className="text-teal-400" /> B. Dados Operacionais Temporários do DDS
                 </p>
                 <p className="text-slate-400 text-xs">
-                  <strong>Dados:</strong> Tema ministrado, fazenda/obra/setor, objetivo, conteúdo programático, fotografias de presença coletiva, anexos de material de treinamento, e dos participantes: nome completo, cargo/função, fotografia facial simples de comprovação de presença física, traçado vetorial de assinatura digital em tela sensível ao toque, horário de entrada, horário e justificativa de saída antecipada (se houver).
+                  <strong>Dados:</strong> Tema ministrado, fazenda/obra/setor, objetivo, conteúdo programático, fotografias de presença coletiva, anexos de material de treinamento, e dos participantes: nome completo, cargo/função, fotografia facial simples de comprovação de presença física (somente quando a empresa contratante mantém a selfie ligada; caso contrário a foto do rosto não é coletada), traçado vetorial de assinatura digital em tela sensível ao toque, horário de entrada, horário e justificativa de saída antecipada (se houver).
                 </p>
                 <p className="text-slate-400 text-xs">
                   <strong>Finalidade e Base Legal:</strong> Comprovação da realização do DDS e cumprimento de obrigações legais e regulamentares trabalhistas de SST (Art. 7º, II da LGPD c/c CLT e Normas Regulamentadoras - NR-1, NR-18, NR-31).
@@ -192,7 +192,7 @@ export default function PrivacidadePage() {
                   <Clock size={16} className="text-amber-400" /> A Janela de Retenção Operacional de 48 Horas
                 </p>
                 <p className="text-slate-400 text-xs leading-relaxed">
-                  Para viabilizar que o instrutor ou administrador conclua o evento, revise os dados e efetue o download do relatório oficial em PDF, todos os dados operacionais e arquivos de mídia (fotos e assinaturas) permanecem disponíveis no banco de dados operacional pelo período padrão de <strong>48 (quarenta e oito) horas</strong> após o encerramento formal da reunião (estado <code>ENDED</code>).
+                  Para viabilizar que o instrutor ou administrador conclua o evento, revise os dados e efetue o download do relatório oficial em PDF, as fotos faciais individuais (selfies) permanecem disponíveis pelo período padrão de <strong>48 (quarenta e oito) horas</strong> após o encerramento formal da reunião (estado <code>ENDED</code>) com a lista fechada. O colaborador é avisado desse prazo na própria tela de captura da foto.
                 </p>
               </div>
 
@@ -201,11 +201,11 @@ export default function PrivacidadePage() {
                   <AlertCircle size={16} className="text-rose-400" /> A Rotina Automática de Purga de Dados Pesados
                 </p>
                 <p className="text-slate-300 text-xs leading-relaxed">
-                  Decorrido o prazo operacional de 48 horas (ou imediatamente mediante solicitação manual de limpeza efetuada pelo organizador na área administrativa após o download da ata), o sistema executa a rotina de <strong>purga permanente e irreversível dos dados pesados em nuvem</strong>:
+                  Decorrido o prazo operacional de 48 horas, o sistema executa automaticamente (pelo menos uma vez por dia) a <strong>exclusão permanente e irreversível das fotos faciais</strong>:
                 </p>
                 <ul className="list-disc list-inside text-slate-400 text-xs space-y-1">
-                  <li><strong>Arquivos Removidos Definitivamente da Nuvem:</strong> Fotografias coletivas (`groupPhoto`), arquivos anexos de slides/documentos (`fileData`), fotos faciais individuais dos participantes (`selfie`) e os traçados vetoriais originais das assinaturas digitais (`signature`).</li>
-                  <li><strong>Registros Preservados para Auditoria de Autenticidade:</strong> O ID da reunião, tema, local/empresa, datas/horários, nome do instrutor, classificação, dados cadastrais básicos da presença (nome completo, cargo e horários) e o <strong>Hash Criptográfico SHA-256</strong>. Isso permite que, a qualquer tempo, quem possuir o PDF emitido possa conferir no validador público da plataforma se aquele documento é autêntico e inalterado.</li>
+                  <li><strong>Removido Definitivamente da Nuvem:</strong> Fotos faciais individuais dos participantes (`selfie`). A ata emitida depois disso sai completa, apenas sem a coluna da foto.</li>
+                  <li><strong>Registros Preservados para Auditoria de Autenticidade:</strong> O ID da reunião, tema, local/empresa, datas/horários, nome do instrutor, classificação, dados cadastrais básicos da presença (nome completo, cargo e horários), as assinaturas desenhadas em tela, as fotografias coletivas e os materiais anexados (necessários para reemitir a ata oficial com as assinaturas) e o <strong>Hash Criptográfico SHA-256</strong>. Isso permite que, a qualquer tempo, quem possuir o PDF emitido possa conferir no validador público da plataforma se aquele documento é autêntico e inalterado.</li>
                 </ul>
               </div>
 
@@ -214,7 +214,7 @@ export default function PrivacidadePage() {
                   <AlertTriangle size={16} className="text-amber-400" /> Não Manutenção de Repositório Permanente (Guarda a Cargo do Cliente)
                 </p>
                 <p className="text-slate-300 text-xs leading-relaxed">
-                  A plataforma <strong>DDS Online atua estritamente como ferramenta tecnológica de coleta, certificação e emissão de atas em PDF</strong>. A plataforma <strong>não atua como repositório documental permanente (GED regulatório)</strong>. Uma vez expirado o prazo de 48 horas e realizada a purga, a plataforma <strong>não possui capacidade técnica de reconstituir ou restaurar as fotos e assinaturas originais</strong> caso o cliente não tenha realizado o download do PDF. A custódia, arquivamento de longo prazo (prazos trabalhistas e previdenciários de 5, 20 anos ou mais) e backup são de responsabilidade integral e exclusiva da empresa cliente.
+                  A plataforma <strong>DDS Online atua estritamente como ferramenta tecnológica de coleta, certificação e emissão de atas em PDF</strong>. A plataforma <strong>não atua como repositório documental permanente (GED regulatório)</strong>. Uma vez expirado o prazo de 48 horas e realizada a purga, a plataforma <strong>não possui capacidade técnica de reconstituir ou restaurar as fotos faciais originais</strong>; para tê-las na ata, o cliente deve baixar o PDF dentro desse prazo. A custódia, arquivamento de longo prazo (prazos trabalhistas e previdenciários de 5, 20 anos ou mais) e backup são de responsabilidade integral e exclusiva da empresa cliente.
                 </p>
               </div>
             </div>

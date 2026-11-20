@@ -777,7 +777,7 @@ async function downloadThemeAttendancePdf(meetingId: string) {
   });
 }
 
-type LiveSignature = { id: string; name: string; role: string; registration: string | null; createdAt: string; hasSelfie: boolean; quizScore: number | null };
+type LiveSignature = { id: string; name: string; role: string; registration: string | null; createdAt: string; hasSelfie: boolean; hasSignature?: boolean; quizScore: number | null };
 
 /** Lista de assinaturas do tema, atualizada a cada 10 s enquanto o tema aceita assinaturas. */
 function LiveSignatures({ themeId, topic, onError, onDownloadPdf, pdfBusy, onCountChange }: {
@@ -864,7 +864,7 @@ function LiveSignatures({ themeId, topic, onError, onDownloadPdf, pdfBusy, onCou
                   <td className="py-2 px-3 text-slate-600">{s.role}</td>
                   <td className="py-2 px-3 font-mono text-slate-600">{s.registration || '—'}</td>
                   <td className="py-2 px-3">{s.quizScore === null ? <span className="text-slate-400 text-xs">—</span> : <span className={`text-xs font-bold ${s.quizScore >= 70 ? 'text-emerald-700' : 'text-amber-700'}`}>{Math.round(s.quizScore)}%</span>}</td>
-                  <td className="py-2 px-3 text-right">{s.hasSelfie && <button type="button" onClick={() => togglePhoto(s.id)} className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-600">{openPhoto === s.id ? 'Ocultar' : 'Foto e assinatura'}</button>}</td>
+                  <td className="py-2 px-3 text-right">{(s.hasSelfie || s.hasSignature) && <button type="button" onClick={() => togglePhoto(s.id)} className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-600">{openPhoto === s.id ? 'Ocultar' : s.hasSelfie ? 'Foto e assinatura' : 'Assinatura'}</button>}</td>
                 </tr>
                 {openPhoto === s.id && <tr className="bg-slate-50 border-b border-slate-100"><td colSpan={7} className="px-3 py-3">
                   {photos[s.id] === 'loading' || !photos[s.id]

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { logSecurityEvent } from '@/lib/auth';
+import { companyRequiresSelfie } from '@/lib/selfiePolicy';
 import { POST as handleSaida } from '@/app/api/saida/route';
 
 export const dynamic = 'force-dynamic';
@@ -89,8 +90,10 @@ export async function POST(req: Request) {
     }
 
     // 6. Sanitização de mídias
+    // Selfie desligada para a empresa no DDS Master: não grava a foto do rosto.
+    const selfieEnabled = await companyRequiresSelfie(meeting.companyId || meeting.organizer?.companyId);
     let sanitizedSelfie = '';
-    if (typeof savedSelfie === 'string' && savedSelfie.length > 50) {
+    if (selfieEnabled && typeof savedSelfie === 'string' && savedSelfie.length > 50) {
       if (savedSelfie.startsWith('data:image/') || savedSelfie.startsWith('http')) {
         sanitizedSelfie = savedSelfie.slice(0, 850000);
       }
