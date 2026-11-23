@@ -12,7 +12,9 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { name, cpf, registration, savedSelfie, savedSignature, meetingId } = body;
+    const { name, cpf, registration, savedSelfie, savedSignature, meetingId, visitor } = body;
+    // Visitante / terceiro sem matrícula (liberado quando a empresa aceita não cadastrados).
+    const isVisitor = visitor === true && (typeof registration !== 'string' || registration.trim() === '');
 
     // 1. Validação estrita de tipos e presença dos campos
     if (!name || typeof name !== 'string' || name.trim().length < 2) {
@@ -23,7 +25,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'A função/cargo é obrigatória.' }, { status: 400 });
     }
 
-    if (typeof registration !== 'string' || !/^\d{4}$/.test(registration.trim())) {
+    if (!isVisitor && (typeof registration !== 'string' || !/^\d{4}$/.test(registration.trim()))) {
       return NextResponse.json({ success: false, error: 'Informe sua matrícula com 4 dígitos.' }, { status: 400 });
     }
 
@@ -33,7 +35,8 @@ export async function POST(req: Request) {
 
     let trimmedName = name.trim().slice(0, 100);
     let trimmedCpf = cpf.trim().slice(0, 80);
-    const trimmedRegistration = registration.trim();
+    const trimmedRegistration = isVisitor ? '' : String(registration).trim();
+    const storedRegistration = trimmedRegistration || null;
 
     // 2. Busca a reunião específica para vincular com precisão
     const meeting = await prisma.meeting.findUnique({
@@ -108,8 +111,9 @@ export async function POST(req: Request) {
         where: {
           meetingId: meeting.id,
           OR: [
-            { registration: trimmedRegistration },
-            { name: { equals: trimmedName, mode: 'insensitive' }, cpf: { equals: trimmedCpf, mode: 'insensitive' } }
+            // Visitante não tem matrícula: identifica só por nome + função.
+            ...(storedRegistration ? [{ registration: storedRegistration }] : []),
+            { name: { equals: trimmedName, mode: 'insensitive' as const }, cpf: { equals: trimmedCpf, mode: 'insensitive' as const } }
           ]
         }
       });
@@ -120,7 +124,7 @@ export async function POST(req: Request) {
         const updated = await tx.attendance.update({
           where: { id: existing.id },
           data: {
-            name: trimmedName, cpf: trimmedCpf, registration: trimmedRegistration,
+            name: trimmedName, cpf: trimmedCpf, registration: storedRegistration,
             selfie: sanitizedSelfie || existing.selfie,
             signature: sanitizedSignature || existing.signature
           }
@@ -131,7 +135,7 @@ export async function POST(req: Request) {
       const quizProof = randomBytes(32).toString('hex');
       const attendance = await tx.attendance.create({
         data: {
-          name: trimmedName, cpf: trimmedCpf, registration: trimmedRegistration,
+          name: trimmedName, cpf: trimmedCpf, registration: storedRegistration,
           selfie: sanitizedSelfie, signature: sanitizedSignature,
           quizProofHash: createHash('sha256').update(quizProof).digest('hex'),
           meetingId: meeting.id

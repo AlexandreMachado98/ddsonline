@@ -200,14 +200,14 @@ export default function CollaboratorManager() {
           )}
 
         <div className="p-4 sm:p-5 border-t border-slate-100 flex items-start gap-3">
-          <button type="button" role="switch" aria-checked={allowUnregistered} aria-label="Aceitar matrícula não cadastrada" disabled={busy} onClick={toggleAllow}
+          <button type="button" role="switch" aria-checked={allowUnregistered} aria-label="Aceitar não cadastrados e visitantes sem matrícula" disabled={busy} onClick={toggleAllow}
             className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors ${allowUnregistered ? 'bg-emerald-600' : 'bg-slate-300'}`}>
             <span className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${allowUnregistered ? 'translate-x-5' : 'translate-x-0.5'}`}/>
           </button>
-          <p className="text-sm text-slate-600"><b className="text-slate-800">Aceitar matrícula não cadastrada</b><br/>
+          <p className="text-sm text-slate-600"><b className="text-slate-800">Aceitar não cadastrados e visitantes sem matrícula</b><br/>
             {allowUnregistered
-              ? 'Ligado: quem não está no cadastro pode assinar digitando nome e função. Bom enquanto você monta o cadastro.'
-              : 'Desligado: só assina quem está no cadastro. Os demais recebem a orientação de procurar o organizador.'}
+              ? 'Ligado: quem não está no cadastro, e visitantes ou terceiros sem matrícula (botão "Não tenho matrícula"), podem assinar digitando nome e função.'
+              : 'Desligado: só assina quem está no cadastro. Visitantes sem matrícula e matrículas não cadastradas recebem a orientação de procurar o organizador.'}
           </p>
         </div>
       </section>

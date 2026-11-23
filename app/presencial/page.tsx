@@ -218,7 +218,7 @@ function PresencialContent() {
       return;
     }
 
-    if (!/^\d{4}$/.test(registration)) {
+    if (identityStatus !== 'visitor' && !/^\d{4}$/.test(registration)) {
       toast.warning('Matrícula obrigatória', 'Informe os 4 números da matrícula do colaborador.');
       return;
     }
@@ -242,6 +242,7 @@ function PresencialContent() {
           name: name.trim(),
           cpf: funcao.trim(),
           registration,
+          visitor: identityStatus === 'visitor',
           savedSelfie: requireSelfie ? savedSelfie || '' : '',
           savedSignature,
           meetingId: meetingId || 'presencial'
@@ -267,6 +268,7 @@ function PresencialContent() {
           name: name.trim(),
           cpf: funcao.trim(),
           registration,
+          visitor: identityStatus === 'visitor',
           savedSelfie: requireSelfie ? savedSelfie || '' : '',
           savedSignature,
           meetingId: meetingId || 'presencial'
@@ -300,6 +302,7 @@ function PresencialContent() {
           name: name.trim(),
           cpf: funcao.trim(),
           registration,
+          visitor: identityStatus === 'visitor',
           savedSelfie: requireSelfie ? savedSelfie || '' : '',
           savedSignature,
           meetingId: meetingId || 'presencial'

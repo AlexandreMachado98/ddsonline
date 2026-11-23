@@ -4,12 +4,13 @@
 // aceitando assinaturas (ou de um questionário publicado) e tem limite por aparelho.
 //
 // GET ?registration=1234&meetingId=<id>   ou   ?registration=1234&quizToken=<token>
+// GET ?policy=1&meetingId=<id> (ou quizToken)  → só diz se a empresa aceita não cadastrados/visitantes
 
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getClientIp } from '@/lib/auth';
 import { REGISTRATION_PATTERN } from '@/lib/collaboratorRules';
-import { allowLookup, companyIdForMeeting, companyIdForQuiz, lookupCollaborator } from '@/lib/collaborators';
+import { allowLookup, allowsUnregistered, companyIdForMeeting, companyIdForQuiz, lookupCollaborator } from '@/lib/collaborators';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,10 +22,11 @@ export async function GET(req: Request) {
   const registration = (params.get('registration') || '').trim();
   const meetingId = (params.get('meetingId') || '').trim();
   const quizToken = (params.get('quizToken') || '').trim();
-  if (!REGISTRATION_PATTERN.test(registration)) return reply({ success: false, error: 'Informe os 4 números da matrícula.' }, 400);
+  const policyOnly = params.get('policy') === '1';
+  if (!policyOnly && !REGISTRATION_PATTERN.test(registration)) return reply({ success: false, error: 'Informe os 4 números da matrícula.' }, 400);
   if (!meetingId && !quizToken) return reply({ success: false, error: 'Consulta inválida.' }, 400);
 
-  if (!allowLookup(getClientIp(req))) {
+  if (!policyOnly && !allowLookup(getClientIp(req))) {
     return reply({ success: false, error: 'Muitas consultas seguidas. Aguarde alguns minutos ou preencha seus dados.' }, 429);
   }
 
@@ -48,6 +50,8 @@ export async function GET(req: Request) {
       if (!quiz || quiz.status !== 'PUBLISHED') return reply({ success: false, error: 'Questionário indisponível.' }, 403);
       companyId = await companyIdForQuiz(quiz);
     }
+
+    if (policyOnly) return reply({ success: true, allowUnregistered: await allowsUnregistered(companyId) });
 
     // Empresa sem cadastro configurado: o colaborador preenche normalmente.
     if (!companyId) return reply({ success: true, found: false, allowUnregistered: true });
