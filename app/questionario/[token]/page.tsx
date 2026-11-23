@@ -188,7 +188,7 @@ function QuestionarioPublicoContent() {
       setError('Informe sua função.');
       return;
     }
-    if (!/^\d{4}$/.test(collaboratorRegistration)) {
+    if (identityStatus !== 'visitor' && !/^\d{4}$/.test(collaboratorRegistration)) {
       setError('A matrícula deve conter exatamente 4 números, incluindo zeros à esquerda.');
       return;
     }
@@ -230,7 +230,7 @@ function QuestionarioPublicoContent() {
       return;
     }
 
-    if (!/^\d{4}$/.test(collaboratorRegistration)) {
+    if (identityStatus !== 'visitor' && !/^\d{4}$/.test(collaboratorRegistration)) {
       setError('A matrícula deve conter exatamente 4 números (incluindo zeros à esquerda).');
       return;
     }
@@ -254,6 +254,7 @@ function QuestionarioPublicoContent() {
       participantName: collaboratorName.trim(),
       participantDoc: collaboratorRole.trim(),
       participantRegistration: collaboratorRegistration,
+      participantVisitor: identityStatus === 'visitor',
       timeSpentSeconds,
       answers: quiz.questions.map(q => ({
         questionId: q.id,

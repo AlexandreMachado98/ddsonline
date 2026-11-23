@@ -6,9 +6,10 @@
 // campos ficam livres; o servidor confere de novo ao gravar.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, BadgeCheck, Loader2, UserX } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, Contact, Loader2, UserRound, UserX } from 'lucide-react';
 
-export type IdentityStatus = 'idle' | 'loading' | 'found' | 'manual' | 'blocked';
+// 'visitor': visitante / terceiro sem matrícula (envia sem matrícula; o servidor confere a regra da empresa).
+export type IdentityStatus = 'idle' | 'loading' | 'found' | 'manual' | 'blocked' | 'visitor';
 
 interface Props {
   registration: string;
@@ -35,11 +36,43 @@ export default function CollaboratorIdentityFields({
   const [note, setNote] = useState('');
   const filledFromRegistry = useRef(false);
   const lastLookup = useRef('');
+  const [visitorMode, setVisitorMode] = useState(false);
+  // A empresa aceita quem não está no cadastro? (null = ainda não sabemos; na dúvida mostra a opção e o servidor confere)
+  const [visitorAllowed, setVisitorAllowed] = useState<boolean | null>(null);
 
   const update = (next: IdentityStatus) => { setStatus(next); onStatusChange?.(next); };
 
   const scopeKey = scope.meetingId || scope.quizToken || '';
+
   useEffect(() => {
+    if (!scopeKey) { setVisitorAllowed(true); return; }
+    const query = new URLSearchParams({ policy: '1' });
+    if (scope.meetingId) query.set('meetingId', scope.meetingId);
+    else if (scope.quizToken) query.set('quizToken', scope.quizToken);
+    let cancelled = false;
+    fetch(`/api/colaboradores/consulta?${query}`, { cache: 'no-store' })
+      .then(res => res.json())
+      .then(data => { if (!cancelled) setVisitorAllowed(data?.success ? data.allowUnregistered !== false : true); })
+      .catch(() => { if (!cancelled) setVisitorAllowed(true); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeKey]);
+
+  const enterVisitorMode = () => {
+    onRegistrationChange('');
+    if (filledFromRegistry.current) { onNameChange(''); onRoleChange(''); filledFromRegistry.current = false; }
+    setNote('');
+    setVisitorMode(true);
+    update('visitor');
+  };
+  const leaveVisitorMode = () => {
+    onNameChange(''); onRoleChange('');
+    setVisitorMode(false);
+    update('idle');
+  };
+
+  useEffect(() => {
+    if (visitorMode) return;
     if (!/^\d{4}$/.test(registration)) {
       lastLookup.current = '';
       if (filledFromRegistry.current) { onNameChange(''); onRoleChange(''); filledFromRegistry.current = false; }
@@ -86,7 +119,31 @@ export default function CollaboratorIdentityFields({
     }, 250);
     return () => { cancelled = true; clearTimeout(timer); lastLookup.current = ''; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registration, scopeKey]);
+  }, [registration, scopeKey, visitorMode]);
+
+  if (visitorMode) {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 p-3 flex gap-2.5 text-xs text-sky-100" aria-live="polite">
+          <UserRound size={16} className="shrink-0 mt-0.5 text-sky-300" />
+          <p><b>Visitante ou terceiro sem matrícula.</b> Preencha seu nome completo e sua função (ex.: &quot;Eletricista – Empresa X&quot;). A assinatura entra na lista de presença sem matrícula.</p>
+        </div>
+        <div>
+          <label htmlFor="identity-name" className={labelClassName}>Nome Completo</label>
+          <input id="identity-name" type="text" value={name} onChange={e => onNameChange(e.target.value)} placeholder="Ex: João da Silva"
+            autoComplete="name" autoCapitalize="words" spellCheck={false} enterKeyHint="next" className={inputClassName} />
+        </div>
+        <div>
+          <label htmlFor="identity-role" className={labelClassName}>Função / Empresa</label>
+          <input id="identity-role" type="text" value={role} onChange={e => onRoleChange(e.target.value)} placeholder="Ex: Eletricista – Empresa X"
+            autoComplete="organization-title" autoCapitalize="sentences" enterKeyHint="done" className={inputClassName} />
+        </div>
+        <button type="button" onClick={leaveVisitorMode} className="text-xs font-bold text-emerald-300 underline underline-offset-2 inline-flex items-center gap-1.5">
+          <Contact size={14} /> Tenho matrícula
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -113,6 +170,11 @@ export default function CollaboratorIdentityFields({
         <p id="identity-registration-help" className="mt-1 text-[10px] text-slate-500">
           Digite primeiro a matrícula, incluindo zeros à esquerda. Seu nome e sua função aparecem automaticamente.
         </p>
+        {visitorAllowed !== false && status !== 'found' && status !== 'loading' && (
+          <button type="button" onClick={enterVisitorMode} className="mt-2 text-xs font-bold text-sky-300 underline underline-offset-2 inline-flex items-center gap-1.5">
+            <UserRound size={14} /> Não tenho matrícula (visitante ou terceiro)
+          </button>
+        )}
       </div>
 
       {status === 'found' && (
@@ -164,6 +226,6 @@ export default function CollaboratorIdentityFields({
 export function identityBlockMessage(status: IdentityStatus): string | null {
   if (status === 'loading') return 'Aguarde: estamos consultando sua matrícula.';
   if (status === 'blocked') return 'Matrícula não cadastrada. Procure o organizador do DDS para fazer seu cadastro.';
-  if (status === 'idle') return 'Digite os 4 números da sua matrícula.';
+  if (status === 'idle') return 'Digite os 4 números da sua matrícula ou toque em "Não tenho matrícula".';
   return null;
 }

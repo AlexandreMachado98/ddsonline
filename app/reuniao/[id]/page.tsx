@@ -210,7 +210,7 @@ export default function MeetingRoom() {
       return;
     }
 
-    if (!/^\d{4}$/.test(registration)) {
+    if (identityStatus !== 'visitor' && !/^\d{4}$/.test(registration)) {
       toast.warning('Matrícula obrigatória', 'Informe sua matrícula com 4 dígitos.');
       return;
     }
@@ -234,6 +234,7 @@ export default function MeetingRoom() {
           name: name.trim(),
           cpf: funcao.trim(),
           registration,
+          visitor: identityStatus === 'visitor',
           savedSelfie: requireSelfie ? savedSelfie || '' : '',
           savedSignature,
           meetingId: roomId
@@ -258,6 +259,7 @@ export default function MeetingRoom() {
           name: name.trim(),
           cpf: funcao.trim(),
           registration,
+          visitor: identityStatus === 'visitor',
           savedSelfie: requireSelfie ? savedSelfie || '' : '',
           savedSignature,
           meetingId: roomId
@@ -291,6 +293,7 @@ export default function MeetingRoom() {
           name: name.trim(),
           cpf: funcao.trim(),
           registration,
+          visitor: identityStatus === 'visitor',
           savedSelfie: requireSelfie ? savedSelfie || '' : '',
           savedSignature,
           meetingId: roomId

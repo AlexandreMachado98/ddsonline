@@ -12,7 +12,9 @@ function equals(a: string, b: string) { return timingSafeEqual(fingerprint(a), f
 export async function POST(req: Request) {
   let body: any;
   try { body = await req.json(); } catch { return failure('JSON inválido.', 400); }
-  const { token, attendanceId, answers, attendanceProof, participantName, participantDoc, participantRegistration, timeSpentSeconds: incomingTimeSpent } = body || {};
+  const { token, attendanceId, answers, attendanceProof, participantName, participantDoc, participantRegistration, participantVisitor, timeSpentSeconds: incomingTimeSpent } = body || {};
+  // Visitante / terceiro sem matrícula (liberado quando a empresa aceita não cadastrados).
+  const isVisitor = participantVisitor === true && (typeof participantRegistration !== 'string' || participantRegistration.trim() === '');
   const parsedTimeSpent = Number(incomingTimeSpent);
   const timeSpentSeconds = Number.isInteger(parsedTimeSpent) && parsedTimeSpent > 0 && parsedTimeSpent <= 14400 ? parsedTimeSpent : null;
 
@@ -77,12 +79,13 @@ export async function POST(req: Request) {
     if (typeof participantDoc !== 'string' || !participantDoc.trim()) {
       return failure('Informe sua função.', 400);
     }
-    if (typeof participantRegistration !== 'string' || !/^\d{4}$/.test(participantRegistration)) {
+    if (!isVisitor && (typeof participantRegistration !== 'string' || !/^\d{4}$/.test(participantRegistration))) {
       return failure('A matrícula deve conter exatamente 4 números.', 400);
     }
+    const finalRegistration = isVisitor ? '' : String(participantRegistration);
 
     // Cadastro de colaboradores: matrícula cadastrada usa o nome e a função do cadastro.
-    const identity = await resolveIdentity(await companyIdForQuiz(quiz), participantRegistration, { name: finalParticipantName.trim(), role: participantDoc.trim() });
+    const identity = await resolveIdentity(await companyIdForQuiz(quiz), finalRegistration, { name: finalParticipantName.trim(), role: participantDoc.trim() });
     if (!identity.ok) return failure(identity.error, 403);
     finalParticipantName = identity.name;
     const finalParticipantDoc = identity.role;
@@ -116,7 +119,7 @@ export async function POST(req: Request) {
           attendanceId: finalAttendanceId,
           participantName: finalParticipantName,
           participantDoc: finalParticipantDoc,
-          participantRegistration,
+          participantRegistration: finalRegistration || null,
           score: result.score,
           earnedPoints: result.earnedPoints,
           possiblePoints: result.possiblePoints,
